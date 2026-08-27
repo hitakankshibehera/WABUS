@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { Trip, Seat, BoardingPoint, DroppingPoint, PassengerDetails, FeatureFlags } from '../../types';
+import React, { useState, useEffect } from 'react';
+import { Trip, Seat, BoardingPoint, DroppingPoint, PassengerDetails, FeatureFlags, OfferCoupon } from '../../types';
+import { api } from '../../services/api';
 import { 
   MapPin, 
   User, 
@@ -14,7 +15,9 @@ import {
   CreditCard,
   Lock,
   ChevronRight,
-  Sparkles
+  Sparkles,
+  Loader2,
+  AlertCircle
 } from 'lucide-react';
 
 interface PassengerFormProps {
@@ -57,10 +60,53 @@ export const PassengerForm: React.FC<PassengerFormProps> = ({
     }))
   );
 
-  // Coupon state
+  // Offers & Coupon State
+  const [availableOffers, setAvailableOffers] = useState<OfferCoupon[]>([]);
   const [couponCode, setCouponCode] = useState('BHARAT100');
   const [appliedCoupon, setAppliedCoupon] = useState<string | null>('BHARAT100');
+  const [discountAmount, setDiscountAmount] = useState<number>(100);
   const [couponSuccess, setCouponSuccess] = useState<string | null>('₹100 discount applied!');
+  const [couponError, setCouponError] = useState<string | null>(null);
+  const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
+
+  const totalSeatsPrice = selectedSeats.reduce((acc, s) => acc + s.basePrice, 0);
+
+  // Load live published offers from backend
+  React.useEffect(() => {
+    api.getOffers()
+      .then(offers => {
+        setAvailableOffers(offers);
+        // Pre-validate default coupon
+        validateCode('BHARAT100', totalSeatsPrice);
+      })
+      .catch(() => {});
+  }, []);
+
+  const validateCode = async (code: string, price: number) => {
+    if (!code.trim()) return;
+    setIsValidatingCoupon(true);
+    setCouponError(null);
+    try {
+      const res = await api.validateCoupon(code, price);
+      if (res.valid) {
+        setAppliedCoupon(res.code || code.toUpperCase());
+        setDiscountAmount(res.discountAmount || 0);
+        setCouponSuccess(res.message || `Coupon ${code.toUpperCase()} applied!`);
+      } else {
+        setAppliedCoupon(null);
+        setDiscountAmount(0);
+        setCouponSuccess(null);
+        setCouponError(res.error || 'Invalid coupon code');
+      }
+    } catch (err: any) {
+      setAppliedCoupon(null);
+      setDiscountAmount(0);
+      setCouponSuccess(null);
+      setCouponError('Failed to validate coupon');
+    } finally {
+      setIsValidatingCoupon(false);
+    }
+  };
 
   const handlePassengerChange = (index: number, field: keyof PassengerDetails, value: any) => {
     setPassengers(prev => {
@@ -72,20 +118,12 @@ export const PassengerForm: React.FC<PassengerFormProps> = ({
 
   const handleApplyCoupon = (e: React.FormEvent) => {
     e.preventDefault();
-    if (couponCode.toUpperCase() === 'BHARAT100' || couponCode.toUpperCase() === 'REDBUS50' || couponCode.toUpperCase() === 'WABUS50') {
-      setAppliedCoupon(couponCode.toUpperCase());
-      setCouponSuccess(`Coupon ${couponCode.toUpperCase()} applied successfully!`);
-    } else {
-      setAppliedCoupon(null);
-      setCouponSuccess(null);
-    }
+    validateCode(couponCode, totalSeatsPrice);
   };
 
   const selectedBoarding = trip.boardingPoints.find(bp => bp.id === boardingPointId) || trip.boardingPoints[0];
   const selectedDropping = trip.droppingPoints.find(dp => dp.id === droppingPointId) || trip.droppingPoints[0];
 
-  const totalSeatsPrice = selectedSeats.reduce((acc, s) => acc + s.basePrice, 0);
-  const discountAmount = appliedCoupon === 'BHARAT100' ? 100 : (appliedCoupon === 'REDBUS50' || appliedCoupon === 'WABUS50') ? 50 : 0;
   const gst = Math.round(totalSeatsPrice * 0.05); // 5% GST
   const finalPayable = Math.max(0, totalSeatsPrice + gst - discountAmount);
 
@@ -369,29 +407,67 @@ export const PassengerForm: React.FC<PassengerFormProps> = ({
               </div>
             </div>
 
-            {/* Coupon Code Box */}
-            <div className="pt-2 border-t border-slate-100 space-y-2">
+            {/* Coupon Code Box & Available Offers */}
+            <div className="pt-3 border-t border-slate-100 space-y-2.5">
+              <span className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5">
+                <Tag className="w-3.5 h-3.5 text-[#D84E55]" />
+                <span>Apply Promo Code & Save</span>
+              </span>
+
+              {/* Available Offer Chips */}
+              {availableOffers.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {availableOffers.map(off => (
+                    <button
+                      key={off.id}
+                      type="button"
+                      onClick={() => {
+                        setCouponCode(off.code);
+                        validateCode(off.code, totalSeatsPrice);
+                      }}
+                      className={`text-[10px] font-mono font-bold px-2 py-1 rounded-lg border transition cursor-pointer flex items-center gap-1 ${
+                        appliedCoupon === off.code
+                          ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                          : 'bg-red-50 hover:bg-red-100 text-[#D84E55] border-red-200'
+                      }`}
+                    >
+                      <Sparkles className="w-2.5 h-2.5 text-[#D84E55]" />
+                      <span>{off.code} ({off.badgeTag || `${off.discountValue} OFF`})</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
               <div className="flex gap-2">
                 <input
                   type="text"
                   placeholder="Enter Coupon (e.g. BHARAT100)"
                   value={couponCode}
                   onChange={e => setCouponCode(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), validateCode(couponCode, totalSeatsPrice))}
                   className="flex-1 bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs font-mono font-bold text-slate-900 uppercase focus:border-[#D84E55] focus:outline-none"
                 />
                 <button
                   type="button"
                   onClick={handleApplyCoupon}
-                  className="px-3.5 py-2 rounded-lg bg-slate-900 text-white font-bold text-xs hover:bg-slate-800 transition cursor-pointer"
+                  disabled={isValidatingCoupon}
+                  className="px-3.5 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition cursor-pointer flex items-center gap-1"
                 >
-                  Apply
+                  {isValidatingCoupon ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Apply'}
                 </button>
               </div>
 
               {couponSuccess && (
-                <div className="text-[11px] text-emerald-700 font-semibold flex items-center gap-1">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                <div className="text-[11px] text-emerald-700 bg-emerald-50 p-2 rounded-lg border border-emerald-200 font-semibold flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                   <span>{couponSuccess}</span>
+                </div>
+              )}
+
+              {couponError && (
+                <div className="text-[11px] text-rose-700 bg-rose-50 p-2 rounded-lg border border-rose-200 font-semibold flex items-center gap-1.5">
+                  <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                  <span>{couponError}</span>
                 </div>
               )}
             </div>

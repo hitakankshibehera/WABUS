@@ -146,6 +146,9 @@ export interface Booking {
   verifiedByConductorId?: string;
   verifiedByConductorName?: string;
   verifiedVehicleNumber?: string;
+  refundAmount?: number;
+  refundStatus?: string;
+  refundedAt?: string;
 }
 
 export interface ConductorProfile {
@@ -241,4 +244,18 @@ export interface UserAccount {
   adminDepartment?: string;
   adminLevel?: 'SUPER_ADMIN' | 'OPS_MANAGER' | 'FLEET_MANAGER';
   twoFactorEnabled?: boolean;
+}
+
+export interface OfferCoupon {
+  id: string;
+  code: string;
+  title: string;
+  description: string;
+  discountType: 'FLAT' | 'PERCENTAGE';
+  discountValue: number;
+  minBookingAmount: number;
+  maxDiscountAmount?: number;
+  isLive: boolean;
+  validUntil: string;
+  badgeTag?: string;
 }

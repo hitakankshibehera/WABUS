@@ -1,4 +1,4 @@
-import { Trip, Booking, FeatureFlags, PayoutRecord, Route } from '../types';
+import { Trip, Booking, FeatureFlags, PayoutRecord, Route, ConductorProfile, OfferCoupon } from '../types';
 
 export const api = {
   async getFeatureFlags(): Promise<FeatureFlags> {
@@ -91,11 +91,11 @@ export const api = {
     return res.json();
   },
 
-  async cancelBooking(pnr: string, reason?: string): Promise<{ booking: Booking; refundPercentage: number; refundAmount: number }> {
-    const res = await fetch(`/api/bookings/${pnr}/cancel`, {
+  async cancelBooking(pnrOrId: string, flexiCover?: boolean, reason?: string): Promise<{ success: boolean; booking: Booking; refundPercentage?: number; refundAmount: number }> {
+    const res = await fetch(`/api/bookings/${pnrOrId}/cancel`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ reason })
+      body: JSON.stringify({ flexiCover, reason })
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Cancellation failed');
@@ -190,13 +190,126 @@ export const api = {
     return data;
   },
 
-  async generateRecurringSchedule(payload: any): Promise<{ success: boolean; trip: Trip }> {
+  async generateRecurringSchedule(payload: any): Promise<{ 
+    success: boolean; 
+    trip: Trip; 
+    conductorCredentials?: {
+      employeeId: string;
+      pin: string;
+      name: string;
+      phone: string;
+      busRegistrationNumber: string;
+    } | null 
+  }> {
     const res = await fetch('/api/admin/schedules/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
     const data = await res.json();
+    return data;
+  },
+
+  async getConductors(): Promise<ConductorProfile[]> {
+    const res = await fetch('/api/admin/conductors');
+    if (!res.ok) return [];
+    return res.json();
+  },
+
+  async addConductor(payload: Partial<ConductorProfile>): Promise<{ success: boolean; conductor: ConductorProfile }> {
+    const res = await fetch('/api/admin/conductors', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to add conductor');
+    return data;
+  },
+
+  async deleteConductor(id: string): Promise<{ success: boolean }> {
+    const res = await fetch(`/api/admin/conductors/${id}`, { method: 'DELETE' });
+    return res.json();
+  },
+
+  async loginConductor(employeeIdOrPhone: string, pin: string): Promise<{ success: boolean; conductor: ConductorProfile }> {
+    const res = await fetch('/api/conductor/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ employeeIdOrPhone, pin })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Conductor authentication failed');
+    return data;
+  },
+
+  async getOffers(): Promise<OfferCoupon[]> {
+    const res = await fetch('/api/offers');
+    if (!res.ok) return [];
+    return res.json();
+  },
+
+  async getAdminOffers(): Promise<OfferCoupon[]> {
+    const res = await fetch('/api/admin/offers');
+    if (!res.ok) return [];
+    return res.json();
+  },
+
+  async createOffer(payload: Partial<OfferCoupon>): Promise<{ success: boolean; offer: OfferCoupon }> {
+    const res = await fetch('/api/admin/offers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to create offer package');
+    return data;
+  },
+
+  async toggleOffer(id: string): Promise<{ success: boolean; offer: OfferCoupon }> {
+    const res = await fetch(`/api/admin/offers/${id}/toggle`, { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to toggle offer status');
+    return data;
+  },
+
+  async deleteOffer(id: string): Promise<{ success: boolean }> {
+    const res = await fetch(`/api/admin/offers/${id}`, { method: 'DELETE' });
+    return res.json();
+  },
+
+  async validateCoupon(code: string, bookingAmount?: number): Promise<{
+    valid: boolean;
+    code?: string;
+    discountAmount?: number;
+    offer?: OfferCoupon;
+    message?: string;
+    error?: string;
+  }> {
+    const res = await fetch('/api/coupons/validate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code, bookingAmount })
+    });
+    const data = await res.json();
+    if (!res.ok && !data.error) throw new Error('Failed to validate coupon code');
+    return data;
+  },
+
+  async deleteTrip(id: string): Promise<{ success: boolean; removedCount?: number }> {
+    const res = await fetch(`/api/admin/trips/${id}`, { method: 'DELETE' });
+    return res.json();
+  },
+
+  async deleteBus(registrationNumber: string): Promise<{ success: boolean; refundTripsCount?: number }> {
+    const res = await fetch(`/api/admin/buses/${encodeURIComponent(registrationNumber)}`, { method: 'DELETE' });
+    return res.json();
+  },
+
+  async deleteBooking(id: string): Promise<{ success: boolean }> {
+    const res = await fetch(`/api/bookings/${id}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to remove ticket');
     return data;
   },
 

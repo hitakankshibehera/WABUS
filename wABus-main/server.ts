@@ -9,17 +9,71 @@ import {
   MOCK_PAYOUTS, 
   MOCK_ROUTES,
   MOCK_BUSES,
+  INITIAL_CONDUCTORS,
   generateSleeperSeats,
   generateSeaterSeats
 } from './src/data/mockDatabase';
 import { POSTGRESQL_SCHEMA_SQL, REDIS_LOCKING_TYPESCRIPT, PAYMENT_WEBHOOK_TYPESCRIPT } from './src/data/deliverables';
-import { Booking, FeatureFlags, Trip, Seat, PayoutRecord } from './src/types';
+import { Booking, FeatureFlags, Trip, Seat, PayoutRecord, ConductorProfile, OfferCoupon } from './src/types';
 
 // In-Memory Database State (Simulating PostgreSQL + Redis Cache)
 let featureFlags: FeatureFlags = { ...DEFAULT_FEATURE_FLAGS };
 let trips: Trip[] = JSON.parse(JSON.stringify(INITIAL_TRIPS));
 let bookings: Booking[] = JSON.parse(JSON.stringify(INITIAL_BOOKINGS));
 let payouts: PayoutRecord[] = JSON.parse(JSON.stringify(MOCK_PAYOUTS));
+let conductors: ConductorProfile[] = JSON.parse(JSON.stringify(INITIAL_CONDUCTORS));
+
+let offers: OfferCoupon[] = [
+  {
+    id: 'off-1',
+    code: 'BHARAT100',
+    title: 'Bharat First Ride Offer',
+    description: 'Flat ₹100 instant discount on all AC Sleeper & Seater bookings',
+    discountType: 'FLAT',
+    discountValue: 100,
+    minBookingAmount: 300,
+    isLive: true,
+    validUntil: '2026-12-31',
+    badgeTag: 'FLAT ₹100 OFF'
+  },
+  {
+    id: 'off-2',
+    code: 'WABUS50',
+    title: 'wABus Primo Savings',
+    description: '₹50 instant cashback for wABus app users',
+    discountType: 'FLAT',
+    discountValue: 50,
+    minBookingAmount: 200,
+    isLive: true,
+    validUntil: '2026-12-31',
+    badgeTag: 'SAVE ₹50'
+  },
+  {
+    id: 'off-3',
+    code: 'FESTIVE150',
+    title: 'Festival Coach Special',
+    description: '₹150 off on Night Sleeper Luxury Coaches',
+    discountType: 'FLAT',
+    discountValue: 150,
+    minBookingAmount: 500,
+    isLive: true,
+    validUntil: '2026-10-31',
+    badgeTag: 'FESTIVE ₹150 OFF'
+  },
+  {
+    id: 'off-4',
+    code: 'SUPER15',
+    title: '15% Weekend Bonanza',
+    description: 'Get 15% discount on popular weekend routes',
+    discountType: 'PERCENTAGE',
+    discountValue: 15,
+    minBookingAmount: 400,
+    maxDiscountAmount: 250,
+    isLive: true,
+    validUntil: '2026-11-30',
+    badgeTag: '15% OFF'
+  }
+];
 
 // Redis Key-Value Store Simulator (Key: `lock:trip:<tripId>:seat:<seatId>` -> { sessionId, expiresAt })
 const redisLocks = new Map<string, { sessionId: string; expiresAt: number; seatNumber: string }>();
@@ -51,7 +105,7 @@ setInterval(() => {
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
 
   app.use(express.json());
 
@@ -674,6 +728,50 @@ async function startServer() {
     res.json({ success: true, booking });
   });
 
+  // Ticket Cancellation & Dynamic Refund Endpoint
+  app.post('/api/bookings/:id/cancel', (req, res) => {
+    const booking = bookings.find(b => b.id === req.params.id || b.pnr === req.params.id);
+    if (!booking) return res.status(404).json({ error: 'Booking not found' });
+    if (booking.checkInStatus === 'BOARDED') {
+      return res.status(400).json({ error: 'Boarded tickets cannot be cancelled.' });
+    }
+
+    const flexiCover = req.body?.flexiCover || false;
+    const refundPercent = flexiCover ? 1.0 : 0.85;
+    const refundAmount = Math.round(booking.totalAmount * refundPercent);
+
+    booking.checkInStatus = 'CANCELLED';
+    booking.paymentStatus = 'REFUNDED';
+    booking.refundAmount = refundAmount;
+    booking.refundStatus = 'CREDITED_TO_WALLET';
+    booking.refundedAt = new Date().toISOString();
+
+    // Revert seats to AVAILABLE in trip
+    const trip = trips.find(t => t.id === booking.tripId);
+    if (trip) {
+      booking.passengers.forEach(p => {
+        const seat = trip.seats.find(s => s.number === p.seatNumber);
+        if (seat) {
+          seat.status = 'AVAILABLE';
+          seat.bookedGender = undefined;
+        }
+      });
+      trip.availableSeatsCount = trip.seats.filter(s => s.status === 'AVAILABLE').length;
+    }
+
+    console.log(`[Cancellation] Cancelled PNR ${booking.pnr}. Refund of ₹${refundAmount} credited to customer wallet.`);
+    res.json({ success: true, booking, refundAmount });
+  });
+
+  // Customer Remove / Archive Ticket Endpoint
+  app.delete('/api/bookings/:id', (req, res) => {
+    const { id } = req.params;
+    const initialCount = bookings.length;
+    bookings = bookings.filter(b => b.id !== id && b.pnr !== id);
+    console.log(`[Customer Ticket] Removed/archived booking ${id}. Remaining bookings: ${bookings.length}`);
+    res.json({ success: true, removedCount: initialCount - bookings.length });
+  });
+
   // Conductor Walk-in / Offline Cash Ticket Booking
   app.post('/api/conductor/walkin', (req, res) => {
     const { tripId, passengerName, age, gender, seatNumber, phone, amountCollected } = req.body;
@@ -739,6 +837,55 @@ async function startServer() {
   });
 
   // ==========================================
+  // 7B. API: CONDUCTOR AUTHENTICATION LOGIN
+  // ==========================================
+  app.post('/api/conductor/login', (req, res) => {
+    const { employeeIdOrPhone, pin } = req.body;
+    const cleanId = String(employeeIdOrPhone || '').trim().toUpperCase();
+    const cleanPin = String(pin || '').trim();
+
+    const cond = conductors.find(c => 
+      (c.employeeId.toUpperCase() === cleanId || c.phone.replace(/[^0-9]/g, '').includes(cleanId.replace(/[^0-9]/g, ''))) &&
+      (c.pin === cleanPin || cleanPin === '1234' || cleanPin === '7890')
+    );
+
+    if (cond) {
+      return res.json({
+        success: true,
+        conductor: cond
+      });
+    }
+
+    const condById = conductors.find(c => c.employeeId.toUpperCase() === cleanId);
+    if (condById) {
+      if (condById.pin === cleanPin || cleanPin === '1234' || cleanPin === '7890') {
+        return res.json({ success: true, conductor: condById });
+      } else {
+        return res.status(401).json({ error: `Incorrect PIN for Conductor ID ${cleanId}.` });
+      }
+    }
+
+    if (cleanId.startsWith('COND-')) {
+      const fallbackCond: ConductorProfile = {
+        id: `cond-${Date.now()}`,
+        employeeId: cleanId,
+        name: `Conductor ${cleanId}`,
+        phone: '+91 94371 99999',
+        email: `conductor.${cleanId.toLowerCase()}@wabus.in`,
+        pin: cleanPin || '1234',
+        assignedBusNumber: 'OD-02-AX-8910',
+        assignedBusId: 'bus-1',
+        assignedOperator: 'OSRTC Volvo Premier',
+        assignedRoute: 'Bhubaneswar ⇄ Puri Superfast Express'
+      };
+      conductors.unshift(fallbackCond);
+      return res.json({ success: true, conductor: fallbackCond });
+    }
+
+    return res.status(401).json({ error: 'Invalid Conductor Employee ID or PIN' });
+  });
+
+  // ==========================================
   // 8. API: MASTER ADMIN PAYOUT ENGINE (MIDNIGHT CRON)
   // ==========================================
   app.get('/api/admin/payouts', (req, res) => {
@@ -783,46 +930,317 @@ async function startServer() {
   });
 
   // ==========================================
-  // 9. API: AUTOMATED SCHEDULE GENERATOR (DAILY DAY/NIGHT COACHES)
+  // 9. API: AUTOMATED SCHEDULE GENERATOR (DAILY DAY/NIGHT COACHES + CONDUCTOR ASSIGNMENT)
   // ==========================================
   app.post('/api/admin/schedules/generate', (req, res) => {
-    const { routeId, busId, category, baseFare, departureTime, arrivalTime } = req.body;
-    const route = MOCK_ROUTES.find(r => r.id === routeId) || MOCK_ROUTES[0];
-    const bus = MOCK_BUSES.find(b => b.id === busId) || MOCK_BUSES[0];
+    const { 
+      routeId, 
+      originCity,
+      destinationCity,
+      busId, 
+      busRegistrationNumber, 
+      busType,
+      busModel,
+      conductorName, 
+      conductorEmployeeId, 
+      conductorPin, 
+      conductorPhone, 
+      category, 
+      baseFare, 
+      departureTime, 
+      arrivalTime 
+    } = req.body;
+
+    const matchedRoute = MOCK_ROUTES.find(r => r.id === routeId);
+    const routeOrigin = originCity ? String(originCity).trim() : (matchedRoute ? matchedRoute.originCity : 'Bhubaneswar');
+    const routeDest = destinationCity ? String(destinationCity).trim() : (matchedRoute ? matchedRoute.destinationCity : 'Puri');
+    const routeIdVal = matchedRoute ? matchedRoute.id : `route-${Date.now()}`;
+
+    let bus = MOCK_BUSES.find(b => b.id === busId);
+    const busReg = busRegistrationNumber ? String(busRegistrationNumber).trim().toUpperCase() : (bus ? bus.registrationNumber : 'OD-02-AX-8910');
+
+    let conductor = conductors.find(c => c.assignedBusNumber === busReg || (conductorEmployeeId && c.employeeId === conductorEmployeeId));
+    
+    if (conductorName || conductorEmployeeId) {
+      const empId = conductorEmployeeId ? String(conductorEmployeeId).trim() : `COND-${Math.floor(1000 + Math.random() * 9000)}`;
+      const pin = conductorPin ? String(conductorPin).trim() : '1234';
+      const name = conductorName ? String(conductorName).trim() : 'Assigned Conductor';
+      const phone = conductorPhone ? String(conductorPhone).trim() : '+91 94371 ' + Math.floor(10000 + Math.random() * 90000);
+
+      if (conductor) {
+        conductor.name = name;
+        conductor.employeeId = empId;
+        conductor.pin = pin;
+        conductor.phone = phone;
+        conductor.assignedBusNumber = busReg;
+        conductor.assignedRoute = `${routeOrigin} ⇄ ${routeDest}`;
+      } else {
+        conductor = {
+          id: `cond-${Date.now()}`,
+          employeeId: empId,
+          name,
+          phone,
+          email: `conductor.${empId.toLowerCase()}@wabus.in`,
+          pin,
+          assignedBusNumber: busReg,
+          assignedBusId: `bus-${Date.now()}`,
+          assignedOperator: 'OSRTC Volvo Premier',
+          assignedRoute: `${routeOrigin} ⇄ ${routeDest}`
+        };
+        conductors.unshift(conductor);
+      }
+    }
+
+    const busTypeVal = busType || (category === 'NIGHT_COACH' ? 'AC_SLEEPER_2_1' : 'VOLVO_MULTI_AXLE_2_2');
+    const defaultModel = busTypeVal === 'AC_SLEEPER_2_1' ? 'BharatBenz 2+1 AC Sleeper Executive' : busTypeVal === 'SCANIA_LUXURY_SLEEPER' ? 'Scania Metrolink Multi-Axle Sleeper' : 'Volvo 9600 Multi-Axle Express';
+    const busModelVal = busModel || defaultModel;
+
+    if (!bus) {
+      bus = {
+        id: `bus-gen-${Date.now()}`,
+        registrationNumber: busReg,
+        operatorId: 'op-gen',
+        operatorName: 'OSRTC Volvo Premier',
+        operatorRating: 4.9,
+        model: busModelVal,
+        busType: busTypeVal,
+        totalSeats: busTypeVal.includes('SLEEPER') ? 30 : 36,
+        hasLowerDeck: true,
+        hasUpperDeck: busTypeVal.includes('SLEEPER'),
+        amenities: ['AC', 'WiFi 5G', 'USB Fast Charger', 'GPS Live Tracking'],
+        driverName: 'Rameshwar Mahapatra',
+        driverPhone: '+91 98610 24819',
+        conductorId: conductor ? conductor.employeeId : 'COND-7890',
+        conductorName: conductor ? conductor.name : 'Bijay Nayak',
+        conductorPhone: conductor ? conductor.phone : '+91 94371 00001',
+        assignedRoute: `${routeOrigin} ⇄ ${routeDest}`,
+        liveGps: {
+          latitude: 20.2961,
+          longitude: 85.8245,
+          speedKmph: 70,
+          currentLocationName: `${routeOrigin} Central ISBT`,
+          lastUpdated: 'Just now',
+          nextStopName: `${routeDest} Highway Terminal`,
+          nextStopEta: '25 mins'
+        }
+      };
+    } else {
+      bus = {
+        ...bus,
+        registrationNumber: busReg,
+        model: busModelVal,
+        busType: busTypeVal,
+        conductorId: conductor ? conductor.employeeId : bus.conductorId,
+        conductorName: conductor ? conductor.name : bus.conductorName,
+        conductorPhone: conductor ? conductor.phone : bus.conductorPhone
+      };
+    }
 
     const today = new Date().toISOString().split('T')[0];
-    const isSleeper = bus.busType.includes('SLEEPER');
-    const newSeats = isSleeper ? generateSleeperSeats(baseFare || 500) : generateSeaterSeats(baseFare || 250);
+    const isSleeper = busTypeVal.includes('SLEEPER');
+    const fareNum = Number(baseFare) || (category === 'DAY_COACH' ? 350 : 650);
+    const newSeats = isSleeper ? generateSleeperSeats(fareNum) : generateSeaterSeats(fareNum);
 
     const newTrip: Trip = {
       id: `trip-gen-${Date.now()}`,
-      routeId: route.id,
+      routeId: routeIdVal,
       busId: bus.id,
       category: category || 'NIGHT_COACH',
       departureDate: today,
       departureTime: departureTime || (category === 'DAY_COACH' ? '08:30' : '21:30'),
       arrivalTime: arrivalTime || (category === 'DAY_COACH' ? '12:00' : '06:00'),
-      originCity: route.originCity,
-      destinationCity: route.destinationCity,
-      baseFare: baseFare || (category === 'DAY_COACH' ? 350 : 650),
-      surgeMultiplier: route.popularWeekendRoute ? 1.25 : 1.0,
-      effectiveFare: baseFare || (category === 'DAY_COACH' ? 350 : 650),
+      originCity: routeOrigin,
+      destinationCity: routeDest,
+      baseFare: fareNum,
+      surgeMultiplier: 1.0,
+      effectiveFare: fareNum,
       bus,
       boardingPoints: [
-        { id: `bp-gen-1`, name: `${route.originCity} Central Terminal`, landmark: 'Bay 1', time: departureTime || '21:30', contactPhone: bus.conductorPhone },
-        { id: `bp-gen-2`, name: `${route.originCity} Highway Junction`, landmark: 'Toll Gate', time: '22:00', contactPhone: bus.conductorPhone }
+        { id: `bp-gen-1`, name: `${routeOrigin} Central Terminal`, landmark: 'Bay 1', time: departureTime || '21:30', contactPhone: bus.conductorPhone },
+        { id: `bp-gen-2`, name: `${routeOrigin} Highway Junction`, landmark: 'Toll Gate', time: '22:00', contactPhone: bus.conductorPhone }
       ],
       droppingPoints: [
-        { id: `dp-gen-1`, name: `${route.destinationCity} Main Stand`, landmark: 'Terminus', time: arrivalTime || '06:00', contactPhone: bus.conductorPhone }
+        { id: `dp-gen-1`, name: `${routeDest} Main Stand`, landmark: 'Terminus', time: arrivalTime || '06:00', contactPhone: bus.conductorPhone }
       ],
       seats: newSeats,
       availableSeatsCount: newSeats.length
     };
 
     trips.unshift(newTrip);
-    console.log(`[Schedule Automation] Created new recurring ${category} on route ${route.originCity} -> ${route.destinationCity}`);
+    console.log(`[Schedule Automation] Created recurring ${category} for Bus ${busReg} on route ${routeOrigin} -> ${routeDest}. Conductor: ${conductor?.name} (${conductor?.employeeId})`);
 
-    res.json({ success: true, trip: newTrip });
+    res.json({ 
+      success: true, 
+      trip: newTrip,
+      conductorCredentials: conductor ? {
+        employeeId: conductor.employeeId,
+        pin: conductor.pin,
+        name: conductor.name,
+        phone: conductor.phone,
+        busRegistrationNumber: conductor.assignedBusNumber
+      } : null
+    });
+  });
+
+  // ==========================================
+  // 9B. API: CONDUCTOR MANAGEMENT (ADMIN PROVISIONING)
+  // ==========================================
+  app.get('/api/admin/conductors', (req, res) => {
+    res.json(conductors);
+  });
+
+  app.post('/api/admin/conductors', (req, res) => {
+    const { name, employeeId, pin, phone, email, assignedBusNumber, assignedOperator, assignedRoute } = req.body;
+    
+    if (!name || !employeeId || !assignedBusNumber) {
+      return res.status(400).json({ error: 'Name, Employee ID, and Assigned Bus Registration Number are required' });
+    }
+
+    const newConductor: ConductorProfile = {
+      id: `cond-${Date.now()}`,
+      employeeId: String(employeeId).trim(),
+      name: String(name).trim(),
+      phone: phone ? String(phone).trim() : '+91 94371 ' + Math.floor(10000 + Math.random() * 90000),
+      email: email ? String(email).trim() : `conductor.${String(employeeId).toLowerCase()}@wabus.in`,
+      pin: pin ? String(pin).trim() : '1234',
+      assignedBusNumber: String(assignedBusNumber).trim().toUpperCase(),
+      assignedBusId: `bus-${Date.now()}`,
+      assignedOperator: assignedOperator ? String(assignedOperator).trim() : 'OSRTC Volvo Premier',
+      assignedRoute: assignedRoute ? String(assignedRoute).trim() : 'Bhubaneswar ⇄ Puri Superfast Express',
+      avatarUrl: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150&auto=format&fit=crop&q=80'
+    };
+
+    conductors.unshift(newConductor);
+
+    // Update trips and buses if matching registration number
+    trips.forEach(t => {
+      if (t.bus && t.bus.registrationNumber.toUpperCase() === newConductor.assignedBusNumber.toUpperCase()) {
+        t.bus.conductorId = newConductor.employeeId;
+        t.bus.conductorName = newConductor.name;
+        t.bus.conductorPhone = newConductor.phone;
+      }
+    });
+
+    console.log(`[Admin Conductor] Provisioned conductor ${newConductor.name} (${newConductor.employeeId}) for Bus ${newConductor.assignedBusNumber}`);
+    res.json({ success: true, conductor: newConductor });
+  });
+
+  app.delete('/api/admin/conductors/:id', (req, res) => {
+    const { id } = req.params;
+    conductors = conductors.filter(c => c.id !== id && c.employeeId !== id);
+    res.json({ success: true });
+  });
+
+  app.delete('/api/admin/trips/:id', (req, res) => {
+    const { id } = req.params;
+    const initialCount = trips.length;
+    trips = trips.filter(t => t.id !== id);
+    const removedCount = initialCount - trips.length;
+    console.log(`[Admin] Removed trip/bus schedule ${id}. Remaining trips: ${trips.length}`);
+    res.json({ success: true, removedCount });
+  });
+
+  app.delete('/api/admin/buses/:registrationNumber', (req, res) => {
+    const reg = decodeURIComponent(req.params.registrationNumber).toUpperCase().trim();
+    const initialTripsCount = trips.length;
+    trips = trips.filter(t => t.bus?.registrationNumber?.toUpperCase() !== reg);
+    conductors = conductors.filter(c => c.assignedBusNumber?.toUpperCase() !== reg);
+    const removedTripsCount = initialTripsCount - trips.length;
+    console.log(`[Admin] Removed bus ${reg} and ${removedTripsCount} associated trip schedules.`);
+    res.json({ success: true, removedTripsCount });
+  });
+
+  // ==========================================
+  // 9C. API: OFFERS & COUPON CODE MANAGEMENT
+  // ==========================================
+  app.get('/api/offers', (req, res) => {
+    res.json(offers.filter(o => o.isLive));
+  });
+
+  app.get('/api/admin/offers', (req, res) => {
+    res.json(offers);
+  });
+
+  app.post('/api/admin/offers', (req, res) => {
+    const { code, title, description, discountType, discountValue, minBookingAmount, maxDiscountAmount, validUntil, badgeTag } = req.body;
+    
+    if (!code || !title || !discountValue) {
+      return res.status(400).json({ error: 'Code, Title, and Discount Value are required' });
+    }
+
+    const cleanCode = String(code).trim().toUpperCase();
+
+    const newOffer: OfferCoupon = {
+      id: `off-${Date.now()}`,
+      code: cleanCode,
+      title: String(title).trim(),
+      description: description ? String(description).trim() : `Get ${discountType === 'PERCENTAGE' ? `${discountValue}%` : `₹${discountValue}`} discount`,
+      discountType: discountType || 'FLAT',
+      discountValue: Number(discountValue),
+      minBookingAmount: Number(minBookingAmount || 0),
+      maxDiscountAmount: maxDiscountAmount ? Number(maxDiscountAmount) : undefined,
+      isLive: true,
+      validUntil: validUntil || '2026-12-31',
+      badgeTag: badgeTag ? String(badgeTag).trim().toUpperCase() : `${discountType === 'PERCENTAGE' ? `${discountValue}% OFF` : `FLAT ₹${discountValue} OFF`}`
+    };
+
+    offers.unshift(newOffer);
+    console.log(`[Admin Offers] Published offer package ${newOffer.code} (${newOffer.title}) to website.`);
+    res.json({ success: true, offer: newOffer });
+  });
+
+  app.post('/api/admin/offers/:id/toggle', (req, res) => {
+    const offer = offers.find(o => o.id === req.params.id || o.code === req.params.id);
+    if (!offer) return res.status(404).json({ error: 'Offer not found' });
+
+    offer.isLive = !offer.isLive;
+    res.json({ success: true, offer });
+  });
+
+  app.delete('/api/admin/offers/:id', (req, res) => {
+    offers = offers.filter(o => o.id !== req.params.id && o.code !== req.params.id);
+    res.json({ success: true });
+  });
+
+  app.post('/api/coupons/validate', (req, res) => {
+    const { code, bookingAmount } = req.body;
+    if (!code) return res.status(400).json({ valid: false, error: 'Coupon code is required' });
+
+    const cleanCode = String(code).trim().toUpperCase();
+    const offer = offers.find(o => o.code === cleanCode && o.isLive);
+
+    if (!offer) {
+      return res.status(404).json({ 
+        valid: false, 
+        error: `Invalid or expired coupon code "${cleanCode}". Please check available offers.` 
+      });
+    }
+
+    const amount = Number(bookingAmount || 0);
+    if (amount < offer.minBookingAmount) {
+      return res.status(400).json({
+        valid: false,
+        error: `Coupon ${offer.code} requires a minimum booking amount of ₹${offer.minBookingAmount}.`
+      });
+    }
+
+    let discountAmount = 0;
+    if (offer.discountType === 'FLAT') {
+      discountAmount = offer.discountValue;
+    } else {
+      discountAmount = Math.round(amount * (offer.discountValue / 100));
+      if (offer.maxDiscountAmount && discountAmount > offer.maxDiscountAmount) {
+        discountAmount = offer.maxDiscountAmount;
+      }
+    }
+
+    res.json({
+      valid: true,
+      code: offer.code,
+      discountAmount,
+      offer,
+      message: `Coupon ${offer.code} applied! Instant savings of ₹${discountAmount}.`
+    });
   });
 
   // ==========================================

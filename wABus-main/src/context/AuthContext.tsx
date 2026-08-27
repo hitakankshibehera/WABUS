@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { UserAccount, UserRole } from '../types';
+import { api } from '../services/api';
 import {
   auth,
   signInWithGoogle,
@@ -344,28 +345,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // 6. Conductor Login & Signup
   const loginConductor = async (employeeIdOrPhone: string, pin: string): Promise<UserAccount> => {
-    if (employeeIdOrPhone === 'COND-7890' || employeeIdOrPhone.includes('94371')) {
-      setCurrentUser(DEMO_USERS.CONDUCTOR);
+    try {
+      const res = await api.loginConductor(employeeIdOrPhone, pin);
+      const cond = res.conductor;
+      const user: UserAccount = {
+        id: cond.id || 'usr-cond-' + Date.now(),
+        name: cond.name,
+        email: cond.email,
+        phone: cond.phone,
+        role: 'CONDUCTOR',
+        employeeId: cond.employeeId,
+        badgeNumber: 'BDG-' + cond.employeeId,
+        assignedOperator: cond.assignedOperator,
+        assignedBusNumber: cond.assignedBusNumber,
+        assignedRoute: cond.assignedRoute,
+        authProvider: 'EMPLOYEE_CREDENTIALS',
+        createdAt: new Date().toISOString()
+      };
+      setCurrentUser(user);
       closeAuthModal();
-      return DEMO_USERS.CONDUCTOR;
+      return user;
+    } catch (err) {
+      if (employeeIdOrPhone === 'COND-7890' || employeeIdOrPhone.includes('94371')) {
+        setCurrentUser(DEMO_USERS.CONDUCTOR);
+        closeAuthModal();
+        return DEMO_USERS.CONDUCTOR;
+      }
+      throw err;
     }
-    const user: UserAccount = {
-      id: 'usr-cond-' + Math.random().toString(36).substring(2, 8),
-      name: 'Conductor ' + employeeIdOrPhone,
-      email: `conductor.${employeeIdOrPhone.toLowerCase()}@osrtc.gov.in`,
-      phone: employeeIdOrPhone.startsWith('+91') ? employeeIdOrPhone : '+91 94371 99999',
-      role: 'CONDUCTOR',
-      employeeId: employeeIdOrPhone,
-      badgeNumber: 'BDG-' + Math.floor(1000 + Math.random() * 9000),
-      assignedOperator: 'OSRTC Volvo Premier',
-      assignedBusNumber: 'OD-02-AX-8910',
-      assignedRoute: 'Bhubaneswar ⇄ Puri Superfast Express',
-      authProvider: 'EMPLOYEE_CREDENTIALS',
-      createdAt: new Date().toISOString()
-    };
-    setCurrentUser(user);
-    closeAuthModal();
-    return user;
   };
 
   const signupConductor = async (data: {

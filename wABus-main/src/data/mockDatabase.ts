@@ -12,6 +12,61 @@ export const DEFAULT_FEATURE_FLAGS: FeatureFlags = {
   platformCommissionRate: 0.08, // 8% platform fee
 };
 
+export const INITIAL_CONDUCTORS: ConductorProfile[] = [
+  {
+    id: 'cond-1',
+    employeeId: 'COND-7890',
+    name: 'Bijay Nayak',
+    phone: '+91 94371 00001',
+    email: 'conductor.bijay@osrtc.gov.in',
+    pin: '7890',
+    assignedBusNumber: 'OD-02-AX-8910',
+    assignedBusId: 'bus-1',
+    assignedOperator: 'OSRTC Volvo Premier',
+    assignedRoute: 'Bhubaneswar ⇄ Puri Superfast Express',
+    avatarUrl: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150&auto=format&fit=crop&q=80'
+  },
+  {
+    id: 'cond-2',
+    employeeId: 'COND-4421',
+    name: 'Pradeep Jena',
+    phone: '+91 93370 11984',
+    email: 'conductor.pradeep@dolphintransits.in',
+    pin: '4421',
+    assignedBusNumber: 'OD-33-K-1080',
+    assignedBusId: 'bus-2',
+    assignedOperator: 'Dolphin Transits & Travels',
+    assignedRoute: 'Bhubaneswar ⇄ Puri Day Coach',
+    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80'
+  },
+  {
+    id: 'cond-3',
+    employeeId: 'COND-5589',
+    name: 'Venkatesh Rao',
+    phone: '+91 98450 67890',
+    email: 'conductor.venkatesh@orangetravels.com',
+    pin: '5589',
+    assignedBusNumber: 'KA-01-MJ-4521',
+    assignedBusId: 'bus-3',
+    assignedOperator: 'Orange National Royal Express',
+    assignedRoute: 'Bangalore ⇄ Hyderabad Royal Sleeper',
+    avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80'
+  },
+  {
+    id: 'cond-4',
+    employeeId: 'COND-1024',
+    name: 'Ganesh Sawant',
+    phone: '+91 98202 33445',
+    email: 'conductor.ganesh@neetatravels.in',
+    pin: '1024',
+    assignedBusNumber: 'MH-04-ER-8877',
+    assignedBusId: 'bus-4',
+    assignedOperator: 'Neeta Intercity Luxury Wings',
+    assignedRoute: 'Mumbai ⇄ Pune Express',
+    avatarUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80'
+  }
+];
+
 export const MOCK_BUSES: Bus[] = [
   {
     id: 'bus-1',

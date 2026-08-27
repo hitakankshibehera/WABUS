@@ -785,15 +785,35 @@ export const TripSearch: React.FC<TripSearchProps> = ({
       </div>
 
       {/* Results Header Count */}
-      <div className="flex items-center justify-between px-1">
-        <div className="flex items-center gap-2">
-          <h2 className="text-sm sm:text-base font-extrabold text-slate-900">
-            {filteredTrips.length} Buses Available
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-1">
+        <div className="flex items-center gap-2 flex-wrap">
+          <h2 className="text-sm sm:text-base font-extrabold text-slate-900 flex items-center gap-2">
+            <span>{filteredTrips.length} Buses Available</span>
+            <span className="flex items-center gap-1 text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full border border-emerald-300">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
+              Real-Time Sync Active
+            </span>
           </h2>
           <span className="text-xs text-slate-500">
             from <strong className="text-slate-900">{origin}</strong> to <strong className="text-slate-900">{destination}</strong>
           </span>
         </div>
+
+        {filteredTrips.length < trips.length && (
+          <button
+            type="button"
+            onClick={() => {
+              setOrigin('');
+              setDestination('');
+              setCategoryFilter('ALL');
+              setBusTypeFilter('ALL');
+            }}
+            className="text-xs font-bold text-[#D84E55] hover:underline flex items-center gap-1 self-start sm:self-auto cursor-pointer"
+          >
+            <span>Show All Live Buses ({trips.length})</span>
+            <ChevronRight className="w-3.5 h-3.5" />
+          </button>
+        )}
       </div>
 
       {/* Realistic Bus Cards List */}
@@ -805,24 +825,38 @@ export const TripSearch: React.FC<TripSearchProps> = ({
             </div>
             <h3 className="text-base font-bold text-slate-900">No buses found for this combination</h3>
             <p className="text-xs text-slate-500 max-w-md mx-auto">
-              Try selecting popular corridors like <strong>Bhubaneswar ⇄ Puri</strong> or <strong>Bangalore ⇄ Hyderabad</strong>.
+              Showing <strong>{trips.length} total live buses</strong> in the network. Try viewing all buses or selecting popular corridors like <strong>Bhubaneswar ⇄ Puri</strong>.
             </p>
-            <button
-              onClick={() => {
-                setOrigin('Bhubaneswar');
-                setDestination('Puri');
-                setCategoryFilter('ALL');
-                setBusTypeFilter('ALL');
-              }}
-              className="mt-2 text-xs px-4 py-2 rounded-xl bg-[#D84E55] text-white font-bold hover:bg-[#C33E44] shadow-xs cursor-pointer"
-            >
-              Reset to Popular Route (Bhubaneswar ⇄ Puri)
-            </button>
+            <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+              <button
+                onClick={() => {
+                  setOrigin('');
+                  setDestination('');
+                  setCategoryFilter('ALL');
+                  setBusTypeFilter('ALL');
+                }}
+                className="text-xs px-4 py-2 rounded-xl bg-slate-900 text-white font-bold hover:bg-slate-800 shadow-xs cursor-pointer"
+              >
+                View All {trips.length} Network Buses
+              </button>
+              <button
+                onClick={() => {
+                  setOrigin('Bhubaneswar');
+                  setDestination('Puri');
+                  setCategoryFilter('ALL');
+                  setBusTypeFilter('ALL');
+                }}
+                className="text-xs px-4 py-2 rounded-xl bg-[#D84E55] text-white font-bold hover:bg-[#C33E44] shadow-xs cursor-pointer"
+              >
+                Reset to Popular Route (Bhubaneswar ⇄ Puri)
+              </button>
+            </div>
           </div>
         ) : (
           filteredTrips.map(trip => {
             const isSelected = selectedTripId === trip.id;
             const hasSurge = featureFlags.enableSurgePricing && trip.surgeMultiplier > 1;
+            const isNewlyAdded = trip.id.startsWith('trip-gen-');
 
             return (
               <div
@@ -833,6 +867,37 @@ export const TripSearch: React.FC<TripSearchProps> = ({
                     : 'border-slate-200 hover:border-slate-300'
                 }`}
               >
+                {/* Highlight Banner for Real-Time Admin Added Buses */}
+                <div className="flex flex-wrap items-center justify-between gap-2 pb-3 mb-3 border-b border-slate-100 text-xs">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {/* Bus Registration Number */}
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900 text-white font-mono font-bold text-xs tracking-wider shadow-xs">
+                      <BusIcon className="w-3.5 h-3.5 text-amber-400" />
+                      <span>{trip.bus.registrationNumber}</span>
+                    </span>
+
+                    {/* From -> To Corridor */}
+                    <span className="inline-flex items-center gap-1 font-bold text-slate-800 bg-slate-100 px-2.5 py-1 rounded-lg">
+                      <span>{trip.originCity}</span>
+                      <span className="text-[#D84E55]">➔</span>
+                      <span>{trip.destinationCity}</span>
+                    </span>
+
+                    {isNewlyAdded && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 text-[#D84E55] font-extrabold text-[10px] border border-red-200">
+                        <Sparkles className="w-3 h-3 text-[#D84E55]" /> NEWLY ADDED REAL-TIME
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Conductor Details Badge */}
+                  <div className="flex items-center gap-2 bg-purple-50 border border-purple-200 px-2.5 py-1 rounded-lg text-[11px] text-purple-900 font-medium">
+                    <span className="font-bold text-purple-950">👮 Conductor: {trip.bus.conductorName}</span>
+                    <span className="text-purple-700 font-mono font-bold">({trip.bus.conductorId || 'COND-7890'})</span>
+                    <span className="text-purple-600 hidden sm:inline">&bull; 📞 {trip.bus.conductorPhone}</span>
+                  </div>
+                </div>
+
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                   {/* Left & Middle Details */}
                   <div className="space-y-2.5 flex-1">
@@ -853,8 +918,9 @@ export const TripSearch: React.FC<TripSearchProps> = ({
                         <Award className="w-3 h-3 text-blue-600" /> Primo Certified
                       </span>
 
-                      <span className="text-[11px] px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-medium">
-                        {trip.bus.model}
+                      {/* Coach & Model */}
+                      <span className="text-[11px] px-2 py-0.5 rounded-md bg-amber-50 text-amber-900 border border-amber-200 font-bold">
+                        Coach: {trip.bus.model}
                       </span>
 
                       {trip.category === 'NIGHT_COACH' ? (
@@ -868,13 +934,14 @@ export const TripSearch: React.FC<TripSearchProps> = ({
                       )}
                     </div>
 
-                    {/* Schedule & Duration Timeline */}
+                    {/* Schedule Timings: Start Time & Reach Time */}
                     <div className="flex items-center gap-4 sm:gap-8 pt-1">
                       <div>
+                        <span className="text-[10px] font-bold text-slate-400 block uppercase tracking-wider">Start Time (Arrival at Origin)</span>
                         <div className="text-lg sm:text-xl font-extrabold text-slate-900">{trip.departureTime}</div>
                         <div className="text-xs text-slate-600 font-semibold">{trip.originCity}</div>
                         <div className="text-[11px] text-slate-400 truncate max-w-[130px]">
-                          {trip.boardingPoints[0]?.name || 'Main Stand'}
+                          {trip.boardingPoints[0]?.name || 'Central Terminal'}
                         </div>
                       </div>
 
@@ -886,15 +953,16 @@ export const TripSearch: React.FC<TripSearchProps> = ({
                           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-[#D84E55]"></div>
                         </div>
                         <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-50 px-1.5 py-0.2 rounded">
-                          Non-Stop
+                          Non-Stop Express
                         </span>
                       </div>
 
                       <div>
+                        <span className="text-[10px] font-bold text-slate-400 block uppercase tracking-wider">Reach Time (Arrival at Dest)</span>
                         <div className="text-lg sm:text-xl font-extrabold text-slate-900">{trip.arrivalTime}</div>
                         <div className="text-xs text-slate-600 font-semibold">{trip.destinationCity}</div>
                         <div className="text-[11px] text-slate-400 truncate max-w-[130px]">
-                          {trip.droppingPoints[0]?.name || 'City Terminal'}
+                          {trip.droppingPoints[0]?.name || 'Main Stand'}
                         </div>
                       </div>
                     </div>

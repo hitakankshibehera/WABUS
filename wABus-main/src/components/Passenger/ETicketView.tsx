@@ -99,16 +99,16 @@ export const ETicketView: React.FC<ETicketViewProps> = ({
         {/* Ticket Red Header Ribbon */}
         <div className="bg-gradient-to-r from-[#D84E55] to-[#C33E44] text-white p-4 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center">
-              <Bus className="w-5 h-5 text-white" />
+            <div className="w-10 h-10 rounded-xl bg-gray-900 overflow-hidden border border-white/40 shadow-sm shrink-0 flex items-center justify-center">
+              <img src="/logo.png" alt="Wonderlight Adventure Logo" className="w-full h-full object-cover" />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-extrabold text-xl tracking-tight text-white">
-                  red<span className="text-red-200">Bus</span>
+                  wA<span className="text-red-200">Bus</span>
                 </span>
                 <span className="text-[10px] px-2 py-0.5 rounded bg-white/20 uppercase font-bold tracking-wider">
-                  Verified E-Ticket
+                  Wonderlight Verified E-Ticket
                 </span>
               </div>
               <p className="text-xs text-red-100">

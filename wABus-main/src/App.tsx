@@ -10,6 +10,7 @@ import { AdminPortal } from './components/Admin/AdminPortal';
 import { DeliverablesViewer } from './components/Architecture/DeliverablesViewer';
 import { AuthModal } from './components/Auth/AuthModal';
 import { PassengerProfileModal } from './components/Auth/PassengerProfileModal';
+import { CustomerSupportModal } from './components/Support/CustomerSupportModal';
 import { api } from './services/api';
 import { Trip, Seat, FeatureFlags, Booking, PaymentMethod, BoardingPoint, DroppingPoint, PassengerDetails } from './types';
 import { DEFAULT_FEATURE_FLAGS } from './data/mockDatabase';
@@ -56,6 +57,7 @@ export default function App() {
   } | null>(null);
   const [confirmedBooking, setConfirmedBooking] = useState<Booking | null>(null);
   const [statusNotification, setStatusNotification] = useState<string | null>(null);
+  const [isSupportOpen, setIsSupportOpen] = useState(false);
 
   // Client Session ID for Redis Distributed Lock
   const [sessionId] = useState<string>(() => 'sess-' + Math.random().toString(36).substring(2, 11));
@@ -83,8 +85,8 @@ export default function App() {
 
   useEffect(() => {
     loadData();
-    // Poll feature flags & trips periodically (every 10s)
-    const interval = setInterval(loadData, 10000);
+    // Poll feature flags & trips periodically in real-time (every 3s)
+    const interval = setInterval(loadData, 3000);
     return () => clearInterval(interval);
   }, []);
 
@@ -227,7 +229,15 @@ export default function App() {
     if (!selectedSeats.length) return 0;
     const base = selectedSeats.reduce((sum, s) => sum + s.basePrice, 0);
     const gst = Math.round(base * 0.05);
-    const discount = checkoutPayload?.appliedCoupon === 'BHARAT100' ? 100 : (checkoutPayload?.appliedCoupon === 'REDBUS50' || checkoutPayload?.appliedCoupon === 'WABUS50') ? 50 : 0;
+    let discount = 0;
+    const code = checkoutPayload?.appliedCoupon;
+    if (code) {
+      if (code === 'BHARAT100') discount = 100;
+      else if (code === 'WABUS50' || code === 'REDBUS50') discount = 50;
+      else if (code === 'FESTIVE150') discount = 150;
+      else if (code === 'SUPER15') discount = Math.round(base * 0.15);
+      else discount = 100; // Fallback for custom admin coupons
+    }
     return Math.max(0, base + gst - discount);
   };
 
@@ -238,6 +248,8 @@ export default function App() {
         activeTab={activeTab}
         setActiveTab={handleTabSwitch}
         featureFlags={featureFlags}
+        bookings={bookings}
+        onOpenSupport={() => setIsSupportOpen(true)}
       />
 
       {/* Floating Status Notification */}
@@ -427,23 +439,29 @@ export default function App() {
       <AuthModal />
 
       {/* Passenger / User Account Profile Modal */}
-      <PassengerProfileModal />
+      <PassengerProfileModal bookings={bookings} onRefreshBookings={loadData} />
+
+      {/* 24x7 Customer Support & FAQs Modal */}
+      <CustomerSupportModal isOpen={isSupportOpen} onClose={() => setIsSupportOpen(false)} />
 
       {/* wABus Authentic Footer */}
       <footer className="border-t border-gray-200 bg-white py-8 text-xs text-gray-500 mt-auto">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
             <div>
-              <div className="flex items-center space-x-2 mb-2">
-                <span className="font-black text-lg text-[#D84E55]">
-                  wA<span className="text-gray-900">Bus</span>
-                </span>
-                <span className="text-[9px] uppercase font-extrabold px-1.5 py-0.5 rounded bg-red-50 text-[#D84E55] border border-red-200">
-                  India
-                </span>
+              <div className="flex items-center space-x-2.5 mb-2">
+                <div className="w-8 h-8 rounded-xl bg-gray-900 overflow-hidden shadow-xs border border-gray-200 shrink-0">
+                  <img src="/logo.png" alt="Wonderlight Adventure Co." className="w-full h-full object-cover" />
+                </div>
+                <div>
+                  <span className="font-black text-lg text-[#D84E55] block leading-none">
+                    wA<span className="text-gray-900">Bus</span>
+                  </span>
+                  <span className="text-[9px] uppercase font-bold text-gray-500">Wonderlight Adventure Co.</span>
+                </div>
               </div>
               <p className="text-[11px] text-gray-500 leading-relaxed">
-                wABus is India&apos;s largest online bus ticketing platform trusted by over 25+ million satisfied customers.
+                wABus is Wonderlight Adventure Company&apos;s automated bus ticketing ecosystem trusted by over 25+ million satisfied passengers.
               </p>
             </div>
 

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Bus, Smartphone, ShieldCheck, Database, Zap, Sparkles, HelpCircle, PhoneCall, Radio, User, LogIn, UserPlus, LogOut, ChevronDown, BadgeCheck, Search, ArrowRight, X } from 'lucide-react';
-import { FeatureFlags } from '../types';
+import { Bus, Smartphone, ShieldCheck, Database, Zap, Sparkles, HelpCircle, PhoneCall, Radio, User, LogIn, UserPlus, LogOut, ChevronDown, BadgeCheck, Search, ArrowRight, X, Ticket } from 'lucide-react';
+import { FeatureFlags, Booking } from '../types';
 import { useAuth } from '../context/AuthContext';
 
 export type ActiveTab = 'PASSENGER' | 'CONDUCTOR' | 'ADMIN' | 'ARCHITECTURE';
@@ -9,13 +9,17 @@ interface HeaderProps {
   activeTab: ActiveTab;
   setActiveTab: (tab: ActiveTab) => void;
   featureFlags: FeatureFlags;
+  bookings?: Booking[];
   onOpenQuickTicket?: () => void;
+  onOpenSupport?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   activeTab,
   setActiveTab,
   featureFlags,
+  bookings = [],
+  onOpenSupport,
 }) => {
   const { currentUser, openAuthModal, openProfileModal, logout } = useAuth();
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
@@ -23,6 +27,8 @@ export const Header: React.FC<HeaderProps> = ({
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const accountMenuRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  const totalTicketsCount = bookings.reduce((sum, b) => sum + b.passengers.length, 0);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -89,8 +95,8 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="flex items-center justify-between h-18">
           {/* wABus Iconic Logo & Name */}
           <div className="flex items-center space-x-3 cursor-pointer select-none" onClick={() => setActiveTab('PASSENGER')}>
-            <div className="w-11 h-11 rounded-2xl bg-[#D84E55] flex items-center justify-center shadow-md shadow-red-500/20 transition-transform hover:scale-105">
-              <Bus className="w-6 h-6 text-white" />
+            <div className="w-11 h-11 rounded-2xl bg-gray-900 overflow-hidden shadow-md border border-gray-200 transition-transform hover:scale-105 shrink-0 flex items-center justify-center">
+              <img src="/logo.png" alt="Wonderlight Adventure WA Logo" className="w-full h-full object-cover" />
             </div>
             <div>
               <div className="flex items-center gap-1.5">
@@ -101,7 +107,7 @@ export const Header: React.FC<HeaderProps> = ({
                   India
                 </span>
               </div>
-              <p className="text-[11px] text-gray-500 font-medium -mt-1 hidden sm:block">Automated Day & Night Bus Booking Ecosystem</p>
+              <p className="text-[11px] text-gray-500 font-medium -mt-1 hidden sm:block">Wonderlight Adventure Co. Ecosystem</p>
             </div>
           </div>
 
@@ -207,6 +213,17 @@ export const Header: React.FC<HeaderProps> = ({
               <span className="font-bold text-[11px]">Redis TTL Active</span>
             </div>
 
+            {/* 24x7 Help & Support Button */}
+            {onOpenSupport && (
+              <button
+                onClick={onOpenSupport}
+                className="hidden sm:flex items-center gap-1.5 py-1.5 px-3 rounded-2xl border border-red-200 bg-red-50 hover:bg-red-100 text-[#D84E55] font-bold text-xs transition cursor-pointer shadow-2xs"
+              >
+                <HelpCircle className="w-3.5 h-3.5 text-[#D84E55]" />
+                <span>24x7 Support</span>
+              </button>
+            )}
+
             {/* Mobile Search Toggle */}
             <button
               onClick={() => setIsSearchOpen(!isSearchOpen)}
@@ -236,11 +253,18 @@ export const Header: React.FC<HeaderProps> = ({
                     </div>
                   )}
                   <div className="text-left hidden sm:block">
-                    <span className="text-xs font-bold text-gray-900 block leading-tight max-w-[110px] truncate">
-                      {currentUser.name}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-bold text-gray-900 block leading-tight max-w-[100px] truncate">
+                        {currentUser.name}
+                      </span>
+                      {totalTicketsCount > 0 && (
+                        <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-red-50 text-[#D84E55] font-black border border-red-200">
+                          {totalTicketsCount} Ticket{totalTicketsCount > 1 ? 's' : ''}
+                        </span>
+                      )}
+                    </div>
                     <span className="text-[10px] text-[#D84E55] font-semibold block leading-none">
-                      {currentUser.role === 'PASSENGER' ? 'Passenger' : currentUser.role === 'CONDUCTOR' ? 'Conductor' : 'Admin'}
+                      {currentUser.role === 'PASSENGER' ? 'Passenger Account' : currentUser.role === 'CONDUCTOR' ? 'Conductor Staff' : 'Admin'}
                     </span>
                   </div>
                   <ChevronDown className="w-3.5 h-3.5 text-gray-500 ml-0.5" />
@@ -259,13 +283,20 @@ export const Header: React.FC<HeaderProps> = ({
               {isAccountMenuOpen && (
                 <div className="absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-gray-200 py-2 z-50 animate-in fade-in zoom-in-95 duration-150">
                   {currentUser && (
-                    <div className="px-4 py-2.5 border-b border-gray-100">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-gray-900 truncate">{currentUser.name}</span>
-                        <BadgeCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <div className="px-4 py-2.5 border-b border-gray-100 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-bold text-gray-900 truncate">{currentUser.name}</span>
+                          <BadgeCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        </div>
+                        {totalTicketsCount > 0 && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 font-extrabold border border-amber-200">
+                            🎟️ {totalTicketsCount} Ticket{totalTicketsCount > 1 ? 's' : ''}
+                          </span>
+                        )}
                       </div>
                       <p className="text-[11px] text-gray-500 truncate">{currentUser.email || currentUser.phone}</p>
-                      <span className="inline-block text-[9px] uppercase font-extrabold px-1.5 py-0.2 rounded bg-red-50 text-[#D84E55] border border-red-200 mt-1">
+                      <span className="inline-block text-[9px] uppercase font-extrabold px-1.5 py-0.2 rounded bg-red-50 text-[#D84E55] border border-red-200">
                         Active Role: {currentUser.role}
                       </span>
                     </div>
@@ -273,16 +304,29 @@ export const Header: React.FC<HeaderProps> = ({
 
                   <div className="py-1">
                     {currentUser && (
-                      <button
-                        onClick={() => {
-                          setIsAccountMenuOpen(false);
-                          openProfileModal();
-                        }}
-                        className="w-full text-left px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 flex items-center gap-2 cursor-pointer"
-                      >
-                        <User className="w-4 h-4 text-gray-400" />
-                        <span>View My Account</span>
-                      </button>
+                      <>
+                        <button
+                          onClick={() => {
+                            setIsAccountMenuOpen(false);
+                            openProfileModal();
+                          }}
+                          className="w-full text-left px-4 py-2 text-xs font-bold text-[#D84E55] hover:bg-red-50 flex items-center gap-2 cursor-pointer border-b border-gray-100"
+                        >
+                          <Ticket className="w-4 h-4 text-[#D84E55]" />
+                          <span>View Your Journey & QR Passes</span>
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            setIsAccountMenuOpen(false);
+                            openProfileModal();
+                          }}
+                          className="w-full text-left px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 flex items-center gap-2 cursor-pointer"
+                        >
+                          <User className="w-4 h-4 text-gray-400" />
+                          <span>View My Account</span>
+                        </button>
+                      </>
                     )}
 
                     <div className="px-3 py-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
@@ -396,6 +440,25 @@ export const Header: React.FC<HeaderProps> = ({
           >
             Bus Tickets
           </button>
+          
+          {currentUser && (
+            <button
+              onClick={openProfileModal}
+              className="flex-1 py-1.5 px-2 text-center text-xs font-bold rounded-lg transition whitespace-nowrap bg-red-50 text-[#D84E55] border border-red-200"
+            >
+              🎟️ Journeys
+            </button>
+          )}
+
+          {onOpenSupport && (
+            <button
+              onClick={onOpenSupport}
+              className="flex-1 py-1.5 px-2 text-center text-xs font-bold rounded-lg transition whitespace-nowrap bg-gray-100 text-gray-800"
+            >
+              ❓ Help
+            </button>
+          )}
+
           <button
             onClick={() => setActiveTab('CONDUCTOR')}
             className={`flex-1 py-1.5 px-2 text-center text-xs font-bold rounded-lg transition whitespace-nowrap ${
