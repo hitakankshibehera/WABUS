@@ -58,9 +58,12 @@ export const QRScanner: React.FC<QRScannerProps> = ({
     conductorBusNumber?: string;
   } | null>(null);
 
+  const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
+  const [torchActive, setTorchActive] = useState(false);
+
   // Auto-start camera when component mounts
   useEffect(() => {
-    startCamera();
+    startCamera('environment');
     return () => {
       stopCamera();
     };
@@ -72,26 +75,42 @@ export const QRScanner: React.FC<QRScannerProps> = ({
       streamRef.current = null;
     }
     setCameraActive(false);
+    setTorchActive(false);
   };
 
-  const startCamera = async () => {
+  const startCamera = async (mode: 'environment' | 'user' = facingMode) => {
     setCameraError(null);
+    stopCamera();
+
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         throw new Error('Camera hardware access API not supported in browser environment');
       }
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
-      });
+
+      // Explicit mobile camera constraints
+      const constraints: MediaStreamConstraints = {
+        video: {
+          facingMode: { ideal: mode },
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }
+      };
+
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
       streamRef.current = stream;
+
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
+        videoRef.current.setAttribute('playsinline', 'true');
+        videoRef.current.setAttribute('muted', 'true');
+        videoRef.current.play().catch(() => {});
       }
       setCameraActive(true);
+      setFacingMode(mode);
     } catch (err: any) {
-      console.warn('[Camera Scanner] Media device access note:', err.message);
+      console.warn('[Mobile Camera Scanner] Media device access note:', err.message);
       setCameraError('Live camera feed active in simulation mode. Use camera viewfinder, file upload, or test scan buttons below.');
-      setCameraActive(true); // Keep viewfinder visual active
+      setCameraActive(true);
     }
   };
 
@@ -100,7 +119,30 @@ export const QRScanner: React.FC<QRScannerProps> = ({
     if (cameraActive && streamRef.current) {
       stopCamera();
     } else {
-      await startCamera();
+      await startCamera(facingMode);
+    }
+  };
+
+  // Switch Rear / Front Mobile Camera
+  const switchMobileCamera = async () => {
+    const nextMode = facingMode === 'environment' ? 'user' : 'environment';
+    await startCamera(nextMode);
+  };
+
+  // Mobile Flashlight Torch Toggle
+  const toggleTorch = async () => {
+    if (!streamRef.current) return;
+    const track = streamRef.current.getVideoTracks()[0];
+    if (track && 'applyConstraints' in track) {
+      try {
+        const nextState = !torchActive;
+        await (track as any).applyConstraints({
+          advanced: [{ torch: nextState }]
+        });
+        setTorchActive(nextState);
+      } catch (e) {
+        console.warn('Torch flashlight constraint not supported on this device');
+      }
     }
   };
 
@@ -228,10 +270,16 @@ export const QRScanner: React.FC<QRScannerProps> = ({
 
       if (res.valid && res.passengerAllowed) {
         soundEngine.playSuccess();
+        if (typeof navigator !== 'undefined' && navigator.vibrate) {
+          try { navigator.vibrate([100, 50, 100]); } catch (e) {}
+        }
         setScanResult(res);
         onScanComplete();
       } else if (res.status === 'PENDING_CASH_COLLECTION') {
         soundEngine.playAlert();
+        if (typeof navigator !== 'undefined' && navigator.vibrate) {
+          try { navigator.vibrate([80, 40, 80]); } catch (e) {}
+        }
         setScanResult(res);
       } else {
         soundEngine.playError();
@@ -287,6 +335,28 @@ export const QRScanner: React.FC<QRScannerProps> = ({
             <span>Upload QR Photo</span>
             <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
           </label>
+
+          <button
+            type="button"
+            onClick={switchMobileCamera}
+            title="Switch Rear/Front Camera"
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-100 text-slate-700 border border-slate-200 hover:bg-slate-200 text-xs font-bold transition cursor-pointer"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">{facingMode === 'environment' ? 'Rear Cam' : 'Front Cam'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={toggleTorch}
+            title="Toggle Flashlight / Torch"
+            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-xs font-bold transition cursor-pointer ${
+              torchActive ? 'bg-amber-100 text-amber-800 border-amber-300' : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">{torchActive ? 'Torch On' : 'Torch Off'}</span>
+          </button>
 
           <button
             onClick={toggleCamera}
