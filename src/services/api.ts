@@ -1,5 +1,5 @@
 import { Trip, Booking, FeatureFlags, PayoutRecord, Route, ConductorProfile, OfferCoupon, UserAccount, OtpSessionResponse, VerifyOtpResponse, GiftCard, Bus } from '../types';
-import { INITIAL_TRIPS, MOCK_BUSES, generateSleeperSeats, generateSeaterSeats } from '../data/mockDatabase';
+import { INITIAL_TRIPS, MOCK_BUSES, MOCK_ROUTES, INITIAL_CONDUCTORS, MOCK_PAYOUTS, DEFAULT_FEATURE_FLAGS, generateSleeperSeats, generateSeaterSeats } from '../data/mockDatabase';
 
 async function safeParseJson(res: Response, defaultError: string): Promise<any> {
   const contentType = res.headers.get('content-type') || '';
@@ -507,10 +507,13 @@ export const api = {
         routeId: payload.routeId || `route-${Date.now()}`,
         originCity: origin,
         destinationCity: dest,
+        departureDate: new Date().toISOString().split('T')[0],
         departureTime: payload.departureTime || '21:30',
         arrivalTime: payload.arrivalTime || '06:00',
         durationText: '8h 30m',
         baseFare: fareNum,
+        surgeMultiplier: 1.0,
+        effectiveFare: fareNum,
         availableSeatsCount: newSeats.filter(s => s.status === 'AVAILABLE').length,
         totalSeatsCount: newSeats.length,
         rating: 4.8,

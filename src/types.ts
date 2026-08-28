@@ -3,7 +3,7 @@ export type TripCategory = 'DAY_COACH' | 'NIGHT_COACH';
 export type SeatTier = 'LOWER_BERTH' | 'UPPER_BERTH' | 'SEATER_WINDOW' | 'SEATER_AISLE';
 export type SeatGenderRestriction = 'ANY' | 'FEMALE_ONLY' | 'MALE_ONLY';
 export type SeatStatus = 'AVAILABLE' | 'LOCKED' | 'BOOKED' | 'CONDUCTOR_RESERVED';
-export type PaymentStatus = 'PAID_ONLINE' | 'PAY_ON_BOARDING_PENDING' | 'REFUNDED' | 'FAILED';
+export type PaymentStatus = 'PAID_ONLINE' | 'PAY_ON_BOARDING_PENDING' | 'REFUNDED' | 'FAILED' | 'PENDING' | 'COMPLETED';
 export type CheckInStatus = 'CONFIRMED' | 'BOARDED' | 'NO_SHOW' | 'CANCELLED';
 export type PaymentMethod = 'UPI' | 'UPI_QR' | 'CARD' | 'CREDIT_DEBIT_CARD' | 'NET_BANKING' | 'GIFT_CARD' | 'PAY_ON_BOARDING_COD';
 
@@ -80,6 +80,7 @@ export interface Trip {
   departureDate: string; // YYYY-MM-DD
   departureTime: string; // "20:30"
   arrivalTime: string; // "06:15"
+  durationText?: string;
   originCity: string;
   destinationCity: string;
   boardingPoints: BoardingDroppingPoint[];
@@ -89,6 +90,10 @@ export interface Trip {
   effectiveFare: number;
   seats: Seat[];
   availableSeatsCount: number;
+  totalSeatsCount?: number;
+  rating?: number;
+  totalReviewsCount?: number;
+  operatingDays?: string[];
   bus: Bus;
 }
 
@@ -111,31 +116,40 @@ export interface Booking {
   trip: {
     originCity: string;
     destinationCity: string;
-    departureDate: string;
+    departureDate?: string;
     departureTime: string;
     arrivalTime: string;
     busModel: string;
+    busType?: CoachType;
     operatorName: string;
     busRegistrationNumber: string; // Vehicle Number
-    category: TripCategory;
+    category?: TripCategory;
+    boardingPointName?: string;
+    boardingTime?: string;
+    droppingPointName?: string;
+    droppingTime?: string;
+    travelDate?: string;
   };
   passengers: Passenger[];
   contactEmail: string;
   contactPhone: string;
-  boardingPoint: BoardingDroppingPoint;
-  droppingPoint: BoardingDroppingPoint;
-  baseAmount: number;
-  surgeAmount: number;
-  gstAmount: number;
-  discountAmount: number;
+  boardingPoint?: BoardingDroppingPoint;
+  droppingPoint?: BoardingDroppingPoint;
+  baseAmount?: number;
+  surgeAmount?: number;
+  gstAmount?: number;
+  discountAmount?: number;
   totalAmount: number;
+  bookingDate?: string;
   paymentMethod: PaymentMethod;
   paymentStatus: PaymentStatus;
   checkInStatus: CheckInStatus;
-  qrPayloadHash: string;
+  qrPayloadHash?: string;
   qrPayloadData?: string;
-  bookedAt: string;
-  cancellationPolicy: {
+  qrCodeToken?: string;
+  whatsappDelivered?: boolean;
+  bookedAt?: string;
+  cancellationPolicy?: {
     refundPercentage: number;
     refundAmount: number;
     canCancel: boolean;
