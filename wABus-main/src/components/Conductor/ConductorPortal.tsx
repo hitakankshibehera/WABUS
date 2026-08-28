@@ -46,7 +46,7 @@ export const ConductorPortal: React.FC<ConductorPortalProps> = ({
   onRefreshData,
 }) => {
   const { currentUser, loginConductor, signupConductor, switchDemoRole, logout } = useAuth();
-  const [activeTab, setActiveTab] = useState<'MANIFEST' | 'SCANNER' | 'WALKIN_DISPATCH'>('MANIFEST');
+  const [activeTab, setActiveTab] = useState<'MANIFEST' | 'SCANNER' | 'WALKIN_DISPATCH'>('SCANNER');
   const [isWalkinModalOpen, setIsWalkinModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'BOARDED' | 'AWAITING' | 'CASH_DUE'>('ALL');
@@ -460,17 +460,6 @@ export const ConductorPortal: React.FC<ConductorPortalProps> = ({
           {/* Quick Action Navigation Buttons */}
           <div className="flex flex-wrap items-center gap-2">
             <button
-              onClick={() => setActiveTab('MANIFEST')}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
-                activeTab === 'MANIFEST'
-                  ? 'bg-[#D84E55] text-white shadow-xs'
-                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-              }`}
-            >
-              Passenger Manifest ({filteredBookings.length})
-            </button>
-
-            <button
               onClick={() => setActiveTab('SCANNER')}
               className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
                 activeTab === 'SCANNER'
@@ -479,7 +468,18 @@ export const ConductorPortal: React.FC<ConductorPortalProps> = ({
               }`}
             >
               <Camera className="w-3.5 h-3.5" />
-              <span>QR Scanner</span>
+              <span>QR Scanner (Default)</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('MANIFEST')}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+                activeTab === 'MANIFEST'
+                  ? 'bg-[#D84E55] text-white shadow-xs'
+                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              }`}
+            >
+              Passenger Manifest ({filteredBookings.length})
             </button>
 
             <button

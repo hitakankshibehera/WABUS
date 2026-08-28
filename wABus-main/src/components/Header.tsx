@@ -1,7 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Bus, Smartphone, ShieldCheck, Database, Zap, Sparkles, HelpCircle, PhoneCall, Radio, User, LogIn, UserPlus, LogOut, ChevronDown, BadgeCheck, Search, ArrowRight, X, Ticket } from 'lucide-react';
+import { 
+  Bus, Smartphone, ShieldCheck, Database, Zap, Sparkles, HelpCircle, 
+  PhoneCall, Radio, User, LogIn, UserPlus, LogOut, ChevronDown, BadgeCheck, 
+  Search, ArrowRight, X, Ticket, Wallet, Gift, Tag, Info, List, ChevronRight 
+} from 'lucide-react';
 import { FeatureFlags, Booking } from '../types';
 import { useAuth } from '../context/AuthContext';
+import { WalletModal, GiftCardModal, AboutModal, CancelTicketModal } from './Account/AccountModals';
 
 export type ActiveTab = 'PASSENGER' | 'CONDUCTOR' | 'ADMIN' | 'ARCHITECTURE';
 
@@ -27,6 +32,12 @@ export const Header: React.FC<HeaderProps> = ({
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const accountMenuRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Modals triggered from Account Menu
+  const [isWalletOpen, setIsWalletOpen] = useState(false);
+  const [isGiftCardOpen, setIsGiftCardOpen] = useState(false);
+  const [isAboutOpen, setIsAboutOpen] = useState(false);
+  const [isCancelTicketOpen, setIsCancelTicketOpen] = useState(false);
 
   const totalTicketsCount = bookings.reduce((sum, b) => sum + b.passengers.length, 0);
 
@@ -93,18 +104,19 @@ export const Header: React.FC<HeaderProps> = ({
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-18">
-          {/* wABus Iconic Logo & Name */}
-          <div className="flex items-center space-x-3 cursor-pointer select-none" onClick={() => setActiveTab('PASSENGER')}>
-            <div className="w-11 h-11 rounded-2xl bg-gray-900 overflow-hidden shadow-md border border-gray-200 transition-transform hover:scale-105 shrink-0 flex items-center justify-center">
+          {/* wABus Iconic Logo & Name with Floating Micro-Animation */}
+          <div className="flex items-center space-x-3 cursor-pointer select-none group" onClick={() => setActiveTab('PASSENGER')}>
+            <div className="w-11 h-11 rounded-2xl bg-gray-900 overflow-hidden shadow-md border border-gray-200 transition-all duration-300 group-hover:scale-110 group-hover:rotate-3 shrink-0 flex items-center justify-center animate-float-slow">
               <img src="/logo.png" alt="Wonderlight Adventure WA Logo" className="w-full h-full object-cover" />
             </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="font-black text-2xl tracking-tighter text-[#D84E55]">
+                <span className="font-black text-2xl tracking-tighter text-[#D84E55] transition-colors group-hover:text-[#B83238]">
                   wA<span className="text-gray-900 font-extrabold">Bus</span>
                 </span>
-                <span className="text-[9px] uppercase font-extrabold tracking-wider px-1.5 py-0.5 rounded bg-red-50 text-[#D84E55] border border-red-200">
-                  India
+                <span className="text-[9px] uppercase font-extrabold tracking-wider px-1.5 py-0.5 rounded bg-red-50 text-[#D84E55] border border-red-200 flex items-center gap-1 shadow-2xs">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#D84E55] animate-ping"></span>
+                  <span>India</span>
                 </span>
               </div>
               <p className="text-[11px] text-gray-500 font-medium -mt-1 hidden sm:block">Wonderlight Adventure Co. Ecosystem</p>
@@ -279,109 +291,228 @@ export const Header: React.FC<HeaderProps> = ({
                 </button>
               )}
 
-              {/* Account Dropdown Popover */}
+              {/* Account Dropdown Popover (Redbus Style matching screenshot) */}
               {isAccountMenuOpen && (
-                <div className="absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-gray-200 py-2 z-50 animate-in fade-in zoom-in-95 duration-150">
-                  {currentUser && (
-                    <div className="px-4 py-2.5 border-b border-gray-100 space-y-1">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-xs font-bold text-gray-900 truncate">{currentUser.name}</span>
-                          <BadgeCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                        </div>
-                        {totalTicketsCount > 0 && (
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 font-extrabold border border-amber-200">
-                            🎟️ {totalTicketsCount} Ticket{totalTicketsCount > 1 ? 's' : ''}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-gray-500 truncate">{currentUser.email || currentUser.phone}</p>
-                      <span className="inline-block text-[9px] uppercase font-extrabold px-1.5 py-0.2 rounded bg-red-50 text-[#D84E55] border border-red-200">
-                        Active Role: {currentUser.role}
-                      </span>
-                    </div>
-                  )}
-
-                  <div className="py-1">
-                    {currentUser && (
-                      <>
-                        <button
-                          onClick={() => {
-                            setIsAccountMenuOpen(false);
-                            openProfileModal();
-                          }}
-                          className="w-full text-left px-4 py-2 text-xs font-bold text-[#D84E55] hover:bg-red-50 flex items-center gap-2 cursor-pointer border-b border-gray-100"
-                        >
-                          <Ticket className="w-4 h-4 text-[#D84E55]" />
-                          <span>View Your Journey & QR Passes</span>
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            setIsAccountMenuOpen(false);
-                            openProfileModal();
-                          }}
-                          className="w-full text-left px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 flex items-center gap-2 cursor-pointer"
-                        >
-                          <User className="w-4 h-4 text-gray-400" />
-                          <span>View My Account</span>
-                        </button>
-                      </>
-                    )}
-
-                    <div className="px-3 py-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                      Switch or Sign In As:
-                    </div>
-
-                    <button
-                      onClick={() => {
-                        setIsAccountMenuOpen(false);
-                        openAuthModal('PASSENGER', 'SIGN_IN');
-                      }}
-                      className="w-full text-left px-4 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 flex items-center gap-2 cursor-pointer"
-                    >
-                      <User className="w-3.5 h-3.5 text-blue-600" />
-                      <span>Passenger Sign In / Sign Up</span>
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        setIsAccountMenuOpen(false);
-                        openAuthModal('CONDUCTOR', 'SIGN_IN');
-                      }}
-                      className="w-full text-left px-4 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 flex items-center gap-2 cursor-pointer"
-                    >
-                      <Smartphone className="w-3.5 h-3.5 text-amber-600" />
-                      <span>Conductor Sign In / Sign Up</span>
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        setIsAccountMenuOpen(false);
-                        setActiveTab('ADMIN');
-                        openAuthModal('ADMIN', 'SIGN_IN');
-                      }}
-                      className="w-full text-left px-4 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 flex items-center gap-2 cursor-pointer"
-                    >
-                      <ShieldCheck className="w-3.5 h-3.5 text-purple-600" />
-                      <span>Master Admin Sign In / Sign Up</span>
-                    </button>
-                  </div>
-
-                  {currentUser && (
-                    <div className="pt-1 border-t border-gray-100">
+                <div className="absolute right-0 mt-2 w-80 bg-white rounded-3xl shadow-2xl border border-gray-200 p-5 z-50 animate-in fade-in zoom-in-95 duration-150 text-slate-800 space-y-4 max-h-[85vh] overflow-y-auto">
+                  {/* Header Block */}
+                  {!currentUser ? (
+                    <div className="space-y-3 pb-3 border-b border-gray-100">
+                      <h3 className="text-base font-extrabold text-slate-900 leading-snug">
+                        Log in to manage your bookings
+                      </h3>
                       <button
                         onClick={() => {
                           setIsAccountMenuOpen(false);
-                          logout();
+                          openAuthModal('PASSENGER', 'SIGN_IN');
                         }}
-                        className="w-full text-left px-4 py-2 text-xs font-bold text-[#D84E55] hover:bg-red-50 flex items-center gap-2 cursor-pointer"
+                        className="w-full py-3 rounded-full bg-[#D84E55] hover:bg-[#C33E44] text-white font-black text-xs uppercase tracking-wider shadow-md transition cursor-pointer text-center block"
                       >
-                        <LogOut className="w-3.5 h-3.5 text-[#D84E55]" />
-                        <span>Log Out</span>
+                        Log in
                       </button>
+                      <p className="text-xs text-slate-500 text-center">
+                        Don’t have an account?{' '}
+                        <button
+                          onClick={() => {
+                            setIsAccountMenuOpen(false);
+                            openAuthModal('PASSENGER', 'SIGN_UP');
+                          }}
+                          className="text-slate-900 font-bold underline cursor-pointer hover:text-[#D84E55]"
+                        >
+                          Sign up
+                        </button>
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-rose-50/60 border border-rose-100 rounded-2xl space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          {currentUser.avatarUrl ? (
+                            <img src={currentUser.avatarUrl} alt={currentUser.name} className="w-9 h-9 rounded-full object-cover border-2 border-[#D84E55] shrink-0" />
+                          ) : (
+                            <div className="w-9 h-9 rounded-full bg-[#D84E55] text-white flex items-center justify-center font-black text-sm shrink-0">
+                              {currentUser.name.charAt(0)}
+                            </div>
+                          )}
+                          <div className="min-w-0">
+                            <div className="font-extrabold text-slate-900 text-xs flex items-center gap-1 truncate">
+                              <span className="truncate">{currentUser.name}</span>
+                              <BadgeCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                            </div>
+                            <p className="text-[10px] text-slate-500 truncate max-w-[130px]">{currentUser.email || currentUser.phone}</p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            setIsAccountMenuOpen(false);
+                            logout();
+                          }}
+                          className="p-2 rounded-xl bg-white border border-gray-200 hover:bg-rose-50 text-[#D84E55] font-bold text-[11px] transition cursor-pointer shrink-0"
+                          title="Log Out"
+                        >
+                          <LogOut className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
                   )}
+
+                  {/* Section 1: My details */}
+                  <div className="space-y-1">
+                    <h4 className="text-xs font-black text-slate-900 px-1">My details</h4>
+                    <div className="space-y-0.5">
+                      <button
+                        onClick={() => {
+                          setIsAccountMenuOpen(false);
+                          openProfileModal();
+                        }}
+                        className="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-50 text-slate-700 hover:text-slate-900 transition cursor-pointer text-xs font-semibold"
+                      >
+                        <div className="flex items-center gap-3">
+                          <List className="w-4 h-4 text-slate-700 shrink-0" />
+                          <span>Bookings</span>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-slate-400" />
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setIsAccountMenuOpen(false);
+                          openProfileModal();
+                        }}
+                        className="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-50 text-slate-700 hover:text-slate-900 transition cursor-pointer text-xs font-semibold"
+                      >
+                        <div className="flex items-center gap-3">
+                          <User className="w-4 h-4 text-slate-700 shrink-0" />
+                          <span>Personal information</span>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-slate-400" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Section 2: Payments */}
+                  <div className="space-y-1 pt-1 border-t border-gray-100">
+                    <h4 className="text-xs font-black text-slate-900 px-1">Payments</h4>
+                    <div className="space-y-0.5">
+                      <button
+                        onClick={() => {
+                          setIsAccountMenuOpen(false);
+                          setIsWalletOpen(true);
+                        }}
+                        className="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-50 text-slate-700 hover:text-slate-900 transition cursor-pointer text-xs font-semibold"
+                      >
+                        <div className="flex items-center gap-3">
+                          <Wallet className="w-4 h-4 text-slate-700 shrink-0" />
+                          <span>wABus Wallet</span>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-slate-400" />
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setIsAccountMenuOpen(false);
+                          setIsGiftCardOpen(true);
+                        }}
+                        className="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-50 text-slate-700 hover:text-slate-900 transition cursor-pointer text-xs font-semibold"
+                      >
+                        <div className="flex items-center gap-3">
+                          <Gift className="w-4 h-4 text-slate-700 shrink-0" />
+                          <span>Redeem gift card</span>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-slate-400" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Section 3: More */}
+                  <div className="space-y-1 pt-1 border-t border-gray-100">
+                    <h4 className="text-xs font-black text-slate-900 px-1">More</h4>
+                    <div className="space-y-0.5">
+                      <button
+                        onClick={() => {
+                          setIsAccountMenuOpen(false);
+                          setActiveTab('PASSENGER');
+                          setTimeout(() => {
+                            const offersEl = document.getElementById('offers-section');
+                            if (offersEl) offersEl.scrollIntoView({ behavior: 'smooth' });
+                          }, 100);
+                        }}
+                        className="w-full flex items-center justify-between p-2.5 rounded-2xl bg-rose-50 hover:bg-rose-100 text-[#D84E55] transition cursor-pointer text-xs font-bold"
+                      >
+                        <div className="flex items-center gap-3">
+                          <Tag className="w-4 h-4 text-[#D84E55] shrink-0" />
+                          <span>Offers</span>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-[#D84E55]" />
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setIsAccountMenuOpen(false);
+                          setIsAboutOpen(true);
+                        }}
+                        className="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-50 text-slate-700 hover:text-slate-900 transition cursor-pointer text-xs font-semibold"
+                      >
+                        <div className="flex items-center gap-3">
+                          <Info className="w-4 h-4 text-slate-700 shrink-0" />
+                          <span>Know about wABus</span>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-slate-400" />
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setIsAccountMenuOpen(false);
+                          if (onOpenSupport) onOpenSupport();
+                        }}
+                        className="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-50 text-slate-700 hover:text-slate-900 transition cursor-pointer text-xs font-semibold"
+                      >
+                        <div className="flex items-center gap-3">
+                          <HelpCircle className="w-4 h-4 text-slate-700 shrink-0" />
+                          <span>Help</span>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-slate-400" />
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setIsAccountMenuOpen(false);
+                          setIsCancelTicketOpen(true);
+                        }}
+                        className="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-50 text-slate-700 hover:text-slate-900 transition cursor-pointer text-xs font-semibold"
+                      >
+                        <div className="flex items-center gap-3">
+                          <Ticket className="w-4 h-4 text-slate-700 shrink-0" />
+                          <span>Cancel Ticket</span>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-slate-400" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Section 4: Role Portals */}
+                  <div className="pt-2 border-t border-gray-100 space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 px-1">Platform Portals</span>
+                    <div className="grid grid-cols-2 gap-2 pt-1">
+                      <button
+                        onClick={() => {
+                          setIsAccountMenuOpen(false);
+                          setActiveTab('CONDUCTOR');
+                        }}
+                        className="p-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 text-[11px] font-bold transition cursor-pointer text-center border border-amber-200"
+                      >
+                        Conductor Staff
+                      </button>
+                      <button
+                        onClick={() => {
+                          setIsAccountMenuOpen(false);
+                          setActiveTab('ADMIN');
+                        }}
+                        className="p-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-900 text-[11px] font-bold transition cursor-pointer text-center border border-[#D84E55]/30"
+                      >
+                        Master Admin
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -488,6 +619,15 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           )}
         </div>
+        {/* Render Modals triggered from Account Menu */}
+        <WalletModal isOpen={isWalletOpen} onClose={() => setIsWalletOpen(false)} />
+        <GiftCardModal isOpen={isGiftCardOpen} onClose={() => setIsGiftCardOpen(false)} />
+        <AboutModal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} />
+        <CancelTicketModal 
+          isOpen={isCancelTicketOpen} 
+          onClose={() => setIsCancelTicketOpen(false)} 
+          bookings={bookings}
+        />
       </div>
     </header>
   );

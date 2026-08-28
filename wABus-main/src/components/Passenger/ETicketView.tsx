@@ -68,6 +68,23 @@ export const ETicketView: React.FC<ETicketViewProps> = ({
     setTimeout(() => setIsCopied(false), 2000);
   };
 
+  const handleWhatsAppShare = () => {
+    const text = encodeURIComponent(
+      `🎫 *Wonderlight Advanture E-Ticket & QR Code*\n\n` +
+      `*PNR:* ${booking.pnr}\n` +
+      `*Route:* ${trip.originCity} ➔ ${trip.destinationCity}\n` +
+      `*Departure:* ${booking.trip.departureDate} at ${booking.trip.departureTime}\n` +
+      `*Coach:* ${booking.trip.operatorName} (${vehicleNumber})\n` +
+      `*Seats:* ${booking.passengers.map(p => p.seatNumber).join(', ')}\n` +
+      `*Boarding Point:* ${booking.boardingPoint.name} (${booking.boardingPoint.time})\n` +
+      `*Passengers:* ${booking.passengers.map(p => p.name).join(', ')}\n` +
+      `*Total Paid:* ₹${booking.totalAmount}\n\n` +
+      `Dispatched from Wonderlight Advanture Gateway (+91 94383 18821)`
+    );
+    const cleanPhone = (booking.contactPhone || '9438318821').replace(/\D/g, '');
+    window.open(`https://wa.me/91${cleanPhone}?text=${text}`, '_blank');
+  };
+
   const handlePrint = () => {
     window.print();
   };
@@ -86,12 +103,10 @@ export const ETicketView: React.FC<ETicketViewProps> = ({
           Your ticket is securely mapped to assigned vehicle <strong className="font-mono bg-emerald-100 px-1.5 py-0.5 rounded text-emerald-900">{vehicleNumber}</strong>. Present this QR code to your conductor for instant digital verification.
         </p>
 
-        {booking.whatsappDispatched && (
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-900 text-xs font-semibold mt-1">
-            <MessageSquare className="w-3.5 h-3.5 text-emerald-700" />
-            <span>PDF E-Ticket sent to +91 {booking.contactPhone}</span>
-          </div>
-        )}
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-900 text-xs font-semibold mt-1">
+          <MessageSquare className="w-3.5 h-3.5 text-emerald-700" />
+          <span>PDF E-Ticket & QR Code sent to +91 {booking.contactPhone} (From Company Gateway +91 94383 18821)</span>
+        </div>
       </div>
 
       {/* wABus Authentic Boarding Pass Card */}
@@ -204,7 +219,7 @@ export const ETicketView: React.FC<ETicketViewProps> = ({
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] uppercase font-bold text-slate-500">Assigned Conductor</span>
-                  <span className="font-semibold text-slate-800">{trip.bus.conductorName || 'Bijay Nayak'} ({trip.bus.conductorPhone || '+91 94371 00001'})</span>
+                  <span className="font-semibold text-slate-800">{trip.bus.conductorName || 'Bijay Nayak'} (ID: {trip.bus.conductorId || 'COND-7890'})</span>
                 </div>
               </div>
 
@@ -286,10 +301,19 @@ export const ETicketView: React.FC<ETicketViewProps> = ({
             <button
               type="button"
               onClick={() => setShowLiveTracker(true)}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-xs transition cursor-pointer"
+              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl bg-[#D84E55] hover:bg-[#C33E44] text-white font-bold text-xs shadow-xs transition cursor-pointer"
             >
-              <Radio className="w-3.5 h-3.5 text-blue-200 animate-pulse" />
-              <span>Track Bus Live (GPS)</span>
+              <Radio className="w-3.5 h-3.5 text-red-200 animate-pulse" />
+              <span>🚌 Track My Bus</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleWhatsAppShare}
+              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition cursor-pointer"
+            >
+              <MessageSquare className="w-3.5 h-3.5" />
+              <span>WhatsApp Ticket (+91 94383 18821)</span>
             </button>
 
             <button
@@ -324,8 +348,8 @@ export const ETicketView: React.FC<ETicketViewProps> = ({
       {/* Live GPS Telemetry Modal */}
       {showLiveTracker && (
         <LiveBusTracker
+          bookingId={booking.id}
           trip={trip}
-          booking={booking}
           onClose={() => setShowLiveTracker(false)}
         />
       )}

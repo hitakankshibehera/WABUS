@@ -543,6 +543,23 @@ export const QRScanner: React.FC<QRScannerProps> = ({
               )}
             </div>
           )}
+
+          {/* Action to scan next passenger */}
+          <div className="pt-3 border-t border-slate-200/60 flex items-center justify-between gap-2 mt-3">
+            <span className="text-[11px] font-bold opacity-80">
+              {scanResult.valid && scanResult.passengerAllowed ? '✓ Ticket Verified' : '❌ Verification Failed'}
+            </span>
+            <button
+              onClick={() => {
+                setScanResult(null);
+                setInputCode('');
+              }}
+              className="px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>Scan Next Ticket</span>
+            </button>
+          </div>
         </div>
       )}
     </div>

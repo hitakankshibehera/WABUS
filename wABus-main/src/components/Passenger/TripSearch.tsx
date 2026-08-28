@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Trip, TripCategory, CoachType, FeatureFlags } from '../../types';
+import { motion } from 'motion/react';
+import { Trip, TripCategory, CoachType, FeatureFlags, OfferCoupon } from '../../types';
+import { api } from '../../services/api';
 import { 
   Search, 
   MapPin, 
@@ -71,6 +73,27 @@ export const TripSearch: React.FC<TripSearchProps> = ({
   const [categoryFilter, setCategoryFilter] = useState<'ALL' | TripCategory>('ALL');
   const [busTypeFilter, setBusTypeFilter] = useState<'ALL' | CoachType>('ALL');
 
+  // Live Offers from Admin (polls every 5s so new admin offers appear instantly)
+  const [liveOffers, setLiveOffers] = useState<OfferCoupon[]>([]);
+  const [offerCopied, setOfferCopied] = useState<string | null>(null);
+  const [offerTabFilter, setOfferTabFilter] = useState<string>('ALL');
+  const [selectedOfferModal, setSelectedOfferModal] = useState<OfferCoupon | null>(null);
+
+  useEffect(() => {
+    const fetchOffers = () => {
+      api.getOffers().then(setLiveOffers).catch(() => {});
+    };
+    fetchOffers();
+    const pollInterval = setInterval(fetchOffers, 5000);
+    return () => clearInterval(pollInterval);
+  }, []);
+
+  const handleCopyCode = (code: string) => {
+    navigator.clipboard.writeText(code).catch(() => {});
+    setOfferCopied(code);
+    setTimeout(() => setOfferCopied(null), 2000);
+  };
+
   // Interactive UI Dropdowns
   const [isOriginOpen, setIsOriginOpen] = useState(false);
   const [isDestOpen, setIsDestOpen] = useState(false);
@@ -108,20 +131,65 @@ export const TripSearch: React.FC<TripSearchProps> = ({
     setDestination(temp);
   };
 
+  // Dynamic compilation of preset + admin added bus stop locations
+  const allAvailableLocations: BusStopOption[] = JSON.parse(JSON.stringify(BUS_STOP_LOCATIONS));
+
+  trips.forEach(t => {
+    // Add Origin city & boarding stops if not already present
+    let originLoc = allAvailableLocations.find(l => l.city.toLowerCase() === t.originCity.toLowerCase());
+    const boardingNames = t.boardingPoints ? t.boardingPoints.map(b => b.name) : [];
+    if (!originLoc) {
+      allAvailableLocations.push({
+        city: t.originCity,
+        state: 'India',
+        majorStops: boardingNames.length > 0 ? boardingNames : [`${t.originCity} Central ISBT`]
+      });
+    } else {
+      boardingNames.forEach(stop => {
+        if (!originLoc!.majorStops.includes(stop)) {
+          originLoc!.majorStops.push(stop);
+        }
+      });
+    }
+
+    // Add Destination city & dropping stops if not already present
+    let destLoc = allAvailableLocations.find(l => l.city.toLowerCase() === t.destinationCity.toLowerCase());
+    const droppingNames = t.droppingPoints ? t.droppingPoints.map(d => d.name) : [];
+    if (!destLoc) {
+      allAvailableLocations.push({
+        city: t.destinationCity,
+        state: 'India',
+        majorStops: droppingNames.length > 0 ? droppingNames : [`${t.destinationCity} Main Stand`]
+      });
+    } else {
+      droppingNames.forEach(stop => {
+        if (!destLoc!.majorStops.includes(stop)) {
+          destLoc!.majorStops.push(stop);
+        }
+      });
+    }
+  });
+
   // Filtered stop locations
-  const filteredOriginLocations = BUS_STOP_LOCATIONS.filter(loc =>
+  const filteredOriginLocations = allAvailableLocations.filter(loc =>
     loc.city.toLowerCase().includes(searchOriginText.toLowerCase()) ||
     loc.majorStops.some(s => s.toLowerCase().includes(searchOriginText.toLowerCase()))
   );
 
-  const filteredDestLocations = BUS_STOP_LOCATIONS.filter(loc =>
+  const filteredDestLocations = allAvailableLocations.filter(loc =>
     loc.city.toLowerCase().includes(searchDestText.toLowerCase()) ||
     loc.majorStops.some(s => s.toLowerCase().includes(searchDestText.toLowerCase()))
   );
 
   const filteredTrips = trips.filter(t => {
-    const matchOrigin = origin ? t.originCity.toLowerCase().includes(origin.toLowerCase()) : true;
-    const matchDest = destination ? t.destinationCity.toLowerCase().includes(destination.toLowerCase()) : true;
+    const matchOrigin = origin ? (
+      t.originCity.toLowerCase().includes(origin.toLowerCase()) ||
+      (t.boardingPoints && t.boardingPoints.some(b => b.name.toLowerCase().includes(origin.toLowerCase())))
+    ) : true;
+    const matchDest = destination ? (
+      t.destinationCity.toLowerCase().includes(destination.toLowerCase()) ||
+      (t.droppingPoints && t.droppingPoints.some(d => d.name.toLowerCase().includes(destination.toLowerCase())))
+    ) : true;
     const matchCat = categoryFilter === 'ALL' || t.category === categoryFilter;
     const matchType = busTypeFilter === 'ALL' || t.bus.busType === busTypeFilter;
     return matchOrigin && matchDest && matchCat && matchType;
@@ -311,76 +379,126 @@ export const TripSearch: React.FC<TripSearchProps> = ({
                   </div>
                 </div>
 
-                {/* Origin Dropdown Popover */}
+                {/* Origin Pop-Up Modal */}
                 {isOriginOpen && (
                   <div 
-                    onClick={e => e.stopPropagation()}
-                    className="fixed sm:absolute inset-x-4 top-28 sm:inset-x-auto sm:top-full sm:left-0 mt-2 sm:w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 p-3 z-50 animate-in fade-in zoom-in-95 duration-150"
+                    className="fixed inset-0 bg-black/40 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in duration-150"
+                    onClick={() => setIsOriginOpen(false)}
                   >
-                    <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                      <span className="text-xs font-bold text-slate-900">Select Boarding Stop</span>
-                      <button 
-                        type="button" 
-                        onClick={() => setIsOriginOpen(false)}
-                        className="text-slate-400 hover:text-slate-600 sm:hidden p-1"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                    <div className="p-2 border-b border-slate-100">
-                      <div className="relative">
-                        <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-                        <input
-                          type="text"
-                          value={searchOriginText}
-                          onChange={e => setSearchOriginText(e.target.value)}
-                          placeholder="Search city or bus stop..."
-                          className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#D84E55] font-medium"
-                          autoFocus
-                        />
+                    <div 
+                      onClick={e => e.stopPropagation()}
+                      className="w-full max-w-sm bg-white rounded-2xl shadow-2xl border border-slate-200 p-4 z-50 animate-in zoom-in-95 duration-150"
+                    >
+                      <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                        <span className="text-xs font-extrabold text-slate-900 uppercase tracking-wide">Select Boarding Stop</span>
+                        <button 
+                          type="button" 
+                          onClick={() => setIsOriginOpen(false)}
+                          className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition cursor-pointer"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
                       </div>
-                    </div>
-                    <div className="max-h-56 overflow-y-auto divide-y divide-slate-100 py-1">
-                      {searchOriginText.trim().toLowerCase().includes('admin') && (
-                        <div
-                          onClick={() => {
-                            window.history.pushState(null, '', '/admin');
-                            window.dispatchEvent(new PopStateEvent('popstate'));
-                            setIsOriginOpen(false);
-                            setSearchOriginText('');
+                      <div className="py-3 border-b border-slate-100">
+                        <form 
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            if (searchOriginText.trim()) {
+                              const match = filteredOriginLocations.find(l => l.city.toLowerCase() === searchOriginText.trim().toLowerCase());
+                              const selected = match ? match.city : (filteredOriginLocations.length > 0 ? filteredOriginLocations[0].city : searchOriginText.trim());
+                              setOrigin(selected);
+                              setIsOriginOpen(false);
+                              setSearchOriginText('');
+                            }
                           }}
-                          className="p-2.5 bg-red-50 hover:bg-red-100/80 border border-red-200 rounded-lg transition cursor-pointer flex items-center justify-between mb-1"
+                          className="flex gap-1.5 items-center"
                         >
-                          <div className="flex items-center gap-2">
-                            <ShieldCheck className="w-4 h-4 text-[#D84E55]" />
-                            <span className="text-xs font-bold text-slate-900">Open Master Admin Panel</span>
+                          <div className="relative flex-1">
+                            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                            <input
+                              type="text"
+                              value={searchOriginText}
+                              onChange={e => setSearchOriginText(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  if (searchOriginText.trim()) {
+                                    const match = filteredOriginLocations.find(l => l.city.toLowerCase() === searchOriginText.trim().toLowerCase());
+                                    const selected = match ? match.city : (filteredOriginLocations.length > 0 ? filteredOriginLocations[0].city : searchOriginText.trim());
+                                    setOrigin(selected);
+                                    setIsOriginOpen(false);
+                                    setSearchOriginText('');
+                                  }
+                                }
+                              }}
+                              placeholder="Type city (e.g. Bhubaneswar) & press Enter..."
+                              className="w-full pl-8 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#D84E55] font-medium"
+                              autoFocus
+                            />
                           </div>
-                          <span className="text-[10px] font-mono font-bold text-[#D84E55] bg-white px-1.5 py-0.5 rounded border border-red-200">
-                            /admin
-                          </span>
-                        </div>
-                      )}
-                      {filteredOriginLocations.map(loc => (
-                        <div
-                          key={loc.city}
-                          onClick={() => {
-                            setOrigin(loc.city);
-                            setIsOriginOpen(false);
-                            setSearchOriginText('');
-                          }}
-                          className={`p-2.5 hover:bg-slate-50 rounded-lg transition cursor-pointer flex flex-col gap-0.5 ${
-                            origin === loc.city ? 'bg-red-50 text-[#D84E55]' : 'text-slate-800'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold">{loc.city}</span>
-                            <span className="text-[10px] text-slate-400">{loc.state}</span>
+                          <button
+                            type="submit"
+                            className="px-3 py-2 bg-[#D84E55] hover:bg-[#C33E44] text-white text-xs font-bold rounded-lg transition shrink-0 cursor-pointer shadow-xs"
+                          >
+                            Enter
+                          </button>
+                        </form>
+                      </div>
+                      <div className="max-h-60 overflow-y-auto divide-y divide-slate-100 py-1">
+                        {searchOriginText.trim() && !filteredOriginLocations.some(l => l.city.toLowerCase() === searchOriginText.trim().toLowerCase()) && (
+                          <div
+                            onClick={() => {
+                              setOrigin(searchOriginText.trim());
+                              setIsOriginOpen(false);
+                              setSearchOriginText('');
+                            }}
+                            className="p-2.5 bg-red-50 hover:bg-red-100 rounded-lg transition cursor-pointer flex items-center justify-between text-[#D84E55] font-bold text-xs mb-1"
+                          >
+                            <span>Select &quot;{searchOriginText.trim()}&quot;</span>
+                            <span className="text-[10px] bg-white px-1.5 py-0.5 rounded border border-red-200 font-semibold">Press Enter</span>
                           </div>
-                          <span className="text-[11px] text-slate-500 truncate">
-                            {loc.majorStops.join(' • ')}
-                          </span>
-                        </div>
-                      ))}
+                        )}
+                        {searchOriginText.trim().toLowerCase().includes('admin') && (
+                          <div
+                            onClick={() => {
+                              window.history.pushState(null, '', '/admin');
+                              window.dispatchEvent(new PopStateEvent('popstate'));
+                              setIsOriginOpen(false);
+                              setSearchOriginText('');
+                            }}
+                            className="p-2.5 bg-red-50 hover:bg-red-100/80 border border-red-200 rounded-lg transition cursor-pointer flex items-center justify-between mb-1"
+                          >
+                            <div className="flex items-center gap-2">
+                              <ShieldCheck className="w-4 h-4 text-[#D84E55]" />
+                              <span className="text-xs font-bold text-slate-900">Open Master Admin Panel</span>
+                            </div>
+                            <span className="text-[10px] font-mono font-bold text-[#D84E55] bg-white px-1.5 py-0.5 rounded border border-red-200">
+                              /admin
+                            </span>
+                          </div>
+                        )}
+                        {filteredOriginLocations.map(loc => (
+                          <div
+                            key={loc.city}
+                            onClick={() => {
+                              setOrigin(loc.city);
+                              setIsOriginOpen(false);
+                              setSearchOriginText('');
+                            }}
+                            className={`p-2.5 hover:bg-slate-50 rounded-lg transition cursor-pointer flex flex-col gap-0.5 ${
+                              origin === loc.city ? 'bg-red-50 text-[#D84E55]' : 'text-slate-800'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold">{loc.city}</span>
+                              <span className="text-[10px] text-slate-400">{loc.state}</span>
+                            </div>
+                            <span className="text-[11px] text-slate-500 truncate">
+                              {loc.majorStops.join(' • ')}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 )}
@@ -431,76 +549,126 @@ export const TripSearch: React.FC<TripSearchProps> = ({
                   </div>
                 </div>
 
-                {/* Destination Dropdown Popover */}
+                {/* Destination Pop-Up Modal */}
                 {isDestOpen && (
                   <div 
-                    onClick={e => e.stopPropagation()}
-                    className="fixed sm:absolute inset-x-4 top-28 sm:inset-x-auto sm:top-full sm:left-0 mt-2 sm:w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 p-3 z-50 animate-in fade-in zoom-in-95 duration-150"
+                    className="fixed inset-0 bg-black/40 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in duration-150"
+                    onClick={() => setIsDestOpen(false)}
                   >
-                    <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                      <span className="text-xs font-bold text-slate-900">Select Dropping Stop</span>
-                      <button 
-                        type="button" 
-                        onClick={() => setIsDestOpen(false)}
-                        className="text-slate-400 hover:text-slate-600 sm:hidden p-1"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                    <div className="p-2 border-b border-slate-100">
-                      <div className="relative">
-                        <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-                        <input
-                          type="text"
-                          value={searchDestText}
-                          onChange={e => setSearchDestText(e.target.value)}
-                          placeholder="Search city or destination stop..."
-                          className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#D84E55] font-medium"
-                          autoFocus
-                        />
+                    <div 
+                      onClick={e => e.stopPropagation()}
+                      className="w-full max-w-sm bg-white rounded-2xl shadow-2xl border border-slate-200 p-4 z-50 animate-in zoom-in-95 duration-150"
+                    >
+                      <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                        <span className="text-xs font-extrabold text-slate-900 uppercase tracking-wide">Select Dropping Stop</span>
+                        <button 
+                          type="button" 
+                          onClick={() => setIsDestOpen(false)}
+                          className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition cursor-pointer"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
                       </div>
-                    </div>
-                    <div className="max-h-56 overflow-y-auto divide-y divide-slate-100 py-1">
-                      {searchDestText.trim().toLowerCase().includes('admin') && (
-                        <div
-                          onClick={() => {
-                            window.history.pushState(null, '', '/admin');
-                            window.dispatchEvent(new PopStateEvent('popstate'));
-                            setIsDestOpen(false);
-                            setSearchDestText('');
+                      <div className="py-3 border-b border-slate-100">
+                        <form 
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            if (searchDestText.trim()) {
+                              const match = filteredDestLocations.find(l => l.city.toLowerCase() === searchDestText.trim().toLowerCase());
+                              const selected = match ? match.city : (filteredDestLocations.length > 0 ? filteredDestLocations[0].city : searchDestText.trim());
+                              setDestination(selected);
+                              setIsDestOpen(false);
+                              setSearchDestText('');
+                            }
                           }}
-                          className="p-2.5 bg-red-50 hover:bg-red-100/80 border border-red-200 rounded-lg transition cursor-pointer flex items-center justify-between mb-1"
+                          className="flex gap-1.5 items-center"
                         >
-                          <div className="flex items-center gap-2">
-                            <ShieldCheck className="w-4 h-4 text-[#D84E55]" />
-                            <span className="text-xs font-bold text-slate-900">Open Master Admin Panel</span>
+                          <div className="relative flex-1">
+                            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                            <input
+                              type="text"
+                              value={searchDestText}
+                              onChange={e => setSearchDestText(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  if (searchDestText.trim()) {
+                                    const match = filteredDestLocations.find(l => l.city.toLowerCase() === searchDestText.trim().toLowerCase());
+                                    const selected = match ? match.city : (filteredDestLocations.length > 0 ? filteredDestLocations[0].city : searchDestText.trim());
+                                    setDestination(selected);
+                                    setIsDestOpen(false);
+                                    setSearchDestText('');
+                                  }
+                                }
+                              }}
+                              placeholder="Type destination & press Enter..."
+                              className="w-full pl-8 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#D84E55] font-medium"
+                              autoFocus
+                            />
                           </div>
-                          <span className="text-[10px] font-mono font-bold text-[#D84E55] bg-white px-1.5 py-0.5 rounded border border-red-200">
-                            /admin
-                          </span>
-                        </div>
-                      )}
-                      {filteredDestLocations.map(loc => (
-                        <div
-                          key={loc.city}
-                          onClick={() => {
-                            setDestination(loc.city);
-                            setIsDestOpen(false);
-                            setSearchDestText('');
-                          }}
-                          className={`p-2.5 hover:bg-slate-50 rounded-lg transition cursor-pointer flex flex-col gap-0.5 ${
-                            destination === loc.city ? 'bg-blue-50 text-blue-700' : 'text-slate-800'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold">{loc.city}</span>
-                            <span className="text-[10px] text-slate-400">{loc.state}</span>
+                          <button
+                            type="submit"
+                            className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition shrink-0 cursor-pointer shadow-xs"
+                          >
+                            Enter
+                          </button>
+                        </form>
+                      </div>
+                      <div className="max-h-60 overflow-y-auto divide-y divide-slate-100 py-1">
+                        {searchDestText.trim() && !filteredDestLocations.some(l => l.city.toLowerCase() === searchDestText.trim().toLowerCase()) && (
+                          <div
+                            onClick={() => {
+                              setDestination(searchDestText.trim());
+                              setIsDestOpen(false);
+                              setSearchDestText('');
+                            }}
+                            className="p-2.5 bg-blue-50 hover:bg-blue-100 rounded-lg transition cursor-pointer flex items-center justify-between text-blue-700 font-bold text-xs mb-1"
+                          >
+                            <span>Select &quot;{searchDestText.trim()}&quot;</span>
+                            <span className="text-[10px] bg-white px-1.5 py-0.5 rounded border border-blue-200 font-semibold">Press Enter</span>
                           </div>
-                          <span className="text-[11px] text-slate-500 truncate">
-                            {loc.majorStops.join(' • ')}
-                          </span>
-                        </div>
-                      ))}
+                        )}
+                        {searchDestText.trim().toLowerCase().includes('admin') && (
+                          <div
+                            onClick={() => {
+                              window.history.pushState(null, '', '/admin');
+                              window.dispatchEvent(new PopStateEvent('popstate'));
+                              setIsDestOpen(false);
+                              setSearchDestText('');
+                            }}
+                            className="p-2.5 bg-red-50 hover:bg-red-100/80 border border-red-200 rounded-lg transition cursor-pointer flex items-center justify-between mb-1"
+                          >
+                            <div className="flex items-center gap-2">
+                              <ShieldCheck className="w-4 h-4 text-[#D84E55]" />
+                              <span className="text-xs font-bold text-slate-900">Open Master Admin Panel</span>
+                            </div>
+                            <span className="text-[10px] font-mono font-bold text-[#D84E55] bg-white px-1.5 py-0.5 rounded border border-red-200">
+                              /admin
+                            </span>
+                          </div>
+                        )}
+                        {filteredDestLocations.map(loc => (
+                          <div
+                            key={loc.city}
+                            onClick={() => {
+                              setDestination(loc.city);
+                              setIsDestOpen(false);
+                              setSearchDestText('');
+                            }}
+                            className={`p-2.5 hover:bg-slate-50 rounded-lg transition cursor-pointer flex flex-col gap-0.5 ${
+                              destination === loc.city ? 'bg-blue-50 text-blue-700' : 'text-slate-800'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold">{loc.city}</span>
+                              <span className="text-[10px] text-slate-400">{loc.state}</span>
+                            </div>
+                            <span className="text-[11px] text-slate-500 truncate">
+                              {loc.majorStops.join(' • ')}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 )}
@@ -538,151 +706,156 @@ export const TripSearch: React.FC<TripSearchProps> = ({
                   </div>
                 </div>
 
-                {/* Calendar Dropdown Popover */}
+                {/* Calendar Pop-Up Modal */}
                 {isCalendarOpen && (
                   <div 
-                    onClick={e => e.stopPropagation()}
-                    className="fixed sm:absolute inset-x-4 top-28 sm:inset-x-auto sm:top-full sm:right-0 sm:left-auto mt-2 sm:w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 p-4 z-50 animate-in fade-in zoom-in-95 duration-150"
+                    className="fixed inset-0 bg-black/40 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in duration-150"
+                    onClick={() => setIsCalendarOpen(false)}
                   >
-                    <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                      <span className="text-xs font-bold text-slate-900">Select Travel Date</span>
-                      <button 
-                        type="button" 
-                        onClick={() => setIsCalendarOpen(false)}
-                        className="text-slate-400 hover:text-slate-600 sm:hidden p-1"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-
-                    {/* Quick Presets */}
-                    <div className="py-2 border-b border-slate-100">
-                      <div className="grid grid-cols-3 gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedDate(todayStr);
-                            setIsCalendarOpen(false);
-                          }}
-                          className={`py-1.5 px-2 rounded-lg text-xs font-bold transition flex flex-col items-center cursor-pointer ${
-                            selectedDate === todayStr
-                              ? 'bg-[#D84E55] text-white shadow-sm'
-                              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                          }`}
+                    <div 
+                      onClick={e => e.stopPropagation()}
+                      className="w-full max-w-sm bg-white rounded-2xl shadow-2xl border border-slate-200 p-4 z-50 animate-in zoom-in-95 duration-150"
+                    >
+                      <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                        <span className="text-xs font-extrabold text-slate-900 uppercase tracking-wide">Select Travel Date</span>
+                        <button 
+                          type="button" 
+                          onClick={() => setIsCalendarOpen(false)}
+                          className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition cursor-pointer"
                         >
-                          <span>Today</span>
-                          <span className="text-[9px] opacity-80">{formatDisplayDate(todayStr).dayName}</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedDate(tomorrowStr);
-                            setIsCalendarOpen(false);
-                          }}
-                          className={`py-1.5 px-2 rounded-lg text-xs font-bold transition flex flex-col items-center cursor-pointer ${
-                            selectedDate === tomorrowStr
-                              ? 'bg-[#D84E55] text-white shadow-sm'
-                              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                          }`}
-                        >
-                          <span>Tomorrow</span>
-                          <span className="text-[9px] opacity-80">{formatDisplayDate(tomorrowStr).dayName}</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedDate(weekendStr);
-                            setIsCalendarOpen(false);
-                          }}
-                          className={`py-1.5 px-2 rounded-lg text-xs font-bold transition flex flex-col items-center cursor-pointer ${
-                            selectedDate === weekendStr
-                              ? 'bg-[#D84E55] text-white shadow-sm'
-                              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                          }`}
-                        >
-                          <span>Weekend</span>
-                          <span className="text-[9px] opacity-80">Saturday</span>
+                          <X className="w-4 h-4" />
                         </button>
                       </div>
-                    </div>
 
-                    {/* Calendar Month Header */}
-                    <div className="flex items-center justify-between my-2">
-                      <h4 className="text-xs font-bold text-slate-900 capitalize">
-                        {monthName}
-                      </h4>
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={handlePrevMonth}
-                          className="w-7 h-7 rounded-md hover:bg-slate-100 flex items-center justify-center text-slate-600 cursor-pointer"
-                        >
-                          <ChevronLeft className="w-4 h-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={handleNextMonth}
-                          className="w-7 h-7 rounded-md hover:bg-slate-100 flex items-center justify-center text-slate-600 cursor-pointer"
-                        >
-                          <ChevronRight className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Weekday Labels */}
-                    <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-slate-400 mb-1">
-                      <span>Su</span>
-                      <span>Mo</span>
-                      <span>Tu</span>
-                      <span>We</span>
-                      <span>Th</span>
-                      <span>Fr</span>
-                      <span>Sa</span>
-                    </div>
-
-                    {/* Calendar Matrix */}
-                    <div className="grid grid-cols-7 gap-1 text-center">
-                      {Array.from({ length: firstDayIndex }).map((_, i) => (
-                        <div key={`empty-${i}`} className="h-7" />
-                      ))}
-                      {Array.from({ length: daysInCalMonth }).map((_, i) => {
-                        const day = i + 1;
-                        const monthFormatted = String(calMonth + 1).padStart(2, '0');
-                        const dayFormatted = String(day).padStart(2, '0');
-                        const dateString = `${calYear}-${monthFormatted}-${dayFormatted}`;
-                        const isSelected = selectedDate === dateString;
-                        const isToday = todayStr === dateString;
-
-                        return (
+                      {/* Quick Presets */}
+                      <div className="py-2 border-b border-slate-100">
+                        <div className="grid grid-cols-3 gap-1.5">
                           <button
-                            key={day}
                             type="button"
-                            onClick={() => handleSelectDay(day)}
-                            className={`h-7 w-full rounded-md text-xs font-semibold transition flex items-center justify-center cursor-pointer ${
-                              isSelected
-                                ? 'bg-[#D84E55] text-white font-bold shadow-sm'
-                                : isToday
-                                ? 'bg-red-50 text-[#D84E55] border border-red-200'
-                                : 'hover:bg-slate-100 text-slate-700'
+                            onClick={() => {
+                              setSelectedDate(todayStr);
+                              setIsCalendarOpen(false);
+                            }}
+                            className={`py-1.5 px-2 rounded-lg text-xs font-bold transition flex flex-col items-center cursor-pointer ${
+                              selectedDate === todayStr
+                                ? 'bg-[#D84E55] text-white shadow-sm'
+                                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                             }`}
                           >
-                            {day}
+                            <span>Today</span>
+                            <span className="text-[9px] opacity-80">{formatDisplayDate(todayStr).dayName}</span>
                           </button>
-                        );
-                      })}
-                    </div>
 
-                    <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
-                      <span className="font-medium text-slate-700">{currentDisplay.full}</span>
-                      <button
-                        type="button"
-                        onClick={() => setIsCalendarOpen(false)}
-                        className="text-[#D84E55] font-bold hover:underline cursor-pointer"
-                      >
-                        Done
-                      </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedDate(tomorrowStr);
+                              setIsCalendarOpen(false);
+                            }}
+                            className={`py-1.5 px-2 rounded-lg text-xs font-bold transition flex flex-col items-center cursor-pointer ${
+                              selectedDate === tomorrowStr
+                                ? 'bg-[#D84E55] text-white shadow-sm'
+                                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                            }`}
+                          >
+                            <span>Tomorrow</span>
+                            <span className="text-[9px] opacity-80">{formatDisplayDate(tomorrowStr).dayName}</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedDate(weekendStr);
+                              setIsCalendarOpen(false);
+                            }}
+                            className={`py-1.5 px-2 rounded-lg text-xs font-bold transition flex flex-col items-center cursor-pointer ${
+                              selectedDate === weekendStr
+                                ? 'bg-[#D84E55] text-white shadow-sm'
+                                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                            }`}
+                          >
+                            <span>Weekend</span>
+                            <span className="text-[9px] opacity-80">Saturday</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Calendar Month Header */}
+                      <div className="flex items-center justify-between my-2">
+                        <h4 className="text-xs font-bold text-slate-900 capitalize">
+                          {monthName}
+                        </h4>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={handlePrevMonth}
+                            className="w-7 h-7 rounded-md hover:bg-slate-100 flex items-center justify-center text-slate-600 cursor-pointer"
+                          >
+                            <ChevronLeft className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleNextMonth}
+                            className="w-7 h-7 rounded-md hover:bg-slate-100 flex items-center justify-center text-slate-600 cursor-pointer"
+                          >
+                            <ChevronRight className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Weekday Labels */}
+                      <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-slate-400 mb-1">
+                        <span>Su</span>
+                        <span>Mo</span>
+                        <span>Tu</span>
+                        <span>We</span>
+                        <span>Th</span>
+                        <span>Fr</span>
+                        <span>Sa</span>
+                      </div>
+
+                      {/* Calendar Matrix */}
+                      <div className="grid grid-cols-7 gap-1 text-center">
+                        {Array.from({ length: firstDayIndex }).map((_, i) => (
+                          <div key={`empty-${i}`} className="h-7" />
+                        ))}
+                        {Array.from({ length: daysInCalMonth }).map((_, i) => {
+                          const day = i + 1;
+                          const monthFormatted = String(calMonth + 1).padStart(2, '0');
+                          const dayFormatted = String(day).padStart(2, '0');
+                          const dateString = `${calYear}-${monthFormatted}-${dayFormatted}`;
+                          const isSelected = selectedDate === dateString;
+                          const isToday = todayStr === dateString;
+
+                          return (
+                            <button
+                              key={day}
+                              type="button"
+                              onClick={() => handleSelectDay(day)}
+                              className={`h-7 w-full rounded-md text-xs font-semibold transition flex items-center justify-center cursor-pointer ${
+                                isSelected
+                                  ? 'bg-[#D84E55] text-white font-bold shadow-sm'
+                                  : isToday
+                                  ? 'bg-red-50 text-[#D84E55] border border-red-200'
+                                  : 'hover:bg-slate-100 text-slate-700'
+                              }`}
+                            >
+                              {day}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+                        <span className="font-medium text-slate-700">{currentDisplay.full}</span>
+                        <button
+                          type="button"
+                          onClick={() => setIsCalendarOpen(false)}
+                          className="text-[#D84E55] font-bold hover:underline cursor-pointer"
+                        >
+                          Done
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -705,11 +878,22 @@ export const TripSearch: React.FC<TripSearchProps> = ({
               </div>
             </div>
 
-            {/* Quick Offers Bar */}
+            {/* Quick Offers Bar – dynamic from admin */}
             <div className="mt-3 pt-2.5 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500">
               <div className="flex items-center gap-1.5 text-slate-700 font-medium">
                 <Tag className="w-3.5 h-3.5 text-[#D84E55]" />
-                <span>Use coupon <strong className="text-[#D84E55] font-bold">BHARAT100</strong> for flat ₹100 OFF</span>
+                {liveOffers.length > 0 ? (
+                  <span>
+                    Use coupon{' '}
+                    <strong className="text-[#D84E55] font-bold">{liveOffers[0].code}</strong>
+                    {' '}for{' '}
+                    {liveOffers[0].discountType === 'FLAT'
+                      ? `flat ₹${liveOffers[0].discountValue} OFF`
+                      : `${liveOffers[0].discountValue}% OFF`}
+                  </span>
+                ) : (
+                  <span>Exclusive offers available — book now &amp; save!</span>
+                )}
               </div>
               <div className="flex items-center gap-4">
                 <span className="flex items-center gap-1 text-emerald-700 font-medium">
@@ -723,6 +907,265 @@ export const TripSearch: React.FC<TripSearchProps> = ({
           </div>
         </div>
       </div>
+
+      {/* ===========================================================
+          OFFERS FOR YOU — Redbus-style, fully admin-controlled
+          =========================================================== */}
+      {liveOffers.length > 0 && (
+        <div id="offers-section" className="space-y-3.5">
+          {/* Header row */}
+          <div className="flex items-center justify-between">
+            <h2 className="text-base sm:text-lg font-extrabold text-slate-900 flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-[#D84E55]" />
+              <span>Offers for you</span>
+            </h2>
+            <span className="text-xs text-slate-500 font-medium">Click any offer for Terms &amp; Conditions</span>
+          </div>
+
+          {/* Offer cards — horizontal scroll on mobile, grid on desktop */}
+          <div className="flex gap-3.5 overflow-x-auto pb-1 sm:pb-0 sm:grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 snap-x snap-mandatory">
+            {liveOffers.map(offer => {
+              const validDate = offer.validUntil
+                ? new Date(offer.validUntil + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+                : null;
+              const categoryLabel = offer.category
+                ? { BUS: 'Bus', TRAIN: 'Train', HOTEL: 'Hotel', ALL: 'All' }[offer.category] || 'Bus'
+                : 'Bus';
+
+              return (
+                <div
+                  key={offer.id}
+                  className="shrink-0 snap-start w-64 sm:w-auto bg-[#FFF5F5] border border-rose-100 rounded-2xl overflow-hidden hover:shadow-lg transition-all hover:-translate-y-1 group cursor-pointer flex flex-col"
+                  onClick={() => setSelectedOfferModal(offer)}
+                >
+                  {/* Top: image area */}
+                  <div className="relative h-[110px] bg-gradient-to-br from-rose-50 to-orange-50 flex items-center justify-end overflow-hidden px-4">
+                    {/* Decorative sunburst */}
+                    <div className="absolute inset-0 flex items-center justify-center opacity-10">
+                      <div className="w-40 h-40 rounded-full border-[20px] border-rose-400" />
+                    </div>
+
+                    {/* Category badge */}
+                    <span className="absolute top-3 left-3 text-[9px] font-black px-2 py-0.5 rounded bg-slate-800 text-white uppercase tracking-wider">
+                      {categoryLabel}
+                    </span>
+
+                    {/* Image */}
+                    {offer.imageUrl ? (
+                      <img
+                        src={offer.imageUrl}
+                        alt={offer.title}
+                        className="h-20 w-auto object-contain relative z-10 drop-shadow-md group-hover:scale-105 transition"
+                        onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                      />
+                    ) : (
+                      <div className="h-20 w-24 flex items-center justify-center relative z-10">
+                        <svg viewBox="0 0 200 100" className="h-full w-full drop-shadow-md" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <rect x="5" y="30" width="190" height="60" rx="12" fill="#D84E55"/>
+                          <rect x="15" y="38" width="170" height="40" rx="8" fill="#E85C5C"/>
+                          <rect x="25" y="44" width="30" height="20" rx="3" fill="#fff" fillOpacity="0.8"/>
+                          <rect x="70" y="44" width="30" height="20" rx="3" fill="#fff" fillOpacity="0.8"/>
+                          <rect x="115" y="44" width="30" height="20" rx="3" fill="#fff" fillOpacity="0.8"/>
+                          <circle cx="45" cy="90" r="12" fill="#222"/>
+                          <circle cx="45" cy="90" r="6" fill="#555"/>
+                          <circle cx="150" cy="90" r="12" fill="#222"/>
+                          <circle cx="150" cy="90" r="6" fill="#555"/>
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Bottom: offer info */}
+                  <div className="p-3.5 space-y-2 flex-1 flex flex-col justify-between">
+                    <div className="space-y-1">
+                      <p className="text-xs font-extrabold text-slate-900 leading-snug group-hover:text-[#D84E55] transition">
+                        {offer.savingsText || offer.title}
+                      </p>
+                      {validDate && (
+                        <p className="text-[10px] text-slate-500 font-medium">Valid till {validDate}</p>
+                      )}
+                    </div>
+
+                    {/* Coupon code row */}
+                    <div className="flex items-center justify-between gap-1.5 pt-2 border-t border-rose-100">
+                      <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-dashed border-slate-400 bg-white">
+                        <Tag className="w-3 h-3 text-slate-500" />
+                        <span className="font-mono font-black text-[11px] text-slate-800 uppercase">{offer.code}</span>
+                      </div>
+                      <span className="text-[10px] text-[#D84E55] font-bold underline flex items-center gap-0.5">
+                        T&amp;C Details <ChevronRight className="w-3 h-3" />
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ===========================================================
+          OFFER DETAILS, TERMS & CONDITIONS & HOW TO USE POPUP MODAL
+          =========================================================== */}
+      {selectedOfferModal && (
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-100 space-y-0 relative max-h-[90vh] flex flex-col">
+            {/* Modal Header Banner */}
+            <div className="relative bg-gradient-to-r from-[#D84E55] via-[#C93F46] to-[#B83238] text-white p-5 sm:p-6">
+              <button
+                type="button"
+                onClick={() => setSelectedOfferModal(null)}
+                className="absolute top-4 right-4 w-8 h-8 rounded-full bg-black/20 hover:bg-black/40 text-white flex items-center justify-center transition cursor-pointer"
+                title="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <div className="flex items-start gap-4">
+                {selectedOfferModal.imageUrl ? (
+                  <img
+                    src={selectedOfferModal.imageUrl}
+                    alt={selectedOfferModal.title}
+                    className="w-16 h-16 object-contain bg-white/10 rounded-2xl p-1.5 shrink-0 border border-white/20"
+                  />
+                ) : (
+                  <div className="w-16 h-16 rounded-2xl bg-white/10 flex items-center justify-center shrink-0 border border-white/20">
+                    <Tag className="w-8 h-8 text-white" />
+                  </div>
+                )}
+
+                <div className="space-y-1 pr-6">
+                  <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/20 text-[10px] font-extrabold uppercase tracking-wider">
+                    {selectedOfferModal.category || 'BUS'} EXCLUSIVE OFFER
+                  </div>
+                  <h3 className="text-lg font-black leading-snug">{selectedOfferModal.title}</h3>
+                  {selectedOfferModal.validUntil && (
+                    <p className="text-xs text-red-100 font-medium">
+                      Valid till {new Date(selectedOfferModal.validUntil + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Body content (scrollable) */}
+            <div className="p-5 sm:p-6 space-y-5 overflow-y-auto flex-1 text-xs">
+              {/* Promo Coupon Code Box */}
+              <div className="p-4 bg-rose-50/70 border-2 border-dashed border-rose-200 rounded-2xl flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">Use Coupon Code</div>
+                  <div className="font-mono font-black text-xl text-slate-900 tracking-wider">
+                    {selectedOfferModal.code}
+                  </div>
+                  <div className="text-[11px] text-[#D84E55] font-bold mt-0.5">
+                    {selectedOfferModal.badgeTag || (selectedOfferModal.discountType === 'FLAT' ? `Flat ₹${selectedOfferModal.discountValue} OFF` : `${selectedOfferModal.discountValue}% OFF`)}
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleCopyCode(selectedOfferModal.code)}
+                  className={`px-4 py-2.5 rounded-xl font-bold text-xs transition cursor-pointer flex items-center gap-1.5 shadow-sm ${
+                    offerCopied === selectedOfferModal.code
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-[#D84E55] hover:bg-[#C33E44] text-white'
+                  }`}
+                >
+                  {offerCopied === selectedOfferModal.code ? (
+                    <><CheckCircle2 className="w-4 h-4" /> Copied!</>
+                  ) : (
+                    <><Tag className="w-4 h-4" /> Copy Code</>
+                  )}
+                </button>
+              </div>
+
+              {/* Offer Subtext / Description */}
+              {selectedOfferModal.description && (
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 text-xs font-medium">
+                  {selectedOfferModal.description}
+                </div>
+              )}
+
+              {/* How to Use Section */}
+              <div className="space-y-2">
+                <h4 className="font-extrabold text-slate-900 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <span>How to Redeem this Offer</span>
+                </h4>
+                <ol className="space-y-2 pl-1">
+                  {(selectedOfferModal.howToUse && selectedOfferModal.howToUse.length > 0
+                    ? selectedOfferModal.howToUse
+                    : [
+                        'Search buses for your route and select your preferred seats.',
+                        'Proceed to passenger details page.',
+                        `Enter code ${selectedOfferModal.code} in the Promo Code section and click Apply.`,
+                        'Enjoy instant discount on your total booking fare!'
+                      ]
+                  ).map((step, idx) => (
+                    <li key={idx} className="flex items-start gap-2.5 text-slate-700 leading-relaxed">
+                      <span className="w-5 h-5 rounded-full bg-rose-100 text-[#D84E55] font-black text-[11px] flex items-center justify-center shrink-0 mt-0.5">
+                        {idx + 1}
+                      </span>
+                      <span>{step}</span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+
+              {/* Terms & Conditions Section */}
+              <div className="space-y-2 pt-2 border-t border-slate-100">
+                <h4 className="font-extrabold text-slate-900 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                  <ShieldCheck className="w-4 h-4 text-[#D84E55]" />
+                  <span>Terms &amp; Conditions</span>
+                </h4>
+                <ul className="space-y-2 pl-1">
+                  {(selectedOfferModal.termsAndConditions && selectedOfferModal.termsAndConditions.length > 0
+                    ? selectedOfferModal.termsAndConditions
+                    : [
+                        `Offer valid on minimum booking transaction value of ₹${selectedOfferModal.minBookingAmount || 0}.`,
+                        'Discount applicable once per user account per booking.',
+                        'Applicable on all eligible bus schedules on wABus.',
+                        'Offer cannot be combined with any other promotional voucher.',
+                        'wABus reserves the right to modify or discontinue the offer at any time.'
+                      ]
+                  ).map((tc, idx) => (
+                    <li key={idx} className="flex items-start gap-2 text-slate-600 leading-relaxed text-[11px]">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#D84E55] shrink-0 mt-1.5" />
+                      <span>{tc}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => setSelectedOfferModal(null)}
+                className="px-4 py-2.5 rounded-xl bg-white border border-slate-300 text-slate-700 font-bold text-xs hover:bg-slate-100 transition cursor-pointer"
+              >
+                Close
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  handleCopyCode(selectedOfferModal.code);
+                  setSelectedOfferModal(null);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className="flex-1 py-2.5 rounded-xl bg-[#D84E55] hover:bg-[#C33E44] text-white font-extrabold text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-md transition cursor-pointer"
+              >
+                <span>Book Bus with {selectedOfferModal.code}</span>
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+
 
       {/* Filter and Schedule Bar */}
       <div className="bg-white border border-slate-200 rounded-xl p-3.5 sm:p-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
@@ -853,17 +1296,21 @@ export const TripSearch: React.FC<TripSearchProps> = ({
             </div>
           </div>
         ) : (
-          filteredTrips.map(trip => {
+          filteredTrips.map((trip, idx) => {
             const isSelected = selectedTripId === trip.id;
             const hasSurge = featureFlags.enableSurgePricing && trip.surgeMultiplier > 1;
             const isNewlyAdded = trip.id.startsWith('trip-gen-');
 
             return (
-              <div
+              <motion.div
                 key={trip.id}
-                className={`bg-white border transition-all duration-150 rounded-xl sm:rounded-2xl p-4 sm:p-5 shadow-xs hover:shadow-sm ${
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: Math.min(idx * 0.05, 0.3), ease: [0.16, 1, 0.3, 1] }}
+                whileHover={{ scale: 1.006, translateY: -2 }}
+                className={`bg-white border transition-all duration-200 rounded-xl sm:rounded-2xl p-4 sm:p-5 shadow-xs hover:shadow-md glass-card ${
                   isSelected
-                    ? 'border-[#D84E55] ring-2 ring-red-500/20'
+                    ? 'border-[#D84E55] ring-2 ring-red-500/20 bg-red-50/20'
                     : 'border-slate-200 hover:border-slate-300'
                 }`}
               >
@@ -894,7 +1341,6 @@ export const TripSearch: React.FC<TripSearchProps> = ({
                   <div className="flex items-center gap-2 bg-purple-50 border border-purple-200 px-2.5 py-1 rounded-lg text-[11px] text-purple-900 font-medium">
                     <span className="font-bold text-purple-950">👮 Conductor: {trip.bus.conductorName}</span>
                     <span className="text-purple-700 font-mono font-bold">({trip.bus.conductorId || 'COND-7890'})</span>
-                    <span className="text-purple-600 hidden sm:inline">&bull; 📞 {trip.bus.conductorPhone}</span>
                   </div>
                 </div>
 
@@ -1013,7 +1459,7 @@ export const TripSearch: React.FC<TripSearchProps> = ({
                     </button>
                   </div>
                 </div>
-              </div>
+              </motion.div>
             );
           })
         )}

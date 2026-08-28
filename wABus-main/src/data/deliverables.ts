@@ -6,6 +6,38 @@ export const POSTGRESQL_SCHEMA_SQL = `-- =======================================
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
+-- 0. USER AUTHENTICATION & OTP VERIFICATIONS
+CREATE TABLE users (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    email VARCHAR(255) UNIQUE NOT NULL,
+    email_verified BOOLEAN DEFAULT TRUE,
+    name VARCHAR(150),
+    phone VARCHAR(20),
+    role VARCHAR(30) DEFAULT 'PASSENGER',
+    status VARCHAR(20) DEFAULT 'ACTIVE',
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    last_login_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE UNIQUE INDEX idx_users_lower_email ON users(LOWER(email));
+
+CREATE TABLE otp_verifications (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    email VARCHAR(255) NOT NULL,
+    otp_hash VARCHAR(255) NOT NULL,
+    salt VARCHAR(64) NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    attempts INTEGER DEFAULT 0,
+    used BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    verified_at TIMESTAMPTZ,
+    ip_address VARCHAR(45)
+);
+
+CREATE INDEX idx_otp_verifications_email ON otp_verifications(LOWER(email));
+CREATE INDEX idx_otp_verifications_lookup ON otp_verifications(LOWER(email), used, expires_at);
+
 -- 1. ENUMS
 CREATE TYPE coach_type_enum AS ENUM ('AC_SLEEPER_2_1', 'VOLVO_MULTI_AXLE_2_2', 'SCANIA_LUXURY_SLEEPER');
 CREATE TYPE trip_category_enum AS ENUM ('DAY_COACH', 'NIGHT_COACH');

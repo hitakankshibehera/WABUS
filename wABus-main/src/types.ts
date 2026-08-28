@@ -5,7 +5,7 @@ export type SeatGenderRestriction = 'ANY' | 'FEMALE_ONLY' | 'MALE_ONLY';
 export type SeatStatus = 'AVAILABLE' | 'LOCKED' | 'BOOKED' | 'CONDUCTOR_RESERVED';
 export type PaymentStatus = 'PAID_ONLINE' | 'PAY_ON_BOARDING_PENDING' | 'REFUNDED' | 'FAILED';
 export type CheckInStatus = 'CONFIRMED' | 'BOARDED' | 'NO_SHOW' | 'CANCELLED';
-export type PaymentMethod = 'UPI' | 'CREDIT_DEBIT_CARD' | 'NET_BANKING' | 'PAY_ON_BOARDING_COD';
+export type PaymentMethod = 'UPI' | 'UPI_QR' | 'CARD' | 'CREDIT_DEBIT_CARD' | 'NET_BANKING' | 'GIFT_CARD' | 'PAY_ON_BOARDING_COD';
 
 export interface Seat {
   id: string;
@@ -106,6 +106,7 @@ export type PassengerDetails = Passenger;
 export interface Booking {
   id: string;
   pnr: string;
+  userId?: string;
   tripId: string;
   trip: {
     originCity: string;
@@ -230,6 +231,9 @@ export interface UserAccount {
   role: UserRole;
   avatarUrl?: string;
   createdAt: string;
+  lastLoginAt?: string;
+  status?: 'ACTIVE' | 'SUSPENDED';
+  bookingsCount?: number;
   isFirebaseUser?: boolean;
   firebaseUid?: string;
   authProvider?: string;
@@ -246,6 +250,23 @@ export interface UserAccount {
   twoFactorEnabled?: boolean;
 }
 
+export interface OtpSessionResponse {
+  success: boolean;
+  message?: string;
+  expiresInSeconds?: number;
+  email?: string;
+  error?: string;
+  retryAfterSeconds?: number;
+}
+
+export interface VerifyOtpResponse {
+  success: boolean;
+  user?: UserAccount;
+  sessionToken?: string;
+  message?: string;
+  error?: string;
+}
+
 export interface OfferCoupon {
   id: string;
   code: string;
@@ -258,4 +279,75 @@ export interface OfferCoupon {
   isLive: boolean;
   validUntil: string;
   badgeTag?: string;
+  savingsText?: string;
+  category?: 'BUS' | 'TRAIN' | 'HOTEL' | 'ALL';
+  imageUrl?: string;
+  termsAndConditions?: string[];
+  howToUse?: string[];
+}
+
+export interface GiftCard {
+  id: string;
+  code: string;
+  pin: string;
+  amount: number;
+  recipientEmail: string;
+  senderEmail: string;
+  status: 'ACTIVE' | 'REDEEMED';
+  validUntil: string;
+  createdAt: string;
+  imageUrl?: string;
+  title?: string;
+}
+
+export type BusGPSStatus = 'LIVE' | 'UPDATING' | 'OFFLINE';
+
+export interface RouteStop {
+  id: string;
+  name: string;
+  status: 'COMPLETED' | 'CURRENT' | 'NEXT' | 'UPCOMING';
+  eta: string;
+}
+
+export interface BusTrackingNotification {
+  id: string;
+  title: string;
+  message: string;
+  time: string;
+}
+
+export interface LiveTrackingResponse {
+  bookingId: string;
+  pnrNumber: string;
+  status: string;
+  seatNumbers: string[];
+  passengerNames: string[];
+  bus: {
+    id: string;
+    displayNumber: string;
+    registrationNumber: string;
+    operatorName: string;
+    model: string;
+    driverName: string;
+    conductorName: string;
+  };
+  route: {
+    originCity: string;
+    destinationCity: string;
+    stops: RouteStop[];
+  };
+  liveGps: {
+    latitude: number;
+    longitude: number;
+    currentLocationName: string;
+    nextStopName: string;
+    distanceRemainingKm: number;
+    speedKmph: number;
+    heading: string;
+    accuracy: string;
+    gpsStatus: BusGPSStatus;
+    lastUpdated: string;
+    lastUpdatedTimestamp: number;
+  };
+  notifications: BusTrackingNotification[];
 }

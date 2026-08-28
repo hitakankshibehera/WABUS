@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { motion } from 'motion/react';
 import { Seat, Trip, FeatureFlags } from '../../types';
 import { soundEngine } from '../../utils/audio';
 import { Layers, Clock, Shield, User, AlertCircle, Info, Lock, ChevronRight } from 'lucide-react';

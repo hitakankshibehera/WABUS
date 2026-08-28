@@ -23,8 +23,10 @@ import {
   RefreshCw,
   ChevronRight,
   Check,
-  Trash2
+  Trash2,
+  Radio
 } from 'lucide-react';
+import { LiveBusTracker } from '../Passenger/LiveBusTracker';
 
 const JourneyQrCode: React.FC<{ booking: Booking }> = ({ booking }) => {
   const [qrUrl, setQrUrl] = useState<string>('');
@@ -112,12 +114,20 @@ export const PassengerProfileModal: React.FC<{
 
   if (!isProfileModalOpen || !currentUser) return null;
 
-  // Filter bookings for current passenger
-  const activeJourneys = userBookings.filter(b => b.checkInStatus !== 'BOARDED' && b.checkInStatus !== 'CANCELLED');
-  const boardedJourneys = userBookings.filter(b => b.checkInStatus === 'BOARDED');
-  const cancelledJourneys = userBookings.filter(b => b.checkInStatus === 'CANCELLED');
+  // Filter bookings strictly for the current logged in passenger
+  const currentEmailClean = (currentUser?.email || '').trim().toLowerCase();
+  const currentUserId = currentUser?.id;
+
+  const myBookings = userBookings.filter(b => {
+    const contactEmailClean = (b.contactEmail || '').trim().toLowerCase();
+    return (contactEmailClean === currentEmailClean && currentEmailClean !== '') || (b.userId && b.userId === currentUserId);
+  });
+
+  const activeJourneys = myBookings.filter(b => b.checkInStatus !== 'BOARDED' && b.checkInStatus !== 'CANCELLED');
+  const boardedJourneys = myBookings.filter(b => b.checkInStatus === 'BOARDED');
+  const cancelledJourneys = myBookings.filter(b => b.checkInStatus === 'CANCELLED');
   
-  const totalSeatsCount = userBookings.reduce((sum, b) => sum + b.passengers.length, 0);
+  const totalSeatsCount = myBookings.reduce((sum, b) => sum + b.passengers.length, 0);
   const activeSeatsCount = activeJourneys.reduce((sum, b) => sum + b.passengers.length, 0);
   const boardedSeatsCount = boardedJourneys.reduce((sum, b) => sum + b.passengers.length, 0);
 
@@ -127,7 +137,7 @@ export const PassengerProfileModal: React.FC<{
     ? boardedJourneys
     : journeyFilter === 'CANCELLED'
     ? cancelledJourneys
-    : userBookings;
+    : myBookings;
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/65 backdrop-blur-xs flex items-center justify-center p-4">

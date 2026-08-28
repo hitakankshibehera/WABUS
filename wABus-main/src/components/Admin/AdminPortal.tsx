@@ -30,7 +30,8 @@ import {
   ArrowRight,
   Key,
   Tag,
-  Trash2
+  Trash2,
+  X
 } from 'lucide-react';
 
 interface AdminPortalProps {
@@ -47,10 +48,11 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   onRefreshTrips,
 }) => {
   const { currentUser, loginAdmin, signupAdmin, switchDemoRole, logout } = useAuth();
-  const [activeAdminTab, setActiveAdminTab] = useState<'FEATURE_FLAGS' | 'SCHEDULES' | 'OFFERS' | 'PAYOUTS' | 'ANALYTICS'>('FEATURE_FLAGS');
+  const [activeAdminTab, setActiveAdminTab] = useState<'FEATURE_FLAGS' | 'SCHEDULES' | 'OFFERS' | 'PAYOUTS' | 'ANALYTICS' | 'CUSTOMERS'>('FEATURE_FLAGS');
   const [payouts, setPayouts] = useState<PayoutRecord[]>([]);
   const [isCronRunning, setIsCronRunning] = useState(false);
   const [cronMessage, setCronMessage] = useState<string | null>(null);
+  const [customers, setCustomers] = useState<any[]>([]);
 
   // Offers State
   const [offers, setOffers] = useState<OfferCoupon[]>([]);
@@ -62,8 +64,110 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [newOfferMinAmount, setNewOfferMinAmount] = useState('300');
   const [newOfferValidUntil, setNewOfferValidUntil] = useState('2026-12-31');
   const [newOfferBadge, setNewOfferBadge] = useState('');
+  const [newOfferSavingsText, setNewOfferSavingsText] = useState('');
+  const [newOfferCategory, setNewOfferCategory] = useState<'BUS' | 'TRAIN' | 'HOTEL' | 'ALL'>('BUS');
+  const [newOfferImageUrl, setNewOfferImageUrl] = useState('');
+  const [newOfferTerms, setNewOfferTerms] = useState('');
+  const [newOfferHowToUse, setNewOfferHowToUse] = useState('');
   const [isPublishingOffer, setIsPublishingOffer] = useState(false);
   const [offerSuccessMsg, setOfferSuccessMsg] = useState<string | null>(null);
+
+  // Gift Card Email Generator State
+  const [gcRecipientEmail, setGcRecipientEmail] = useState('customer@gmail.com');
+  const [gcAmount, setGcAmount] = useState('500');
+  const [gcCode, setGcCode] = useState('WABUS500');
+  const [gcPin, setGcPin] = useState('1234');
+  const [gcTitle, setGcTitle] = useState('Festival Celebration Gift Card');
+  const [gcSelectedImage, setGcSelectedImage] = useState('https://images.unsplash.com/photo-1549465220-1a8b9238cd48?w=600&auto=format&fit=crop&q=80');
+  const [isGcSending, setIsGcSending] = useState(false);
+  const [gcSuccessMsg, setGcSuccessMsg] = useState<string | null>(null);
+  const [sentGiftCardPreview, setSentGiftCardPreview] = useState<{
+    recipientEmail: string;
+    amount: number;
+    code: string;
+    pin: string;
+    senderEmail: string;
+    message: string;
+    imageUrl?: string;
+    title?: string;
+    previewUrl?: string;
+    smtpMessageId?: string;
+    smtpResponse?: string;
+  } | null>(null);
+
+  const GIFT_CARD_TEMPLATES = [
+    {
+      id: 'template-1',
+      name: 'Festival Luxe Gift Card',
+      imageUrl: 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?w=600&auto=format&fit=crop&q=80',
+      badge: 'Red & Gold Luxe'
+    },
+    {
+      id: 'template-2',
+      name: 'Birthday & Celebration Pass',
+      imageUrl: 'https://images.unsplash.com/photo-1513151233558-d860c5398176?w=600&auto=format&fit=crop&q=80',
+      badge: 'Party Lights'
+    },
+    {
+      id: 'template-3',
+      name: 'Primo VIP Black Pass',
+      imageUrl: 'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=600&auto=format&fit=crop&q=80',
+      badge: 'VIP Luxury'
+    },
+    {
+      id: 'template-4',
+      name: 'Bus Travel Ride Voucher',
+      imageUrl: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=600&auto=format&fit=crop&q=80',
+      badge: 'Express Bus'
+    },
+    {
+      id: 'template-5',
+      name: 'Holiday Season Gift Voucher',
+      imageUrl: 'https://images.unsplash.com/photo-1512909006721-3d6018887383?w=600&auto=format&fit=crop&q=80',
+      badge: 'Festive Season'
+    }
+  ];
+
+  const handleSendGiftCardEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!gcRecipientEmail || !gcAmount) {
+      alert('Please enter both customer email address and gift card amount.');
+      return;
+    }
+
+    setIsGcSending(true);
+    setGcSuccessMsg(null);
+    try {
+      const res = await api.sendAdminGiftCard({
+        recipientEmail: gcRecipientEmail.trim(),
+        amount: Number(gcAmount),
+        code: gcCode.trim().toUpperCase(),
+        pin: gcPin.trim(),
+        imageUrl: gcSelectedImage,
+        title: gcTitle
+      });
+      
+      const successText = `Gift card email sent from wonderlightadventure@gmail.com to ${gcRecipientEmail.trim()}!`;
+      setGcSuccessMsg(`📧 ${successText}`);
+      setSentGiftCardPreview({
+        recipientEmail: gcRecipientEmail.trim(),
+        amount: Number(gcAmount),
+        code: gcCode.trim().toUpperCase(),
+        pin: gcPin.trim(),
+        senderEmail: 'wonderlightadventure@gmail.com',
+        message: successText,
+        imageUrl: gcSelectedImage,
+        title: gcTitle,
+        previewUrl: res.previewUrl,
+        smtpMessageId: res.smtpMessageId,
+        smtpResponse: res.smtpResponse
+      });
+    } catch (err: any) {
+      alert(err.message || 'Failed to send gift card email');
+    } finally {
+      setIsGcSending(false);
+    }
+  };
 
   const fetchOffers = async () => {
     try {
@@ -92,12 +196,21 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
         discountValue: Number(newOfferValue),
         minBookingAmount: Number(newOfferMinAmount || 0),
         validUntil: newOfferValidUntil,
-        badgeTag: newOfferBadge
+        badgeTag: newOfferBadge,
+        savingsText: newOfferSavingsText,
+        category: newOfferCategory,
+        imageUrl: newOfferImageUrl,
+        termsAndConditions: newOfferTerms ? newOfferTerms.split('\n').filter(Boolean) : undefined,
+        howToUse: newOfferHowToUse ? newOfferHowToUse.split('\n').filter(Boolean) : undefined,
       });
-      setOfferSuccessMsg(`Offer package ${res.offer.code} released live to website!`);
+      setOfferSuccessMsg(`✅ Offer ${res.offer.code} is now LIVE on the website!`);
       setNewOfferCode('');
       setNewOfferTitle('');
       setNewOfferDesc('');
+      setNewOfferSavingsText('');
+      setNewOfferImageUrl('');
+      setNewOfferTerms('');
+      setNewOfferHowToUse('');
       fetchOffers();
     } catch (err: any) {
       alert(err.message || 'Failed to publish offer package');
@@ -164,6 +277,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [selectedRouteId, setSelectedRouteId] = useState('');
   const [customOrigin, setCustomOrigin] = useState('Bhubaneswar');
   const [customDest, setCustomDest] = useState('Puri');
+  const [customBoardingStops, setCustomBoardingStops] = useState('Baramunda ISBT, Master Canteen, Vani Vihar');
+  const [customDroppingStops, setCustomDroppingStops] = useState('Puri Bus Stand, Grand Road Jagannath Temple, Atharnala');
   const [coachCategory, setCoachCategory] = useState<'DAY_COACH' | 'NIGHT_COACH'>('NIGHT_COACH');
   const [selectedBusType, setSelectedBusType] = useState<CoachType>('AC_SLEEPER_2_1');
   const [customBusModel, setCustomBusModel] = useState('BharatBenz 2+1 AC Sleeper Executive');
@@ -267,6 +382,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
         routeId: routeMode === 'PRESET' ? selectedRouteId : undefined,
         originCity: routeMode === 'CUSTOM' ? customOrigin : undefined,
         destinationCity: routeMode === 'CUSTOM' ? customDest : undefined,
+        boardingStops: routeMode === 'CUSTOM' ? customBoardingStops : undefined,
+        droppingStops: routeMode === 'CUSTOM' ? customDroppingStops : undefined,
         category: coachCategory,
         busType: selectedBusType,
         busModel: customBusModel,
@@ -560,6 +677,17 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
               Midnight Payouts
             </button>
             <button
+              onClick={() => {
+                setActiveAdminTab('CUSTOMERS');
+                api.getAdminCustomers().then(setCustomers).catch(console.error);
+              }}
+              className={`px-3.5 py-1.5 rounded-xl transition cursor-pointer ${
+                activeAdminTab === 'CUSTOMERS' ? 'bg-[#D84E55] text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Customer Accounts
+            </button>
+            <button
               onClick={() => setActiveAdminTab('ANALYTICS')}
               className={`px-3.5 py-1.5 rounded-xl transition cursor-pointer ${
                 activeAdminTab === 'ANALYTICS' ? 'bg-[#D84E55] text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'
@@ -813,28 +941,57 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
               </div>
 
               {routeMode === 'CUSTOM' ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                  <div>
-                    <label className="text-[11px] text-gray-700 font-bold block mb-1">From City (Origin)</label>
-                    <input
-                      type="text"
-                      value={customOrigin}
-                      onChange={e => setCustomOrigin(e.target.value)}
-                      placeholder="e.g. Bhubaneswar"
-                      className="w-full bg-white border border-gray-300 rounded-xl p-2.5 text-gray-900 font-bold focus:border-[#D84E55] focus:outline-none"
-                      required
-                    />
+                <div className="space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <div>
+                      <label className="text-[11px] text-gray-700 font-bold block mb-1">From City (Origin)</label>
+                      <input
+                        type="text"
+                        value={customOrigin}
+                        onChange={e => setCustomOrigin(e.target.value)}
+                        placeholder="e.g. Bhubaneswar"
+                        className="w-full bg-white border border-gray-300 rounded-xl p-2.5 text-gray-900 font-bold focus:border-[#D84E55] focus:outline-none"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] text-gray-700 font-bold block mb-1">To City (Destination)</label>
+                      <input
+                        type="text"
+                        value={customDest}
+                        onChange={e => setCustomDest(e.target.value)}
+                        placeholder="e.g. Puri"
+                        className="w-full bg-white border border-gray-300 rounded-xl p-2.5 text-gray-900 font-bold focus:border-[#D84E55] focus:outline-none"
+                        required
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label className="text-[11px] text-gray-700 font-bold block mb-1">To City (Destination)</label>
-                    <input
-                      type="text"
-                      value={customDest}
-                      onChange={e => setCustomDest(e.target.value)}
-                      placeholder="e.g. Puri"
-                      className="w-full bg-white border border-gray-300 rounded-xl p-2.5 text-gray-900 font-bold focus:border-[#D84E55] focus:outline-none"
-                      required
-                    />
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <div>
+                      <label className="text-[11px] text-gray-700 font-bold block mb-1">
+                        Boarding Bus Stops (From Places - comma separated)
+                      </label>
+                      <input
+                        type="text"
+                        value={customBoardingStops}
+                        onChange={e => setCustomBoardingStops(e.target.value)}
+                        placeholder="e.g. Baramunda ISBT, Master Canteen, Vani Vihar"
+                        className="w-full bg-white border border-gray-300 rounded-xl p-2.5 text-gray-900 font-medium focus:border-[#D84E55] focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] text-gray-700 font-bold block mb-1">
+                        Dropping Bus Stops (To Places - comma separated)
+                      </label>
+                      <input
+                        type="text"
+                        value={customDroppingStops}
+                        onChange={e => setCustomDroppingStops(e.target.value)}
+                        placeholder="e.g. Puri Bus Stand, Grand Road Jagannath Temple, Atharnala"
+                        className="w-full bg-white border border-gray-300 rounded-xl p-2.5 text-gray-900 font-medium focus:border-[#D84E55] focus:outline-none"
+                      />
+                    </div>
                   </div>
                 </div>
               ) : (
@@ -1101,24 +1258,45 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       {/* TAB: OFFERS & COUPONS MANAGER */}
       {activeAdminTab === 'OFFERS' && (
         <div className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-7 shadow-xs space-y-6">
-          <div className="border-b border-gray-100 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          {/* Header */}
+          <div className="border-b border-gray-100 pb-5 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
             <div>
               <h3 className="text-base font-extrabold text-gray-900 flex items-center gap-2">
-                <Tag className="w-5 h-5 text-[#D84E55]" />
-                <span>Offers & Promotional Coupon Code Manager</span>
+                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#D84E55] to-[#b83238] flex items-center justify-center shadow-sm">
+                  <Tag className="w-4 h-4 text-white" />
+                </div>
+                <span>Exclusive Offers &amp; Coupon Manager</span>
               </h3>
-              <p className="text-xs text-gray-500 mt-0.5">
-                Create new promotional packages, specify flat/percentage discounts, and release live offers instantly to website customers.
+              <p className="text-xs text-gray-500 mt-1.5 ml-10">
+                Publish new promo packages here and they go
+                <strong className="text-[#D84E55]"> instantly live</strong> on the customer website.
+                Customers see the latest offers in real-time on the homepage.
               </p>
             </div>
 
             <button
               onClick={fetchOffers}
-              className="px-3 py-1.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer self-start sm:self-auto"
+              className="px-3 py-1.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer self-start sm:self-auto shrink-0"
             >
               <RefreshCw className="w-3.5 h-3.5" />
-              <span>Refresh Offers</span>
+              <span>Refresh</span>
             </button>
+          </div>
+
+          {/* Live Stats Bar */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-3 text-center">
+              <div className="text-xl font-black text-emerald-700">{offers.filter(o => o.isLive).length}</div>
+              <div className="text-[11px] text-emerald-800 font-semibold mt-0.5">Live on Website</div>
+            </div>
+            <div className="bg-gray-50 border border-gray-200 rounded-2xl p-3 text-center">
+              <div className="text-xl font-black text-gray-700">{offers.filter(o => !o.isLive).length}</div>
+              <div className="text-[11px] text-gray-600 font-semibold mt-0.5">Paused</div>
+            </div>
+            <div className="bg-red-50 border border-red-200 rounded-2xl p-3 text-center">
+              <div className="text-xl font-black text-[#D84E55]">{offers.length}</div>
+              <div className="text-[11px] text-red-800 font-semibold mt-0.5">Total Created</div>
+            </div>
           </div>
 
           {/* Create & Release New Offer Form */}
@@ -1204,6 +1382,10 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                 />
               </div>
 
+            </div>
+
+            {/* Row 3: Badge + Valid Until + MaxDiscount */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
               <div>
                 <label className="text-[11px] font-bold text-gray-700 block mb-1">Badge Tag</label>
                 <input
@@ -1214,10 +1396,86 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                   className="w-full bg-white border border-gray-300 rounded-xl p-2.5 font-mono text-gray-900 focus:border-[#D84E55] focus:outline-none"
                 />
               </div>
+              <div>
+                <label className="text-[11px] font-bold text-gray-700 block mb-1">Valid Until Date</label>
+                <input
+                  type="date"
+                  value={newOfferValidUntil}
+                  onChange={e => setNewOfferValidUntil(e.target.value)}
+                  min={new Date().toISOString().split('T')[0]}
+                  className="w-full bg-white border border-gray-300 rounded-xl p-2.5 text-gray-900 font-bold focus:border-[#D84E55] focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-bold text-gray-700 block mb-1">Max Discount Cap (₹) <span className="text-gray-400 font-normal">Optional</span></label>
+                <input
+                  type="number"
+                  placeholder="e.g. 250 (for % offers)"
+                  className="w-full bg-white border border-gray-300 rounded-xl p-2.5 font-mono text-gray-900 focus:border-[#D84E55] focus:outline-none"
+                />
+              </div>
             </div>
 
+            {/* Row 4: Savings Headline + Category */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+              <div className="sm:col-span-2">
+                <label className="text-[11px] font-bold text-gray-700 block mb-1">
+                  Savings Headline
+                  <span className="text-gray-400 font-normal ml-1">(bold card title e.g. &quot;Save up to ₹300 on bus tickets&quot;)</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Save up to ₹150 on luxury night coaches"
+                  value={newOfferSavingsText}
+                  onChange={e => setNewOfferSavingsText(e.target.value)}
+                  className="w-full bg-white border border-gray-300 rounded-xl p-2.5 text-gray-900 font-semibold focus:border-[#D84E55] focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-bold text-gray-700 block mb-1">Category</label>
+                <select
+                  value={newOfferCategory}
+                  onChange={e => setNewOfferCategory(e.target.value as 'BUS' | 'TRAIN' | 'HOTEL' | 'ALL')}
+                  className="w-full bg-white border border-gray-300 rounded-xl p-2.5 text-gray-900 font-bold focus:border-[#D84E55] focus:outline-none"
+                >
+                  <option value="BUS">Bus</option>
+                  <option value="TRAIN">Train</option>
+                  <option value="HOTEL">Hotel</option>
+                  <option value="ALL">All Categories</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Row 5: Image URL + Preview */}
+            <div className="space-y-1.5 text-xs">
+              <label className="text-[11px] font-bold text-gray-700 block">
+                Offer Card Image URL
+                <span className="text-gray-400 font-normal ml-1">(image displayed on the offer card on customer homepage)</span>
+              </label>
+              <div className="flex gap-3">
+                <input
+                  type="url"
+                  placeholder="https://example.com/bus-offer-banner.png"
+                  value={newOfferImageUrl}
+                  onChange={e => setNewOfferImageUrl(e.target.value)}
+                  className="flex-1 bg-white border border-gray-300 rounded-xl p-2.5 text-xs text-gray-900 focus:border-[#D84E55] focus:outline-none"
+                />
+                {newOfferImageUrl && (
+                  <div className="w-20 h-14 rounded-xl border border-gray-200 bg-gray-50 overflow-hidden flex items-center justify-center shrink-0">
+                    <img
+                      src={newOfferImageUrl}
+                      alt="preview"
+                      className="w-full h-full object-contain p-1"
+                      onError={e => { (e.target as HTMLImageElement).style.opacity = '0.2'; }}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Offer Description */}
             <div>
-              <label className="text-[11px] font-bold text-gray-700 block mb-1">Offer Description</label>
+              <label className="text-[11px] font-bold text-gray-700 block mb-1">Offer Description <span className="text-gray-400 font-normal">(supporting subtext shown on website)</span></label>
               <input
                 type="text"
                 placeholder="e.g. Flat ₹150 discount on all Night Sleeper Luxury Coach bookings across Odisha corridors."
@@ -1225,6 +1483,37 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                 onChange={e => setNewOfferDesc(e.target.value)}
                 className="w-full bg-white border border-gray-300 rounded-xl p-2.5 text-gray-900 focus:border-[#D84E55] focus:outline-none"
               />
+            </div>
+
+            {/* Terms & Conditions & How to Use (Pop-up Modal details) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+              <div>
+                <label className="text-[11px] font-bold text-gray-700 block mb-1">
+                  Terms &amp; Conditions
+                  <span className="text-gray-400 font-normal ml-1">(one condition per line)</span>
+                </label>
+                <textarea
+                  rows={3}
+                  placeholder={`e.g. Valid on minimum booking of ₹300.\nApplicable once per user.\nCannot be combined with other offers.`}
+                  value={newOfferTerms}
+                  onChange={e => setNewOfferTerms(e.target.value)}
+                  className="w-full bg-white border border-gray-300 rounded-xl p-2.5 text-xs text-gray-900 focus:border-[#D84E55] focus:outline-none font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-gray-700 block mb-1">
+                  How to Use / Redeem Instructions
+                  <span className="text-gray-400 font-normal ml-1">(one step per line)</span>
+                </label>
+                <textarea
+                  rows={3}
+                  placeholder={`e.g. Select your preferred bus & seats.\nProceed to passenger details page.\nEnter coupon code at checkout and click Apply.`}
+                  value={newOfferHowToUse}
+                  onChange={e => setNewOfferHowToUse(e.target.value)}
+                  className="w-full bg-white border border-gray-300 rounded-xl p-2.5 text-xs text-gray-900 focus:border-[#D84E55] focus:outline-none font-mono"
+                />
+              </div>
             </div>
 
             <div className="flex justify-end pt-1">
@@ -1239,65 +1528,249 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
             </div>
           </form>
 
-          {/* Published Offers Roster Table */}
+          {/* =========================================================================
+              NEW: ADMIN GIFT CARD EMAIL SENDER PANEL (wonderlightadventure@gmail.com)
+              ========================================================================= */}
+          <div className="bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100/50 border border-amber-200 rounded-2xl p-5 space-y-4 shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-amber-200/60 pb-3 gap-2">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-amber-600 text-white flex items-center justify-center font-bold shadow-xs">
+                  🎁
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-sm text-amber-950">Issue &amp; Send Gift Card Email to Customer</h4>
+                  <p className="text-[11px] text-amber-800">
+                    Sends real HTML gift card email from <strong className="text-amber-950 font-mono underline">wonderlightadventure@gmail.com</strong> directly to customer email inbox.
+                  </p>
+                </div>
+              </div>
+              <span className="text-[10px] font-mono font-bold bg-emerald-100 text-emerald-900 px-2.5 py-1 rounded-full border border-emerald-300 flex items-center gap-1 self-start sm:self-auto shrink-0 shadow-2xs">
+                <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse"></span>
+                <span>Gmail SMTP 587 Connected</span>
+              </span>
+            </div>
+
+            {gcSuccessMsg && (
+              <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl text-xs font-semibold flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>{gcSuccessMsg}</span>
+              </div>
+            )}
+
+            {/* Visual Gift Card Image Selector Gallery */}
+            <div className="space-y-2 pt-1">
+              <label className="text-[11px] font-bold text-amber-950 block">Select Gift Card Design Theme / Image</label>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+                {GIFT_CARD_TEMPLATES.map(tpl => (
+                  <button
+                    key={tpl.id}
+                    type="button"
+                    onClick={() => {
+                      setGcSelectedImage(tpl.imageUrl);
+                      setGcTitle(tpl.name);
+                    }}
+                    className={`relative rounded-xl overflow-hidden border-2 text-left transition cursor-pointer group ${
+                      gcSelectedImage === tpl.imageUrl
+                        ? 'border-amber-600 ring-2 ring-amber-500/50 shadow-md scale-[1.02]'
+                        : 'border-white/80 hover:border-amber-300 opacity-80 hover:opacity-100'
+                    }`}
+                  >
+                    <img src={tpl.imageUrl} alt={tpl.name} className="w-full h-16 object-cover" />
+                    <div className="p-1.5 bg-white/95 backdrop-blur-xs text-[10px] font-bold text-slate-800 truncate">
+                      {tpl.badge}
+                    </div>
+                    {gcSelectedImage === tpl.imageUrl && (
+                      <div className="absolute top-1 right-1 w-4 h-4 rounded-full bg-amber-600 text-white flex items-center justify-center text-[9px] font-bold shadow-xs">
+                        ✓
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+
+              {/* Custom Image URL Input */}
+              <div className="pt-1 flex gap-2">
+                <input
+                  type="text"
+                  value={gcSelectedImage}
+                  onChange={e => setGcSelectedImage(e.target.value)}
+                  placeholder="Or paste custom gift card image URL..."
+                  className="flex-1 bg-white border border-amber-300 rounded-xl px-3 py-2 text-xs font-mono text-gray-900 focus:border-amber-600 focus:outline-none"
+                />
+                <input
+                  type="text"
+                  value={gcTitle}
+                  onChange={e => setGcTitle(e.target.value)}
+                  placeholder="Gift Card Title"
+                  className="w-48 bg-white border border-amber-300 rounded-xl px-3 py-2 text-xs font-bold text-gray-900 focus:border-amber-600 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <form onSubmit={handleSendGiftCardEmail} className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
+              <div>
+                <label className="text-[11px] font-bold text-amber-950 block mb-1">Customer Email Address</label>
+                <input
+                  type="email"
+                  placeholder="e.g. customer@gmail.com"
+                  value={gcRecipientEmail}
+                  onChange={e => setGcRecipientEmail(e.target.value)}
+                  className="w-full bg-white border border-amber-300 rounded-xl p-2.5 text-xs text-gray-900 font-semibold focus:border-amber-600 focus:outline-none"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-amber-950 block mb-1">Gift Card Value (₹)</label>
+                <input
+                  type="number"
+                  placeholder="500"
+                  value={gcAmount}
+                  onChange={e => setGcAmount(e.target.value)}
+                  className="w-full bg-white border border-amber-300 rounded-xl p-2.5 font-mono font-bold text-gray-900 focus:border-amber-600 focus:outline-none"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-amber-950 block mb-1">Gift Card Code</label>
+                <input
+                  type="text"
+                  value={gcCode}
+                  onChange={e => setGcCode(e.target.value.toUpperCase())}
+                  placeholder="e.g. WABUS500"
+                  className="w-full bg-white border border-amber-300 rounded-xl p-2.5 font-mono font-bold uppercase text-gray-900 focus:border-amber-600 focus:outline-none"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-amber-950 block mb-1">4-Digit PIN</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={gcPin}
+                    onChange={e => setGcPin(e.target.value)}
+                    placeholder="1234"
+                    maxLength={4}
+                    className="w-full bg-white border border-amber-300 rounded-xl p-2.5 font-mono font-bold text-gray-900 focus:border-amber-600 focus:outline-none"
+                    required
+                  />
+                  <button
+                    type="submit"
+                    disabled={isGcSending}
+                    className="px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs uppercase tracking-wider shrink-0 transition cursor-pointer shadow-xs"
+                  >
+                    {isGcSending ? 'Sending Email...' : 'Send Email'}
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+
+          {/* Published Offers Roster */}
           <div className="space-y-4">
             <h4 className="text-xs font-bold uppercase tracking-wider text-gray-700 flex items-center gap-2">
               <Tag className="w-4 h-4 text-[#D84E55]" />
-              <span>Live Promotional Offers & Coupon Roster ({offers.length})</span>
+              <span>All Offers Roster ({offers.length})</span>
+              <span className="ml-auto text-[11px] normal-case font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                {offers.filter(o => o.isLive).length} currently showing on website
+              </span>
             </h4>
+
+            {offers.length === 0 && (
+              <div className="text-center py-8 text-slate-400 text-xs">
+                No offers yet. Create your first exclusive offer above to push it live to the website!
+              </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {offers.map(off => (
-                <div 
+                <div
                   key={off.id}
-                  className={`p-4 rounded-2xl border transition space-y-3 ${
-                    off.isLive 
-                      ? 'bg-white border-gray-200 shadow-xs' 
-                      : 'bg-gray-50 border-gray-200 opacity-60'
+                  className={`rounded-2xl border transition overflow-hidden ${
+                    off.isLive
+                      ? 'border-gray-200 bg-white shadow-xs'
+                      : 'border-gray-200 bg-gray-50/60 opacity-60'
                   }`}
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-black font-mono px-3 py-1 bg-red-50 text-[#D84E55] rounded-xl border border-red-200">
-                        {off.code}
-                      </span>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-200">
-                        {off.badgeTag || `${off.discountValue} OFF`}
-                      </span>
+                  {/* Card visual: image area + controls */}
+                  <div className="flex">
+                    {/* Image area */}
+                    <div className="w-28 shrink-0 bg-rose-50 flex items-center justify-center p-3 border-r border-gray-100">
+                      {off.imageUrl ? (
+                        <img
+                          src={off.imageUrl}
+                          alt={off.title}
+                          className="w-full h-20 object-contain"
+                          onError={e => { (e.target as HTMLImageElement).src = ''; }}
+                        />
+                      ) : (
+                        <div className="w-full h-20 flex flex-col items-center justify-center gap-1">
+                          <BusIcon className="w-8 h-8 text-[#D84E55] opacity-40" />
+                          <span className="text-[9px] text-gray-400">No Image</span>
+                        </div>
+                      )}
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleToggleOffer(off.id)}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
-                          off.isLive
-                            ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
-                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                        }`}
-                      >
-                        {off.isLive ? '🟢 LIVE' : '⚪ PAUSED'}
-                      </button>
+                    {/* Content */}
+                    <div className="flex-1 p-3 space-y-2 min-w-0">
+                      {/* Category pill + controls */}
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-slate-800 text-white uppercase tracking-wider">
+                          {off.category || 'Bus'}
+                        </span>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            onClick={() => handleToggleOffer(off.id)}
+                            className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition cursor-pointer ${
+                              off.isLive
+                                ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200 border border-emerald-300'
+                                : 'bg-gray-200 text-gray-700 hover:bg-gray-300 border border-gray-300'
+                            }`}
+                          >
+                            {off.isLive ? '🟢 LIVE' : '⚪ OFF'}
+                          </button>
+                          <button
+                            onClick={() => handleDeleteOffer(off.id)}
+                            className="p-1 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition cursor-pointer"
+                            title="Delete offer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
 
-                      <button
-                        onClick={() => handleDeleteOffer(off.id)}
-                        className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition cursor-pointer"
-                        title="Delete offer"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      {/* Savings headline */}
+                      <div className="text-xs font-extrabold text-gray-900 leading-snug line-clamp-2">
+                        {off.savingsText || off.title}
+                      </div>
+
+                      {/* Valid till */}
+                      <div className="text-[10px] text-gray-500">
+                        Valid till {new Date(off.validUntil + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </div>
+
+                      {/* Coupon code row */}
+                      <div className="flex items-center gap-1.5 pt-1 border-t border-gray-100">
+                        <Tag className="w-3 h-3 text-[#D84E55] shrink-0" />
+                        <span className="font-mono font-black text-[11px] text-gray-800">{off.code}</span>
+                        {off.badgeTag && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-200">
+                            {off.badgeTag}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
 
-                  <div>
-                    <h5 className="text-xs font-bold text-gray-900">{off.title}</h5>
-                    <p className="text-[11px] text-gray-500">{off.description}</p>
-                  </div>
-
-                  <div className="flex items-center justify-between text-[11px] font-mono text-gray-600 pt-2 border-t border-gray-100">
-                    <span>Discount: <strong className="text-emerald-700 font-bold">{off.discountType === 'FLAT' ? `₹${off.discountValue} FLAT` : `${off.discountValue}%`}</strong></span>
-                    <span>Min Spend: <strong className="text-gray-900">₹{off.minBookingAmount}</strong></span>
-                    <span>Valid Until: <strong className="text-gray-500">{off.validUntil}</strong></span>
-                  </div>
+                  {/* Footer: stats + website visibility */}
+                  {off.isLive && (
+                    <div className="px-3 py-2 bg-emerald-50 border-t border-emerald-100 text-[10px] text-emerald-800 font-semibold flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                      Visible to customers — Homepage &amp; Checkout
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -1374,6 +1847,74 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
         </div>
       )}
 
+      {/* TAB: CUSTOMER ACCOUNTS & OTP AUTH SECURITY */}
+      {activeAdminTab === 'CUSTOMERS' && (
+        <div className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-7 shadow-xs space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-4">
+            <div>
+              <h3 className="text-base font-extrabold text-gray-900 flex items-center gap-2">
+                <User className="w-4 h-4 text-[#D84E55]" />
+                <span>Customer Accounts & Passwordless OTP Audits</span>
+              </h3>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Registered user profiles, email verification statuses, creation dates, and booking history relations.
+              </p>
+            </div>
+            <div className="px-3 py-1 bg-slate-100 border border-slate-200 rounded-xl text-[11px] font-bold text-slate-700">
+              🔒 Plaintext OTPs & Passwords Never Stored
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="border-b border-gray-200 text-[11px] uppercase font-bold text-gray-500">
+                  <th className="pb-3 px-3">Customer ID</th>
+                  <th className="pb-3 px-3">Email Address</th>
+                  <th className="pb-3 px-3">Verification</th>
+                  <th className="pb-3 px-3">Role</th>
+                  <th className="pb-3 px-3">Account Status</th>
+                  <th className="pb-3 px-3">Created Date</th>
+                  <th className="pb-3 px-3">Last Login</th>
+                  <th className="pb-3 px-3 text-right">Bookings</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 font-mono">
+                {customers.map((c) => (
+                  <tr key={c.id} className="hover:bg-gray-50 transition">
+                    <td className="py-3 px-3 text-[#D84E55] font-bold text-[11px]">{c.id}</td>
+                    <td className="py-3 px-3 text-gray-900 font-sans font-semibold">
+                      {c.email}
+                      {c.name && <div className="text-[10px] text-gray-400 font-normal">{c.name}</div>}
+                    </td>
+                    <td className="py-3 px-3">
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold border border-emerald-200 inline-flex items-center gap-1 font-sans">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-600" /> VERIFIED
+                      </span>
+                    </td>
+                    <td className="py-3 px-3 font-sans font-bold text-slate-700">{c.role}</td>
+                    <td className="py-3 px-3">
+                      <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-800 text-[10px] font-bold border border-slate-200 font-sans">
+                        {c.status || 'ACTIVE'}
+                      </span>
+                    </td>
+                    <td className="py-3 px-3 text-gray-500 text-[11px]">
+                      {c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'N/A'}
+                    </td>
+                    <td className="py-3 px-3 text-gray-500 text-[11px]">
+                      {c.lastLoginAt ? new Date(c.lastLoginAt).toLocaleString() : 'N/A'}
+                    </td>
+                    <td className="py-3 px-3 text-right font-extrabold text-slate-900">
+                      {c.bookingsCount || 0}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* TAB 4: ANALYTICS OVERVIEW */}
       {activeAdminTab === 'ANALYTICS' && (
         <div className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-7 shadow-xs space-y-6">
@@ -1407,6 +1948,115 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
               <span className="text-[11px] font-bold text-gray-500 uppercase">Seat Lock Conflict Rate</span>
               <div className="text-2xl font-black font-mono text-emerald-700">0.00%</div>
               <span className="text-[10px] text-gray-500">Redis Mutex Protection</span>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* =========================================================
+         DISPATCHED GIFT CARD EMAIL PREVIEW MODAL
+         ========================================================= */}
+      {sentGiftCardPreview && (
+        <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-100 relative flex flex-col max-h-[90vh]">
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-emerald-700 via-emerald-800 to-teal-900 text-white p-5 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-white/15 flex items-center justify-center text-white border border-white/20">
+                  <CheckCircle2 className="w-6 h-6 text-emerald-300" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base leading-tight">Gift Card Email Sent Successfully!</h3>
+                  <p className="text-[11px] text-emerald-100 font-mono">Dispatched from wonderlightadventure@gmail.com</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSentGiftCardPreview(null)}
+                className="w-8 h-8 rounded-full bg-black/20 hover:bg-black/40 text-white flex items-center justify-center transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Email Render Preview Container */}
+            <div className="p-5 overflow-y-auto space-y-4 text-xs">
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2">
+                <div className="flex justify-between border-b border-slate-200 pb-2">
+                  <span className="text-slate-500 font-bold">From:</span>
+                  <span className="font-mono font-extrabold text-slate-900">{sentGiftCardPreview.senderEmail}</span>
+                </div>
+                <div className="flex justify-between border-b border-slate-200 pb-2">
+                  <span className="text-slate-500 font-bold">To Customer:</span>
+                  <span className="font-mono font-extrabold text-emerald-700">{sentGiftCardPreview.recipientEmail}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500 font-bold">Subject:</span>
+                  <span className="font-bold text-slate-900">🎁 You received a ₹{sentGiftCardPreview.amount} wABus Gift Card!</span>
+                </div>
+              </div>
+
+              {/* HTML Mail Body Card */}
+              <div className="border border-rose-200 rounded-2xl overflow-hidden shadow-xs">
+                <div className="bg-gradient-to-r from-[#D84E55] to-[#B83238] text-white p-4 text-center">
+                  <h4 className="font-extrabold text-base">🎁 {sentGiftCardPreview.title || 'Special Gift Card for You!'}</h4>
+                  <p className="text-[11px] text-red-100">From Wonderlight Adventure Company (wABus)</p>
+                </div>
+                <div className="p-4 space-y-3 bg-white text-slate-700">
+                  <p>Master Admin (<strong className="text-slate-900">wonderlightadventure@gmail.com</strong>) has issued a <strong>₹{sentGiftCardPreview.amount}</strong> Gift Card to your email address!</p>
+
+                  {sentGiftCardPreview.imageUrl && (
+                    <div className="rounded-xl overflow-hidden shadow-xs border border-slate-100">
+                      <img src={sentGiftCardPreview.imageUrl} alt="Gift Card Theme" className="w-full h-36 object-cover" />
+                    </div>
+                  )}
+
+                  <div className="bg-rose-50 border border-dashed border-rose-300 rounded-xl p-4 text-center space-y-1">
+                    <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Gift Card Code</span>
+                    <div className="text-2xl font-mono font-black text-slate-900">{sentGiftCardPreview.code}</div>
+                    <div className="text-xs font-bold text-[#D84E55]">4-Digit PIN: <span className="font-mono text-slate-900">{sentGiftCardPreview.pin}</span></div>
+                    <div className="text-xs font-extrabold text-emerald-700">Value: ₹{sentGiftCardPreview.amount}</div>
+                  </div>
+
+                  <div className="text-[11px] text-slate-500 space-y-1 pt-1">
+                    <p className="font-bold text-slate-800">Redemption steps:</p>
+                    <p>1. Customer opens Account Menu ➔ Payments ➔ <strong>Redeem gift card</strong>.</p>
+                    <p>2. Enters Code <strong className="font-mono text-slate-900">{sentGiftCardPreview.code}</strong> and PIN <strong className="font-mono text-slate-900">{sentGiftCardPreview.pin}</strong>.</p>
+                    <p>3. ₹{sentGiftCardPreview.amount} is added instantly to customer&apos;s wABus Wallet balance!</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex flex-col sm:flex-row gap-2 pt-2">
+                {sentGiftCardPreview.previewUrl && (
+                  <a
+                    href={sentGiftCardPreview.previewUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex-1 py-3 px-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs transition cursor-pointer text-center flex items-center justify-center gap-1.5 shadow-md"
+                  >
+                    <span>📬 Open Delivered Webmail Inbox</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </a>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(`Gift Card Code: ${sentGiftCardPreview.code}\nPIN: ${sentGiftCardPreview.pin}\nAmount: ₹${sentGiftCardPreview.amount}`);
+                    alert('Gift Card credentials copied to clipboard!');
+                  }}
+                  className="flex-1 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-extrabold text-xs transition cursor-pointer text-center"
+                >
+                  📋 Copy Code &amp; PIN
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSentGiftCardPreview(null)}
+                  className="flex-1 py-3 rounded-xl bg-[#D84E55] hover:bg-[#C33E44] text-white font-extrabold text-xs transition cursor-pointer shadow-md text-center"
+                >
+                  Done &amp; Close
+                </button>
+              </div>
             </div>
           </div>
         </div>

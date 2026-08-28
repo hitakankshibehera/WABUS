@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { Header, ActiveTab } from './components/Header';
 import { TripSearch } from './components/Passenger/TripSearch';
 import { SeatMatrix } from './components/Passenger/SeatMatrix';
@@ -260,63 +261,103 @@ export default function App() {
         </div>
       )}
 
-      {/* Main Container */}
+      {/* Main Container with Smooth Motion Entrance & Exit Animations */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-7">
-        {/* =========================================================================
-            PORTAL 1: PASSENGER WEB / APP
-            ========================================================================= */}
-        {activeTab === 'PASSENGER' && (
-          <div className="space-y-6">
-            {/* Step 1: Trip Search & Bus Listing */}
-            {bookingStep === 'SEARCH' && (
-              <TripSearch
-                trips={trips}
-                onSelectTrip={handleSelectTrip}
-                selectedTripId={selectedTrip?.id || null}
-                featureFlags={featureFlags}
-              />
-            )}
+        <AnimatePresence mode="wait">
+          {/* PORTAL 1: PASSENGER WEB / APP */}
+          {activeTab === 'PASSENGER' && (
+            <motion.div
+              key={`passenger-${bookingStep}`}
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+              transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+              className="space-y-6"
+            >
+              {/* Step 1: Trip Search & Bus Listing */}
+              {bookingStep === 'SEARCH' && (
+                <TripSearch
+                  trips={trips}
+                  onSelectTrip={handleSelectTrip}
+                  selectedTripId={selectedTrip?.id || null}
+                  featureFlags={featureFlags}
+                />
+              )}
 
-            {/* Step 2: 2D Interactive Seat Matrix Selection */}
-            {bookingStep === 'SEATS' && selectedTrip && (
-              <div className="space-y-6 pb-20 sm:pb-0">
-                {/* Back button & Bus info bar */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white border border-slate-200 p-4 sm:p-5 rounded-2xl shadow-xs">
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={handleResetBooking}
-                      className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer"
-                      title="Back to search"
-                    >
-                      <ArrowLeft className="w-4 h-4" />
-                    </button>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-sm text-slate-900">
-                          {selectedTrip.originCity} ➔ {selectedTrip.destinationCity}
-                        </span>
-                        <span className="text-[10px] px-2 py-0.5 rounded bg-red-50 text-[#D84E55] font-mono font-bold border border-red-200">
-                          {selectedTrip.departureTime}
-                        </span>
+              {/* Step 2: 2D Interactive Seat Matrix Selection */}
+              {bookingStep === 'SEATS' && selectedTrip && (
+                <div className="space-y-6 pb-20 sm:pb-0">
+                  {/* Back button & Bus info bar */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white border border-slate-200 p-4 sm:p-5 rounded-2xl shadow-xs">
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={handleResetBooking}
+                        className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer"
+                        title="Back to search"
+                      >
+                        <ArrowLeft className="w-4 h-4" />
+                      </button>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-sm text-slate-900">
+                            {selectedTrip.originCity} ➔ {selectedTrip.destinationCity}
+                          </span>
+                          <span className="text-[10px] px-2 py-0.5 rounded bg-red-50 text-[#D84E55] font-mono font-bold border border-red-200">
+                            {selectedTrip.departureTime}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500">
+                          {selectedTrip.bus.operatorName} &bull; {selectedTrip.bus.model} ({selectedTrip.bus.registrationNumber})
+                        </p>
                       </div>
-                      <p className="text-xs text-slate-500">
-                        {selectedTrip.bus.operatorName} &bull; {selectedTrip.bus.model} ({selectedTrip.bus.registrationNumber})
-                      </p>
                     </div>
+
+                    {selectedSeats.length > 0 && (
+                      <div className="hidden sm:flex items-center gap-3">
+                        <div className="text-right">
+                          <div className="text-xs text-slate-500 font-medium">
+                            Selected Seats: <strong className="text-slate-900">{selectedSeats.map(s => s.number).join(', ')}</strong>
+                          </div>
+                          <div className="text-sm font-black text-[#D84E55] font-mono">
+                            Total: ₹{selectedSeats.reduce((sum, s) => sum + s.basePrice, 0)}
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => setBookingStep('FORM')}
+                          className="py-2.5 px-5 rounded-xl bg-[#D84E55] hover:bg-[#C33E44] text-white font-extrabold text-xs uppercase tracking-wider flex items-center gap-2 shadow-md transition cursor-pointer"
+                        >
+                          <span>Continue</span>
+                          <ChevronRight className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
                   </div>
 
+                  {/* Interactive 2D Seat Matrix */}
+                  <SeatMatrix
+                    trip={selectedTrip}
+                    selectedSeats={selectedSeats}
+                    onSeatToggle={handleSeatToggle}
+                    lockExpiresAt={lockExpiresAt}
+                    featureFlags={featureFlags}
+                    sessionId={sessionId}
+                  />
+
+                  {/* Mobile Sticky Bottom Floating Action Bar */}
                   {selectedSeats.length > 0 && (
-                    <div className="hidden sm:flex items-center gap-3">
-                      <div className="text-right">
-                        <span className="text-xs text-slate-500 block font-medium">Selected ({selectedSeats.length}):</span>
-                        <span className="text-sm font-bold font-mono text-[#D84E55]">
-                          {selectedSeats.map(s => s.number).join(', ')} &bull; ₹
-                          {selectedSeats.reduce((sum, s) => sum + s.basePrice, 0)}
-                        </span>
+                    <div className="sm:hidden fixed bottom-0 inset-x-0 bg-white border-t border-slate-200 p-3.5 shadow-2xl z-40 flex items-center justify-between gap-3 animate-in slide-in-from-bottom-2 duration-150">
+                      <div>
+                        <div className="text-[11px] text-slate-500 font-medium">
+                          Seats: <strong className="text-slate-900">{selectedSeats.map(s => s.number).join(', ')}</strong>
+                        </div>
+                        <div className="text-base font-black text-[#D84E55] font-mono">
+                          ₹{selectedSeats.reduce((sum, s) => sum + s.basePrice, 0)}
+                        </div>
                       </div>
                       <button
                         onClick={() => setBookingStep('FORM')}
-                        className="px-5 py-2.5 rounded-xl bg-[#D84E55] hover:bg-[#C33E44] text-white font-bold text-xs uppercase tracking-wider shadow-sm hover:shadow-md transition cursor-pointer flex items-center gap-1.5"
+                        className="py-2.5 px-5 rounded-xl bg-[#D84E55] text-white font-extrabold text-xs uppercase tracking-wider flex items-center gap-1 shadow-md"
                       >
                         <span>Continue</span>
                         <ChevronRight className="w-4 h-4" />
@@ -324,103 +365,90 @@ export default function App() {
                     </div>
                   )}
                 </div>
+              )}
 
-                {/* Interactive 2D Seat Matrix */}
-                <SeatMatrix
+              {/* Step 3: Passenger Form & Boarding Point Selection */}
+              {bookingStep === 'FORM' && selectedTrip && (
+                <div className="space-y-6">
+                  <button
+                    onClick={() => setBookingStep('SEATS')}
+                    className="flex items-center gap-2 text-xs font-bold text-gray-600 hover:text-[#D84E55] transition cursor-pointer"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                    <span>Back to Seat Matrix (Seats: {selectedSeats.map(s => s.number).join(', ')})</span>
+                  </button>
+
+                  <PassengerForm
+                    trip={selectedTrip}
+                    selectedSeats={selectedSeats}
+                    featureFlags={featureFlags}
+                    onProceedToCheckout={handleProceedToPayment}
+                    onBack={() => setBookingStep('SEATS')}
+                  />
+                </div>
+              )}
+
+              {/* Step 4: E-Ticket View with QR Pass */}
+              {bookingStep === 'ETICKET' && confirmedBooking && selectedTrip && (
+                <ETicketView
+                  booking={confirmedBooking}
                   trip={selectedTrip}
-                  selectedSeats={selectedSeats}
-                  onSeatToggle={handleSeatToggle}
-                  lockExpiresAt={lockExpiresAt}
                   featureFlags={featureFlags}
-                  sessionId={sessionId}
+                  onBookAnother={handleResetBooking}
                 />
+              )}
+            </motion.div>
+          )}
 
-                {/* Mobile Sticky Bottom Floating Action Bar */}
-                {selectedSeats.length > 0 && (
-                  <div className="sm:hidden fixed bottom-0 inset-x-0 bg-white border-t border-slate-200 p-3.5 shadow-2xl z-40 flex items-center justify-between gap-3 animate-in slide-in-from-bottom-2 duration-150">
-                    <div>
-                      <div className="text-[11px] text-slate-500 font-medium">
-                        Seats: <strong className="text-slate-900">{selectedSeats.map(s => s.number).join(', ')}</strong>
-                      </div>
-                      <div className="text-base font-black text-[#D84E55] font-mono">
-                        ₹{selectedSeats.reduce((sum, s) => sum + s.basePrice, 0)}
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => setBookingStep('FORM')}
-                      className="px-5 py-2.5 rounded-xl bg-[#D84E55] hover:bg-[#C33E44] text-white font-bold text-xs uppercase tracking-wider shadow-md flex items-center gap-1 cursor-pointer"
-                    >
-                      <span>Continue</span>
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Step 3: Passenger Form & Boarding Point Selection */}
-            {bookingStep === 'FORM' && selectedTrip && (
-              <div className="space-y-6">
-                <button
-                  onClick={() => setBookingStep('SEATS')}
-                  className="flex items-center gap-2 text-xs font-bold text-gray-600 hover:text-[#D84E55] transition cursor-pointer"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                  <span>Back to Seat Matrix (Seats: {selectedSeats.map(s => s.number).join(', ')})</span>
-                </button>
-
-                <PassengerForm
-                  trip={selectedTrip}
-                  selectedSeats={selectedSeats}
-                  featureFlags={featureFlags}
-                  onProceedToCheckout={handleProceedToPayment}
-                  onBack={() => setBookingStep('SEATS')}
-                />
-              </div>
-            )}
-
-            {/* Step 4: E-Ticket View with QR Pass */}
-            {bookingStep === 'ETICKET' && confirmedBooking && selectedTrip && (
-              <ETicketView
-                booking={confirmedBooking}
-                trip={selectedTrip}
+          {/* PORTAL 2: CONDUCTOR & OPERATOR MOBILE PORTAL */}
+          {activeTab === 'CONDUCTOR' && (
+            <motion.div
+              key="conductor"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+              transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <ConductorPortal
+                trips={trips}
+                bookings={bookings}
                 featureFlags={featureFlags}
-                onBookAnother={handleResetBooking}
+                onRefreshData={loadData}
               />
-            )}
-          </div>
-        )}
+            </motion.div>
+          )}
 
-        {/* =========================================================================
-            PORTAL 2: CONDUCTOR & OPERATOR MOBILE PORTAL
-            ========================================================================= */}
-        {activeTab === 'CONDUCTOR' && (
-          <ConductorPortal
-            trips={trips}
-            bookings={bookings}
-            featureFlags={featureFlags}
-            onRefreshData={loadData}
-          />
-        )}
+          {/* PORTAL 3: MASTER ADMIN & AUTOMATION ENGINE */}
+          {activeTab === 'ADMIN' && (
+            <motion.div
+              key="admin"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+              transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <AdminPortal
+                featureFlags={featureFlags}
+                onUpdateFeatureFlags={handleUpdateFeatureFlags}
+                trips={trips}
+                onRefreshTrips={loadData}
+              />
+            </motion.div>
+          )}
 
-        {/* =========================================================================
-            PORTAL 3: MASTER ADMIN & AUTOMATION ENGINE
-            ========================================================================= */}
-        {activeTab === 'ADMIN' && (
-          <AdminPortal
-            featureFlags={featureFlags}
-            onUpdateFeatureFlags={handleUpdateFeatureFlags}
-            trips={trips}
-            onRefreshTrips={loadData}
-          />
-        )}
-
-        {/* =========================================================================
-            PORTAL 4: SYSTEM ARCHITECTURE & POSTGRESQL / REDIS DDL
-            ========================================================================= */}
-        {activeTab === 'ARCHITECTURE' && (
-          <DeliverablesViewer />
-        )}
+          {/* PORTAL 4: SYSTEM ARCHITECTURE & POSTGRESQL / REDIS DDL */}
+          {activeTab === 'ARCHITECTURE' && (
+            <motion.div
+              key="architecture"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+              transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <DeliverablesViewer />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </main>
 
       {/* Checkout Modal */}

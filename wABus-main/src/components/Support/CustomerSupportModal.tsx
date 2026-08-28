@@ -138,7 +138,7 @@ export const CustomerSupportModal: React.FC<CustomerSupportModalProps> = ({
               </div>
               <div>
                 <span className="text-[10px] uppercase font-bold text-gray-400 block">WhatsApp Support</span>
-                <span className="text-xs font-black text-gray-900 font-mono">+91 98610 99887</span>
+                <span className="text-xs font-black text-gray-900 font-mono">+91 94383 18821</span>
               </div>
             </div>
 

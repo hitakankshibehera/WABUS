@@ -46,7 +46,7 @@ export const PassengerForm: React.FC<PassengerFormProps> = ({
   const [boardingPointId, setBoardingPointId] = useState(trip.boardingPoints[0]?.id || '');
   const [droppingPointId, setDroppingPointId] = useState(trip.droppingPoints[0]?.id || '');
   const [contactEmail, setContactEmail] = useState('ashutosh@wabus.in');
-  const [contactPhone, setContactPhone] = useState('9861099887');
+  const [contactPhone, setContactPhone] = useState('9438318821');
   const [optInWhatsApp, setOptInWhatsApp] = useState(featureFlags.enableWhatsAppNotifications);
 
   // Initialize passenger records for each selected seat

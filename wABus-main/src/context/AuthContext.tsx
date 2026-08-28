@@ -17,6 +17,9 @@ export interface AuthContextType {
   currentUser: UserAccount | null;
   firebaseUser: FirebaseUser | null;
   isFirebaseConnected: boolean;
+  sendEmailOtp: (email: string) => Promise<any>;
+  verifyEmailOtp: (email: string, otp: string) => Promise<UserAccount>;
+  resendEmailOtp: (email: string) => Promise<any>;
   loginWithGoogle: (role?: UserRole) => Promise<UserAccount>;
   loginWithFirebaseEmail: (email: string, pass: string, role?: UserRole) => Promise<UserAccount>;
   signupWithFirebaseEmail: (
@@ -153,6 +156,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     return () => unsubscribe();
   }, []);
+
+  // Restore active server session on mount
+  useEffect(() => {
+    let isMounted = true;
+    api.getSession().then((res) => {
+      if (isMounted && res.authenticated && res.user) {
+        setCurrentUser(res.user);
+      }
+    }).catch(() => {});
+    return () => { isMounted = false; };
+  }, []);
+
+  const sendEmailOtp = async (email: string) => {
+    return await api.sendOtp(email);
+  };
+
+  const verifyEmailOtp = async (email: string, otp: string): Promise<UserAccount> => {
+    const res = await api.verifyOtp(email, otp);
+    if (res.user) {
+      setCurrentUser(res.user);
+      closeAuthModal();
+      return res.user;
+    }
+    throw new Error(res.error || 'Verification failed');
+  };
+
+  const resendEmailOtp = async (email: string) => {
+    return await api.resendOtp(email);
+  };
 
   useEffect(() => {
     if (currentUser) {
@@ -471,6 +503,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // 8. Logout
   const logout = async () => {
     try {
+      await api.logout();
       await logoutFirebase();
     } catch {
       // ignore
@@ -488,6 +521,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         currentUser,
         firebaseUser,
         isFirebaseConnected,
+        sendEmailOtp,
+        verifyEmailOtp,
+        resendEmailOtp,
         loginWithGoogle,
         loginWithFirebaseEmail,
         signupWithFirebaseEmail,
