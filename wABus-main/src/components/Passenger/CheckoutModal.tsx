@@ -130,7 +130,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               <div className="flex items-center gap-2">
                 <h3 className="text-sm sm:text-base font-bold tracking-tight">Select Payment Option</h3>
                 <span className="text-[10px] uppercase font-bold px-1.5 py-0.2 rounded bg-white/20">
-                  wABus Pay
+                  Busivo Pay
                 </span>
               </div>
               <p className="text-[11px] text-red-100">PCI-DSS 256-Bit Encrypted Payment Gateway</p>
@@ -324,7 +324,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             {selectedMethod === 'GIFT_CARD' && (
               <div className="space-y-3 text-xs">
                 <div className="bg-gradient-to-r from-red-600 to-rose-700 text-white rounded-xl p-3 text-center shadow-xs">
-                  <span className="text-[10px] uppercase font-bold tracking-widest text-red-200">wABus Gift Voucher</span>
+                  <span className="text-[10px] uppercase font-bold tracking-widest text-red-200">Busivo Gift Voucher</span>
                   <h4 className="text-xs font-black tracking-wide">GIFT CARDS: THE PERFECT PRESENT</h4>
                 </div>
 

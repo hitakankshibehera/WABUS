@@ -482,14 +482,14 @@ export default function App() {
                   <img src="/logo.png" alt="Wonderlight Adventure Co." className="w-full h-full object-cover" />
                 </div>
                 <div>
-                  <span className="font-black text-lg text-[#D84E55] block leading-none">
-                    wA<span className="text-gray-900">Bus</span>
+                  <span className="font-black text-lg text-gray-900 block leading-none">
+                    Bus<span className="text-[#D84E55]">ivo</span>
                   </span>
                   <span className="text-[9px] uppercase font-bold text-gray-500">Wonderlight Adventure Co.</span>
                 </div>
               </div>
               <p className="text-[11px] text-gray-500 leading-relaxed">
-                wABus is Wonderlight Adventure Company&apos;s automated bus ticketing ecosystem trusted by over 25+ million satisfied passengers.
+                Busivo is Wonderlight Adventure Company&apos;s automated bus ticketing ecosystem trusted by over 25+ million satisfied passengers.
               </p>
             </div>
 

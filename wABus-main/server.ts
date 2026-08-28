@@ -1,5 +1,18 @@
-import dotenv from 'dotenv';
-dotenv.config();
+import fs from 'fs';
+try {
+  if (fs.existsSync('.env')) {
+    const envFile = fs.readFileSync('.env', 'utf8');
+    envFile.split('\n').forEach(line => {
+      const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
+      if (match) {
+        const key = match[1];
+        let val = (match[2] || '').trim();
+        if (val.startsWith('"') && val.endsWith('"')) val = val.slice(1, -1);
+        if (!process.env[key]) process.env[key] = val;
+      }
+    });
+  }
+} catch (e) {}
 
 import express from 'express';
 import path from 'path';
@@ -122,7 +135,7 @@ async function sendOtpEmail(email: string, otp: string): Promise<{ success: bool
   const emailPort = process.env.EMAIL_PORT ? parseInt(process.env.EMAIL_PORT) : 465;
   const emailUser = process.env.EMAIL_USER || 'wonderlightadventure@gmail.com';
   const emailPassword = process.env.EMAIL_PASSWORD;
-  const emailFrom = process.env.EMAIL_FROM || `"wABus Verification" <${emailUser}>`;
+  const emailFrom = process.env.EMAIL_FROM || `"Busivo Verification" <${emailUser}>`;
 
   if (emailUser && emailPassword && emailPassword.trim() !== '') {
     try {
@@ -343,12 +356,12 @@ async function sendGiftCardEmail(recipientEmail: string, card: GiftCard): Promis
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; background: #ffffff;">
       <div style="background: linear-gradient(135deg, #D84E55, #B83238); padding: 24px; text-align: center; color: #ffffff;">
         <h1 style="margin: 0; font-size: 24px; font-weight: 900;">🎁 ${card.title || 'Special Gift Card for You!'}</h1>
-        <p style="margin: 4px 0 0 0; font-size: 14px; opacity: 0.9;">From Wonderlight Adventure Company (wABus)</p>
+        <p style="margin: 4px 0 0 0; font-size: 14px; opacity: 0.9;">From Busivo (Wonderlight Adventure Co.)</p>
       </div>
 
       <div style="padding: 24px; color: #1e293b; line-height: 1.6;">
         <p style="font-size: 15px;">Hello!</p>
-        <p style="font-size: 14px;">Master Admin (<strong style="color: #D84E55;">wonderlightadventure@gmail.com</strong>) has issued a <strong>₹${card.amount}</strong> wABus Gift Card for you!</p>
+        <p style="font-size: 14px;">Master Admin (<strong style="color: #D84E55;">wonderlightadventure@gmail.com</strong>) has issued a <strong>₹${card.amount}</strong> Busivo Gift Card for you!</p>
 
         ${cardImageHtml}
 
@@ -361,10 +374,10 @@ async function sendGiftCardEmail(recipientEmail: string, card: GiftCard): Promis
 
         <h3 style="font-size: 14px; font-weight: 800; color: #0f172a; margin-bottom: 8px;">How to Redeem:</h3>
         <ol style="font-size: 13px; color: #475569; padding-left: 20px; margin: 0 0 20px 0;">
-          <li>Visit <a href="http://localhost:3000" style="color: #D84E55; font-weight: bold;">wABus Website (http://localhost:3000)</a>.</li>
+          <li>Visit <a href="http://localhost:3000" style="color: #D84E55; font-weight: bold;">Busivo Website (http://localhost:3000)</a>.</li>
           <li>Click Account Menu ➔ Payments ➔ <strong>Redeem gift card</strong>.</li>
           <li>Enter Code <strong>${card.code}</strong> and PIN <strong>${card.pin}</strong>.</li>
-          <li>₹${card.amount} will be added instantly to your wABus Wallet balance!</li>
+          <li>₹${card.amount} will be added instantly to your Busivo Wallet balance!</li>
         </ol>
 
         <p style="font-size: 12px; color: #94a3b8; border-top: 1px solid #f1f5f9; padding-top: 16px; margin-top: 20px;">
@@ -2314,6 +2327,10 @@ async function startServer() {
     });
   });
 
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Busivo Enterprise Bus Server running at http://0.0.0.0:${PORT}`);
+  });
+
   // ==========================================
   // 11. VITE MIDDLEWARE / STATIC FILES
   // ==========================================
@@ -2330,12 +2347,8 @@ async function startServer() {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
-
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 BharatRide Enterprise Bus Server running at http://0.0.0.0:${PORT}`);
-  });
 }
 
 startServer().catch(err => {
-  console.error('Failed to start BharatRide server:', err);
+  console.error('Failed to start Busivo server:', err);
 });
