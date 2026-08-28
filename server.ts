@@ -135,7 +135,7 @@ async function sendOtpEmail(email: string, otp: string): Promise<{ success: bool
   const emailUser = process.env.EMAIL_USER || 'wonderlightadventure@gmail.com';
   const rawPassword = process.env.EMAIL_PASSWORD || 'yvlf rizi yibe ieny';
   const emailPassword = rawPassword.replace(/\s+/g, '');
-  const emailFrom = process.env.EMAIL_FROM || `"wABus Verification" <${emailUser}>`;
+  const emailFrom = process.env.EMAIL_FROM || `" Verification" <${emailUser}>`;
 
   if (emailUser && emailPassword && emailPassword.trim() !== '') {
     // Try Primary SMTP Port 465 (SSL)
@@ -654,15 +654,23 @@ setInterval(() => {
 
 export const app = express();
 
-async function startServer() {
-  const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
+const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
 
-  app.use(express.json());
+app.use(express.json());
 
-  // Vercel Serverless Function Path Normalizer Middleware
-  app.use((req, _res, next) => {
-    if (req.url && !req.url.startsWith('/api/') && req.url !== '/' && !req.url.startsWith('/assets') && !req.url.startsWith('/favicon')) {
-      req.url = '/api' + (req.url.startsWith('/') ? req.url : '/' + req.url);
+  // Vercel Serverless Function Path Normalization
+  app.use((req, res, next) => {
+    if (!req.url.startsWith('/api') && (
+      req.url.startsWith('/auth') || 
+      req.url.startsWith('/trips') || 
+      req.url.startsWith('/bookings') || 
+      req.url.startsWith('/seats') || 
+      req.url.startsWith('/admin') || 
+      req.url.startsWith('/conductor') || 
+      req.url.startsWith('/feature-flags') || 
+      req.url.startsWith('/routes')
+    )) {
+      req.url = '/api' + req.url;
     }
     next();
   });
@@ -748,7 +756,7 @@ async function startServer() {
   });
 
   // Verify OTP Endpoint
-  app.post(['/api/auth/verify-otp', '/auth/verify-otp'], (req, res) => {
+  app.post('/api/auth/verify-otp', (req, res) => {
     const { email, otp } = req.body;
     if (!email || !otp) {
       return res.status(400).json({ error: 'Email and verification code are required.' });
@@ -833,7 +841,7 @@ async function startServer() {
   });
 
   // Resend OTP Endpoint
-  app.post(['/api/auth/resend-otp', '/auth/resend-otp'], async (req, res) => {
+  app.post('/api/auth/resend-otp', async (req, res) => {
     const { email } = req.body;
     if (!email) {
       return res.status(400).json({ error: 'Email is required.' });
@@ -2376,31 +2384,27 @@ async function startServer() {
   });
 
   if (!process.env.VERCEL) {
-    app.listen(PORT, '0.0.0.0', () => {
-      console.log(`🚀 Busivo Enterprise Bus Server running at http://0.0.0.0:${PORT}`);
+    (async () => {
+      if (process.env.NODE_ENV !== 'production') {
+        const vite = await createViteServer({
+          server: { middlewareMode: true },
+          appType: 'spa',
+        });
+        app.use(vite.middlewares);
+      } else {
+        const distPath = path.join(process.cwd(), 'dist');
+        app.use(express.static(distPath));
+        app.get('*', (req, res) => {
+          res.sendFile(path.join(distPath, 'index.html'));
+        });
+      }
+
+      app.listen(PORT, '0.0.0.0', () => {
+        console.log(`🚀 Busivo Enterprise Bus Server running at http://0.0.0.0:${PORT}`);
+      });
+    })().catch(err => {
+      console.error('Failed to start local Busivo server:', err);
     });
   }
-
-  // ==========================================
-  // 11. VITE MIDDLEWARE / STATIC FILES
-  // ==========================================
-  if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: 'spa',
-    });
-    app.use(vite.middlewares);
-  } else if (!process.env.VERCEL) {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
-  }
-}
-
-startServer().catch(err => {
-  console.error('Failed to start Busivo server:', err);
-});
 
 export default app;
