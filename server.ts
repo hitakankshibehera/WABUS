@@ -19,7 +19,6 @@ import path from 'path';
 import crypto from 'crypto';
 import nodemailer from 'nodemailer';
 import QRCode from 'qrcode';
-import { createServer as createViteServer } from 'vite';
 import { 
   DEFAULT_FEATURE_FLAGS, 
   INITIAL_TRIPS, 
@@ -2386,6 +2385,7 @@ app.use(express.json());
   if (!process.env.VERCEL) {
     (async () => {
       if (process.env.NODE_ENV !== 'production') {
+        const { createServer: createViteServer } = await import('vite');
         const vite = await createViteServer({
           server: { middlewareMode: true },
           appType: 'spa',
