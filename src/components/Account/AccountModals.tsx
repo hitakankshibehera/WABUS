@@ -64,7 +64,9 @@ export const WalletModal: React.FC<{ isOpen: boolean; onClose: () => void }> = (
     const upiPayload = `upi://pay?pa=wabus.merchant@upi&pn=wABus%20Wallet%20TopUp&am=${val}&cu=INR&tn=Wallet%20Balance%20TopUp`;
     QRCode.toDataURL(upiPayload, { width: 240, margin: 1, color: { dark: '#0F172A', light: '#FFFFFF' } })
       .then(url => setQrUrl(url))
-      .catch(() => {});
+      .catch(() => {
+        setQrUrl(`https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(upiPayload)}`);
+      });
 
     setIsQrScreenOpen(true);
   };

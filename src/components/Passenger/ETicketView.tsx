@@ -30,7 +30,9 @@ export const ETicketView: React.FC<ETicketViewProps> = ({
 }) => {
   const [showLiveTracker, setShowLiveTracker] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
-  const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
+  const [qrCodeUrl, setQrCodeUrl] = useState<string>(
+    () => `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(booking.pnr || 'WB123456')}`
+  );
 
   const vehicleNumber = booking.trip.busRegistrationNumber || (trip && trip.bus ? trip.bus.registrationNumber : 'OD-02-AX-8910');
   const isPaid = booking.paymentStatus === 'PAID_ONLINE' || booking.paymentStatus === 'PAID';
