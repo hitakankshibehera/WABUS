@@ -135,7 +135,7 @@ async function sendOtpEmail(email: string, otp: string): Promise<{ success: bool
   const emailUser = process.env.EMAIL_USER || 'wonderlightadventure@gmail.com';
   const rawPassword = process.env.EMAIL_PASSWORD || 'yvlf rizi yibe ieny';
   const emailPassword = rawPassword.replace(/\s+/g, '');
-  const emailFrom = process.env.EMAIL_FROM || `"wABus Verification" <${emailUser}>`;
+  const emailFrom = process.env.EMAIL_FROM || `" Verification" <${emailUser}>`;
 
   if (emailUser && emailPassword && emailPassword.trim() !== '') {
     // Try Primary SMTP Port 465 (SSL)
@@ -735,7 +735,6 @@ async function startServer() {
       expiresInSeconds: 300,
       resendAllowedInSeconds: 45,
       email: cleanEmail,
-      otpCode: otp,
       sentViaSmtp: mailResult?.sentViaSmtp || false
     });
   });
@@ -875,7 +874,6 @@ async function startServer() {
       expiresInSeconds: 300,
       resendAllowedInSeconds: 45,
       email: cleanEmail,
-      otpCode: otp,
       sentViaSmtp: mailResult?.sentViaSmtp || false
     });
   });

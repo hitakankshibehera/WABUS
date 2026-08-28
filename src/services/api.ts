@@ -47,7 +47,6 @@ export const api = {
         success: true,
         message: `We sent a verification code to ${cleanEmail}`,
         email: cleanEmail,
-        otpCode: generatedOtp,
         expiresInSeconds: 300,
         resendAllowedInSeconds: 45,
         sentViaSmtp: false
@@ -124,7 +123,6 @@ export const api = {
         success: true,
         message: `A new verification code was sent to ${cleanEmail}`,
         email: cleanEmail,
-        otpCode: generatedOtp,
         expiresInSeconds: 300,
         resendAllowedInSeconds: 45,
         sentViaSmtp: false
