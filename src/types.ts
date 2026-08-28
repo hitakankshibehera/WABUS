@@ -254,7 +254,10 @@ export interface OtpSessionResponse {
   success: boolean;
   message?: string;
   expiresInSeconds?: number;
+  resendAllowedInSeconds?: number;
   email?: string;
+  otpCode?: string;
+  sentViaSmtp?: boolean;
   error?: string;
   retryAfterSeconds?: number;
 }

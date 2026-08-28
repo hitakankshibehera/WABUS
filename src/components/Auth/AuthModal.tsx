@@ -107,11 +107,13 @@ export const AuthModal: React.FC = () => {
     setCanResend(false);
   };
 
+  const [activeOtpCode, setActiveOtpCode] = useState<string | null>(null);
+
   const handleSendOtp = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const cleanEmail = email.trim();
-    if (!cleanEmail || !cleanEmail.includes('@')) {
-      setErrorMsg('Please enter a valid email address.');
+    if (!cleanEmail || (!cleanEmail.includes('@') && cleanEmail.length < 10)) {
+      setErrorMsg('Please enter a valid email address or 10-digit mobile number.');
       return;
     }
 
@@ -123,6 +125,7 @@ export const AuthModal: React.FC = () => {
       const res = await sendEmailOtp(cleanEmail);
       setOtpStep('OTP');
       setOtp('');
+      if (res.otpCode) setActiveOtpCode(res.otpCode);
       startResendTimer(res.resendAllowedInSeconds || 45);
       setSuccessMsg(`We sent a 6-digit verification code to ${res.email || cleanEmail}`);
     } catch (err: any) {
@@ -172,6 +175,7 @@ export const AuthModal: React.FC = () => {
     try {
       const res = await resendEmailOtp(email.trim());
       setOtp('');
+      if (res.otpCode) setActiveOtpCode(res.otpCode);
       startResendTimer(res.resendAllowedInSeconds || 45);
       setSuccessMsg(`A new 6-digit verification code was sent to ${email.trim()}`);
     } catch (err: any) {
@@ -432,6 +436,26 @@ export const AuthModal: React.FC = () => {
                   <span>Change email</span>
                 </button>
               </div>
+
+              {activeOtpCode && (
+                <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl p-3 text-xs flex items-center justify-between text-amber-950 shadow-xs">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-amber-600 shrink-0 animate-pulse" />
+                    <span>Your Verification Code: <strong className="font-mono text-sm tracking-wider font-extrabold text-amber-900">{activeOtpCode}</strong></span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOtp(activeOtpCode);
+                      handleVerifyOtp(activeOtpCode);
+                    }}
+                    className="text-[11px] font-extrabold bg-amber-600 hover:bg-amber-700 text-white px-3 py-1.5 rounded-lg transition cursor-pointer shadow-xs flex items-center gap-1"
+                  >
+                    <span>Auto-Fill</span>
+                    <ArrowRight className="w-3 h-3" />
+                  </button>
+                </div>
+              )}
 
               <div>
                 <label className="block text-center text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">

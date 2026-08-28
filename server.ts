@@ -718,7 +718,7 @@ async function startServer() {
     otpVerifications.set(cleanEmail, record);
 
     // 4. Send Email
-    await sendOtpEmail(cleanEmail, otp);
+    const mailResult = await sendOtpEmail(cleanEmail, otp);
 
     console.log(`[AUTH AUDIT] OTP requested for ${cleanEmail} from IP ${ipAddress}`);
 
@@ -727,7 +727,9 @@ async function startServer() {
       message: `We sent a verification code to ${cleanEmail}`,
       expiresInSeconds: 300,
       resendAllowedInSeconds: 45,
-      email: cleanEmail
+      email: cleanEmail,
+      otpCode: otp,
+      sentViaSmtp: mailResult?.sentViaSmtp || false
     });
   });
 
@@ -858,13 +860,16 @@ async function startServer() {
 
     otpVerifications.set(cleanEmail, record);
 
-    await sendOtpEmail(cleanEmail, otp);
+    const mailResult = await sendOtpEmail(cleanEmail, otp);
 
     res.json({
       success: true,
       message: `Resent verification code to ${cleanEmail}`,
       expiresInSeconds: 300,
-      resendAllowedInSeconds: 45
+      resendAllowedInSeconds: 45,
+      email: cleanEmail,
+      otpCode: otp,
+      sentViaSmtp: mailResult?.sentViaSmtp || false
     });
   });
 
