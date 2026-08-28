@@ -82,23 +82,47 @@ export const QRScanner: React.FC<QRScannerProps> = ({
     setCameraError(null);
     stopCamera();
 
-    try {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('Camera hardware access API not supported in browser environment');
-      }
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setCameraError('Camera API is not supported in this browser. Please use Chrome, Safari, or Edge.');
+      return;
+    }
 
-      // Explicit mobile camera constraints
-      const constraints: MediaStreamConstraints = {
+    let stream: MediaStream | null = null;
+    
+    // Tier 1: HD resolution with requested facingMode
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: { ideal: mode },
           width: { ideal: 1280 },
           height: { ideal: 720 }
         }
-      };
+      });
+    } catch (e1) {
+      // Tier 2: Flexible facingMode constraint
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: mode }
+        });
+      } catch (e2) {
+        // Tier 3: Basic video constraint (any mobile camera)
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        } catch (e3: any) {
+          console.error('[Mobile Camera Access Exception]', e3);
+          if (e3.name === 'NotAllowedError' || e3.name === 'PermissionDeniedError') {
+            setCameraError('Camera permission blocked by mobile browser. Please tap the lock icon next to the URL, grant Camera permission, and tap Open Camera below.');
+          } else {
+            setCameraError(`Camera hardware unavailable (${e3.message || 'Camera busy'}). Tap "Open Camera" below or upload a ticket photo.`);
+          }
+          setCameraActive(false);
+          return;
+        }
+      }
+    }
 
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+    if (stream) {
       streamRef.current = stream;
-
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         videoRef.current.setAttribute('playsinline', 'true');
@@ -107,10 +131,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({
       }
       setCameraActive(true);
       setFacingMode(mode);
-    } catch (err: any) {
-      console.warn('[Mobile Camera Scanner] Media device access note:', err.message);
-      setCameraError('Live camera feed active in simulation mode. Use camera viewfinder, file upload, or test scan buttons below.');
-      setCameraActive(true);
+      setCameraError(null);
     }
   };
 
@@ -392,14 +413,31 @@ export const QRScanner: React.FC<QRScannerProps> = ({
             </div>
           </div>
         ) : (
-          <div className="w-20 h-20 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-[#D84E55] mb-3">
-            <QrCode className="w-10 h-10 animate-pulse text-white" />
+          <div className="flex flex-col items-center gap-3 my-2">
+            <button
+              onClick={() => startCamera(facingMode)}
+              className="px-6 py-3 rounded-2xl bg-[#D84E55] hover:bg-[#C33E44] text-white font-extrabold text-sm flex items-center gap-2 shadow-lg shadow-red-500/30 transition cursor-pointer"
+            >
+              <Camera className="w-5 h-5 animate-pulse" />
+              <span>Tap to Open Mobile Camera</span>
+            </button>
+            <span className="text-[11px] text-slate-400">Allows mobile phone camera access for scanning passenger tickets</span>
           </div>
         )}
 
         {cameraError && (
-          <div className="mb-3 px-3 py-1.5 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-200 text-xs max-w-md">
-            {cameraError}
+          <div className="mb-3 px-3 py-2 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-200 text-xs max-w-md space-y-1">
+            <div className="font-bold flex items-center justify-center gap-1">
+              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>Camera Status Notice</span>
+            </div>
+            <p className="text-[11px] text-amber-100">{cameraError}</p>
+            <button
+              onClick={() => startCamera(facingMode)}
+              className="mt-1 px-3 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-[11px] inline-block transition cursor-pointer"
+            >
+              Retry Camera Permission
+            </button>
           </div>
         )}
 
