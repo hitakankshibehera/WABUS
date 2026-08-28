@@ -103,7 +103,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch {
       // ignore
     }
-    return DEMO_USERS.PASSENGER;
+    return null;
   });
 
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
