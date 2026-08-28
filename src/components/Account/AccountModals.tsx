@@ -104,7 +104,7 @@ export const WalletModal: React.FC<{ isOpen: boolean; onClose: () => void }> = (
               <Wallet className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-extrabold text-base leading-tight">wABus Wallet</h3>
+              <h3 className="font-extrabold text-base leading-tight">Busivo Wallet</h3>
               <p className="text-[11px] text-red-100">Instant Refunds &amp; Seamless Checkout</p>
             </div>
           </div>
@@ -322,7 +322,7 @@ export const GiftCardModal: React.FC<{ isOpen: boolean; onClose: () => void }> =
       const res = await api.redeemGiftCard(code.trim(), pin.trim());
       setStatusMsg({
         type: 'SUCCESS',
-        text: res.message || `🎉 Gift card ${code.trim().toUpperCase()} redeemed! ₹${res.amount} credited to your wABus Wallet.`
+        text: res.message || `🎉 Gift card ${code.trim().toUpperCase()} redeemed! ₹${res.amount} credited to your Busivo Wallet.`
       });
       setCode('');
       setPin('');

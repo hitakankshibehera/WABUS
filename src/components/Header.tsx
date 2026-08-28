@@ -111,8 +111,8 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="font-black text-2xl tracking-tighter text-[#D84E55] transition-colors group-hover:text-[#B83238]">
-                  wA<span className="text-gray-900 font-extrabold">Bus</span>
+                <span className="font-black text-2xl tracking-tighter text-gray-900 transition-colors group-hover:text-[#D84E55]">
+                  Bus<span className="text-[#D84E55] font-extrabold">ivo</span>
                 </span>
                 <span className="text-[9px] uppercase font-extrabold tracking-wider px-1.5 py-0.5 rounded bg-red-50 text-[#D84E55] border border-red-200 flex items-center gap-1 shadow-2xs">
                   <span className="w-1.5 h-1.5 rounded-full bg-[#D84E55] animate-ping"></span>

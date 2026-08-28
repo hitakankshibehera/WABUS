@@ -1,6 +1,0 @@
-{
-  "name": "BharatRide - Automated Bus Ecosystem",
-  "description": "wABus-styled enterprise Day & Night bus booking platform with Redis real-time seat locking, dynamic QR ticket validation, conductor on-coach terminal, and master admin automation engine.",
-  "requestFramePermissions": ["camera"],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}
