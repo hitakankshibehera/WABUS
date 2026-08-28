@@ -659,12 +659,20 @@ async function startServer() {
 
   app.use(express.json());
 
+  // Vercel Serverless Function Path Normalizer Middleware
+  app.use((req, _res, next) => {
+    if (req.url && !req.url.startsWith('/api/') && req.url !== '/' && !req.url.startsWith('/assets') && !req.url.startsWith('/favicon')) {
+      req.url = '/api' + (req.url.startsWith('/') ? req.url : '/' + req.url);
+    }
+    next();
+  });
+
   // ==========================================
   // 0. API: EMAIL OTP AUTHENTICATION & SESSIONS
   // ==========================================
 
   // Send OTP Endpoint
-  app.post('/api/auth/send-otp', async (req, res) => {
+  app.post(['/api/auth/send-otp', '/auth/send-otp'], async (req, res) => {
     const { email } = req.body;
     if (!email || typeof email !== 'string') {
       return res.status(400).json({ error: 'Please enter a valid email address.' });
@@ -740,7 +748,7 @@ async function startServer() {
   });
 
   // Verify OTP Endpoint
-  app.post('/api/auth/verify-otp', (req, res) => {
+  app.post(['/api/auth/verify-otp', '/auth/verify-otp'], (req, res) => {
     const { email, otp } = req.body;
     if (!email || !otp) {
       return res.status(400).json({ error: 'Email and verification code are required.' });
@@ -825,7 +833,7 @@ async function startServer() {
   });
 
   // Resend OTP Endpoint
-  app.post('/api/auth/resend-otp', async (req, res) => {
+  app.post(['/api/auth/resend-otp', '/auth/resend-otp'], async (req, res) => {
     const { email } = req.body;
     if (!email) {
       return res.status(400).json({ error: 'Email is required.' });
