@@ -29,5 +29,10 @@
     },
     "allowImportingTsExtensions": true,
     "noEmit": true
-  }
+  },
+  "include": [
+    "src/**/*",
+    "api/**/*",
+    "server.ts"
+  ]
 }
