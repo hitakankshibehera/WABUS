@@ -132,22 +132,25 @@ function generate6DigitOtp(): string {
 
 async function sendOtpEmail(email: string, otp: string): Promise<{ success: boolean; sentViaSmtp: boolean }> {
   const emailHost = process.env.EMAIL_HOST || 'smtp.gmail.com';
-  const emailPort = process.env.EMAIL_PORT ? parseInt(process.env.EMAIL_PORT) : 587;
   const emailUser = process.env.EMAIL_USER || 'wonderlightadventure@gmail.com';
   const rawPassword = process.env.EMAIL_PASSWORD || 'yvlf rizi yibe ieny';
   const emailPassword = rawPassword.replace(/\s+/g, '');
   const emailFrom = process.env.EMAIL_FROM || `"wABus Verification" <${emailUser}>`;
 
   if (emailUser && emailPassword && emailPassword.trim() !== '') {
+    // Try Primary SMTP Port 465 (SSL)
     try {
       const transporter = nodemailer.createTransport({
         host: emailHost,
-        port: emailPort,
-        secure: emailPort === 465,
+        port: 465,
+        secure: true,
         auth: {
           user: emailUser,
           pass: emailPassword
         },
+        connectionTimeout: 8000,
+        greetingTimeout: 4000,
+        socketTimeout: 8000,
         tls: {
           rejectUnauthorized: false
         }
@@ -186,11 +189,11 @@ async function sendOtpEmail(email: string, otp: string): Promise<{ success: bool
         html: htmlBody,
         attachments
       });
-      console.log(`[EMAIL SERVICE] ✉️ Real email sent from ${emailUser} to recipient ${email}`);
+      console.log(`[EMAIL SERVICE] ✉️ Real email sent via Port 465 from ${emailUser} to recipient ${email}`);
       return { success: true, sentViaSmtp: true };
     } catch (err: any) {
-      console.error(`[EMAIL SERVICE] ⚠️ Primary SMTP Delivery failed for ${emailUser}:`, err?.message || err);
-      // Fallback: Retry with direct 587 STARTTLS without attachments if primary fails
+      console.error(`[EMAIL SERVICE] ⚠️ Primary SMTP Port 465 failed for ${emailUser}:`, err?.message || err);
+      // Fallback 1: Retry with direct 587 STARTTLS without attachments if primary 465 fails
       try {
         const fallbackTransporter = nodemailer.createTransport({
           host: 'smtp.gmail.com',
@@ -200,6 +203,9 @@ async function sendOtpEmail(email: string, otp: string): Promise<{ success: bool
             user: emailUser,
             pass: emailPassword
           },
+          connectionTimeout: 8000,
+          greetingTimeout: 4000,
+          socketTimeout: 8000,
           tls: { rejectUnauthorized: false }
         });
 
@@ -213,7 +219,7 @@ async function sendOtpEmail(email: string, otp: string): Promise<{ success: bool
         console.log(`[EMAIL SERVICE] ✉️ Real email sent via fallback SMTP (port 587) to recipient ${email}`);
         return { success: true, sentViaSmtp: true };
       } catch (fallbackErr: any) {
-        console.error(`[EMAIL SERVICE] ⚠️ Fallback SMTP Delivery also failed:`, fallbackErr?.message || fallbackErr);
+        console.error(`[EMAIL SERVICE] ⚠️ Fallback SMTP Port 587 also failed:`, fallbackErr?.message || fallbackErr);
       }
     }
   } else {
