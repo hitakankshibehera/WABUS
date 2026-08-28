@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import jsQR from 'jsqr';
 import { soundEngine } from '../../utils/audio';
 import { api } from '../../services/api';
 import { 
@@ -43,6 +44,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({
   const [cameraError, setCameraError] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const [scanResult, setScanResult] = useState<{
     valid: boolean;
@@ -111,21 +113,43 @@ export const QRScanner: React.FC<QRScannerProps> = ({
         if (isScanning || !videoRef.current) return;
 
         try {
+          // 1. Try native BarcodeDetector API if available
           if ('BarcodeDetector' in window) {
             const detector = new (window as any).BarcodeDetector({ formats: ['qr_code', 'code_128', 'pdf417'] });
             const barcodes = await detector.detect(videoRef.current);
-            if (barcodes && barcodes.length > 0) {
-              const rawValue = barcodes[0].rawValue;
-              if (rawValue) {
-                console.log('[Realtime Camera QR Detector] Code detected:', rawValue);
-                handleScan(rawValue);
+            if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
+              handleScan(barcodes[0].rawValue);
+              return;
+            }
+          }
+
+          // 2. Universal jsQR Canvas Decoder Fallback (Safari, Firefox, Chrome, iOS, Android)
+          const video = videoRef.current;
+          if (video.readyState === video.HAVE_ENOUGH_DATA) {
+            let canvas = canvasRef.current;
+            if (!canvas) {
+              canvas = document.createElement('canvas');
+              canvasRef.current = canvas;
+            }
+            const ctx = canvas.getContext('2d', { willReadFrequently: true });
+            if (ctx) {
+              canvas.width = video.videoWidth || 640;
+              canvas.height = video.videoHeight || 480;
+              ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+              const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+              const decoded = jsQR(imageData.data, imageData.width, imageData.height, {
+                inversionAttempts: 'dontInvert'
+              });
+              if (decoded && decoded.data) {
+                console.log('[jsQR Live Camera Scanner] Code detected:', decoded.data);
+                handleScan(decoded.data);
               }
             }
           }
         } catch (e) {
           // ignore scan frame exception
         }
-      }, 350);
+      }, 300);
     }
 
     return () => {
@@ -143,16 +167,35 @@ export const QRScanner: React.FC<QRScannerProps> = ({
       img.src = URL.createObjectURL(file);
       await img.decode();
 
+      // 1. Try Native BarcodeDetector
       if ('BarcodeDetector' in window) {
-        const detector = new (window as any).BarcodeDetector({ formats: ['qr_code', 'code_128'] });
-        const barcodes = await detector.detect(img);
-        if (barcodes && barcodes.length > 0) {
-          handleScan(barcodes[0].rawValue);
+        try {
+          const detector = new (window as any).BarcodeDetector({ formats: ['qr_code', 'code_128'] });
+          const barcodes = await detector.detect(img);
+          if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
+            handleScan(barcodes[0].rawValue);
+            return;
+          }
+        } catch (e) {}
+      }
+
+      // 2. Universal jsQR Canvas Decoder
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth || img.width;
+      canvas.height = img.naturalHeight || img.height;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(img, 0, 0);
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const decoded = jsQR(imageData.data, imageData.width, imageData.height);
+        if (decoded && decoded.data) {
+          console.log('[jsQR Photo Upload Decoder] Code detected:', decoded.data);
+          handleScan(decoded.data);
           return;
         }
       }
 
-      // Fallback: match PNR code pattern in filename or use demo valid
+      // 3. Fallback: match PNR code pattern in filename or use WB320376
       const pnrMatch = file.name.match(/(WB|BR|PNR-?)\d+/i);
       if (pnrMatch) {
         handleScan(pnrMatch[0]);
