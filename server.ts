@@ -134,7 +134,7 @@ async function sendOtpEmail(email: string, otp: string): Promise<{ success: bool
   const emailHost = process.env.EMAIL_HOST || 'smtp.gmail.com';
   const emailPort = process.env.EMAIL_PORT ? parseInt(process.env.EMAIL_PORT) : 587;
   const emailUser = process.env.EMAIL_USER || 'wonderlightadventure@gmail.com';
-  const rawPassword = process.env.EMAIL_PASSWORD || '';
+  const rawPassword = process.env.EMAIL_PASSWORD || 'yvlf rizi yibe ieny';
   const emailPassword = rawPassword.replace(/\s+/g, '');
   const emailFrom = process.env.EMAIL_FROM || `"wABus Verification" <${emailUser}>`;
 
@@ -233,7 +233,8 @@ async function sendBookingConfirmationEmail(booking: Booking): Promise<{ success
   const emailHost = process.env.EMAIL_HOST || 'smtp.gmail.com';
   const emailPort = process.env.EMAIL_PORT ? parseInt(process.env.EMAIL_PORT) : 465;
   const emailUser = process.env.EMAIL_USER || 'wonderlightadventure@gmail.com';
-  const emailPassword = process.env.EMAIL_PASSWORD;
+  const rawBookingPass = process.env.EMAIL_PASSWORD || 'yvlf rizi yibe ieny';
+  const emailPassword = rawBookingPass.replace(/\s+/g, '');
   const emailFrom = process.env.EMAIL_FROM || `"Wonderlight Advanture" <${emailUser}>`;
 
   const targetEmail = (booking.contactEmail || '').trim().toLowerCase();
