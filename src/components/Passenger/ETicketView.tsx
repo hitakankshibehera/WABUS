@@ -131,7 +131,7 @@ export const ETicketView: React.FC<ETicketViewProps> = ({
                 </span>
               </div>
               <p className="text-xs text-red-100">
-                {trip.bus.operatorName} &bull; {trip.bus.model}
+                {trip?.bus?.operatorName || booking.trip?.operatorName || 'OSRTC'} &bull; {trip?.bus?.model || booking.trip?.busModel || 'Volvo Multi-Axle'}
               </p>
             </div>
           </div>
@@ -154,14 +154,14 @@ export const ETicketView: React.FC<ETicketViewProps> = ({
           <div className="flex items-center justify-between border-b border-slate-200 pb-4">
             <div>
               <span className="text-[10px] font-bold text-slate-400 uppercase">Boarding City & Stop</span>
-              <div className="text-xl sm:text-2xl font-bold text-slate-900">{trip.originCity}</div>
-              <div className="text-xs font-bold text-[#D84E55]">{booking.boardingPoint.time}</div>
-              <div className="text-[11px] text-slate-500 mt-0.5">{booking.boardingPoint.name}</div>
+              <div className="text-xl sm:text-2xl font-bold text-slate-900">{trip?.originCity || booking.trip?.originCity || 'Origin'}</div>
+              <div className="text-xs font-bold text-[#D84E55]">{booking.boardingPoint?.time || booking.trip?.boardingTime || booking.trip?.departureTime || ''}</div>
+              <div className="text-[11px] text-slate-500 mt-0.5">{booking.boardingPoint?.name || booking.trip?.boardingPointName || ''}</div>
             </div>
 
             <div className="flex flex-col items-center px-3">
               <span className="text-[10px] font-mono font-medium text-slate-400">
-                {trip.category === 'DAY_COACH' ? '1h 30m' : '1h 45m'}
+                {trip?.category === 'DAY_COACH' ? '1h 30m' : '1h 45m'}
               </span>
               <div className="w-16 sm:w-28 h-0.5 bg-slate-200 relative my-1.5">
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-[#D84E55]"></div>
@@ -173,9 +173,9 @@ export const ETicketView: React.FC<ETicketViewProps> = ({
 
             <div className="text-right">
               <span className="text-[10px] font-bold text-slate-400 uppercase">Dropping Destination</span>
-              <div className="text-xl sm:text-2xl font-bold text-slate-900">{trip.destinationCity}</div>
-              <div className="text-xs font-bold text-[#D84E55]">{booking.droppingPoint.time}</div>
-              <div className="text-[11px] text-slate-500 mt-0.5">{booking.droppingPoint.name}</div>
+              <div className="text-xl sm:text-2xl font-bold text-slate-900">{trip?.destinationCity || booking.trip?.destinationCity || 'Destination'}</div>
+              <div className="text-xs font-bold text-[#D84E55]">{booking.droppingPoint?.time || booking.trip?.droppingTime || booking.trip?.arrivalTime || ''}</div>
+              <div className="text-[11px] text-slate-500 mt-0.5">{booking.droppingPoint?.name || booking.trip?.droppingPointName || ''}</div>
             </div>
           </div>
 
@@ -223,7 +223,7 @@ export const ETicketView: React.FC<ETicketViewProps> = ({
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] uppercase font-bold text-slate-500">Assigned Conductor</span>
-                  <span className="font-semibold text-slate-800">{trip.bus.conductorName || 'Bijay Nayak'} (ID: {trip.bus.conductorId || 'COND-7890'})</span>
+                  <span className="font-semibold text-slate-800">{trip?.bus?.conductorName || 'Bijay Nayak'} (ID: {trip?.bus?.conductorId || 'COND-7890'})</span>
                 </div>
               </div>
 

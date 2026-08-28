@@ -153,15 +153,15 @@ export const QRScanner: React.FC<QRScannerProps> = ({
       }
 
       // Fallback: match PNR code pattern in filename or use demo valid
-      const pnrMatch = file.name.match(/BR\d{6}/i);
+      const pnrMatch = file.name.match(/(WB|BR|PNR-?)\d+/i);
       if (pnrMatch) {
         handleScan(pnrMatch[0]);
       } else {
-        handleScan('BR899401');
+        handleScan('WB320376');
       }
     } catch (err: any) {
       console.error('File QR decode error:', err);
-      handleScan('BR899401');
+      handleScan('WB320376');
     }
   };
 

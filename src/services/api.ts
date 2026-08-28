@@ -1,5 +1,5 @@
 import { Trip, Booking, FeatureFlags, PayoutRecord, Route, ConductorProfile, OfferCoupon, UserAccount, OtpSessionResponse, VerifyOtpResponse, GiftCard, Bus } from '../types';
-import { INITIAL_TRIPS, MOCK_BUSES, MOCK_ROUTES, INITIAL_CONDUCTORS, MOCK_PAYOUTS, DEFAULT_FEATURE_FLAGS, generateSleeperSeats, generateSeaterSeats } from '../data/mockDatabase';
+import { INITIAL_TRIPS, MOCK_BUSES, MOCK_ROUTES, INITIAL_CONDUCTORS, INITIAL_BOOKINGS, MOCK_PAYOUTS, DEFAULT_FEATURE_FLAGS, generateSleeperSeats, generateSeaterSeats } from '../data/mockDatabase';
 
 async function safeParseJson(res: Response, defaultError: string): Promise<any> {
   const contentType = res.headers.get('content-type') || '';
@@ -292,6 +292,20 @@ export const api = {
         passengers: payload.passengers,
         contactEmail: payload.contactEmail,
         contactPhone: payload.contactPhone,
+        boardingPoint: {
+          id: payload.boardingPointId || 'bp-1',
+          name: trip.boardingPoints[0]?.name || `${trip.originCity} ISBT`,
+          landmark: trip.boardingPoints[0]?.landmark || 'Main Bus Terminal',
+          time: trip.departureTime,
+          contactPhone: '+91 94383 18821'
+        },
+        droppingPoint: {
+          id: payload.droppingPointId || 'dp-1',
+          name: trip.droppingPoints[0]?.name || `${trip.destinationCity} Bus Stand`,
+          landmark: trip.droppingPoints[0]?.landmark || 'Central Bus Terminal',
+          time: trip.arrivalTime,
+          contactPhone: '+91 94383 18821'
+        },
         totalAmount: payload.passengers.length * trip.baseFare - (payload.discountAmount || 0),
         bookingDate: new Date().toISOString(),
         paymentStatus: payload.paymentMethod === 'PAY_ON_BOARDING' ? 'PENDING' : 'COMPLETED',
@@ -413,11 +427,52 @@ export const api = {
       });
       return await safeParseJson(res, 'Ticket verification failed');
     } catch {
+      // Local fallback for offline/static verification
+      let rawCode = payload.qrHashOrPnr.trim();
+      let targetPnr = rawCode;
+
+      if (rawCode.startsWith('{')) {
+        try {
+          const parsed = JSON.parse(rawCode);
+          if (parsed.pnr) targetPnr = parsed.pnr;
+        } catch {}
+      } else if (rawCode.includes(':')) {
+        const parts = rawCode.split(':');
+        targetPnr = parts[parts.length - 1];
+      }
+
+      // Lookup in localStorage and INITIAL_BOOKINGS
+      let allBookings: Booking[] = [...INITIAL_BOOKINGS];
+      try {
+        const saved = localStorage.getItem('wabus_user_bookings');
+        if (saved) {
+          const parsedSaved: Booking[] = JSON.parse(saved);
+          allBookings = [...parsedSaved, ...allBookings.filter(b => !parsedSaved.some(s => s.pnr === b.pnr))];
+        }
+      } catch {}
+
+      const foundBooking = allBookings.find(b => 
+        b.pnr.toLowerCase() === targetPnr.toLowerCase() || 
+        b.id === targetPnr ||
+        (b.qrCodeToken && b.qrCodeToken.toLowerCase().includes(targetPnr.toLowerCase()))
+      ) || allBookings[0];
+
+      if (foundBooking) {
+        foundBooking.checkInStatus = 'BOARDED';
+      }
+
+      const isPendingCash = (foundBooking?.paymentStatus as string) === 'PENDING' || (foundBooking?.paymentMethod as string) === 'PAY_ON_BOARDING';
+
       return {
         valid: true,
-        status: 'VERIFIED_ALLOWED',
+        status: isPendingCash && !payload.autoCollectCash ? 'PENDING_CASH_COLLECTION' : 'VERIFIED_ALLOWED',
         passengerAllowed: true,
-        message: 'Ticket Validated Successfully (Offline Mode).'
+        booking: foundBooking,
+        ticketBusNumber: foundBooking?.trip?.busRegistrationNumber || payload.conductorBusNumber || 'OD-02-AX-8910',
+        conductorBusNumber: payload.conductorBusNumber || 'OD-02-AX-8910',
+        message: isPendingCash && !payload.autoCollectCash 
+          ? `Collect Cash Amount ₹${foundBooking?.totalAmount || 450} from passenger upon boarding.`
+          : `PNR ${foundBooking?.pnr || targetPnr} Verified Successfully.`
       };
     }
   },
