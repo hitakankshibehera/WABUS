@@ -505,7 +505,7 @@ export const ConductorPortal: React.FC<ConductorPortalProps> = ({
           <div className="flex items-center gap-2 text-xs">
             <span className="font-bold text-slate-500 uppercase">Current Route:</span>
             <span className="font-extrabold text-slate-900">
-              {selectedTrip.originCity} ➔ {selectedTrip.destinationCity} ({selectedTrip.departureTime})
+              {selectedTrip?.originCity || 'Bhubaneswar'} ➔ {selectedTrip?.destinationCity || 'Puri'} ({selectedTrip?.departureTime || '08:00'})
             </span>
             <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-mono font-bold">
               Coach: {currentBusReg}
@@ -706,7 +706,7 @@ export const ConductorPortal: React.FC<ConductorPortalProps> = ({
       {/* VIEW 2: HARDWARE QR SCANNER */}
       {activeTab === 'SCANNER' && (
         <QRScanner 
-          tripId={selectedTrip.id} 
+          tripId={selectedTrip?.id || ''} 
           conductorBusNumber={currentBusReg}
           conductorId={currentUser.employeeId}
           conductorName={currentUser.name}

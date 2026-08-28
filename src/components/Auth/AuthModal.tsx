@@ -100,14 +100,14 @@ export const AuthModal: React.FC = () => {
     };
   }, [otpStep, resendCountdown]);
 
+  const [activeOtpCode, setActiveOtpCode] = useState<string | null>(null);
+
   if (!isAuthModalOpen) return null;
 
   const startResendTimer = (seconds: number = 45) => {
     setResendCountdown(seconds);
     setCanResend(false);
   };
-
-  const [activeOtpCode, setActiveOtpCode] = useState<string | null>(null);
 
   const handleSendOtp = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
