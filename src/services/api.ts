@@ -257,13 +257,15 @@ export const api = {
     paymentMethod: string;
     discountAmount?: number;
   }): Promise<{ success: boolean; booking: Booking; qrToken: string; whatsAppDelivered: boolean }> {
+    let bookingResult: { success: boolean; booking: Booking; qrToken: string; whatsAppDelivered: boolean };
+
     try {
       const res = await fetch('/api/bookings/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      return await safeParseJson(res, 'Booking checkout failed');
+      bookingResult = await safeParseJson(res, 'Booking checkout failed');
     } catch {
       // Local fallback booking generation
       const trip = INITIAL_TRIPS.find(t => t.id === payload.tripId) || INITIAL_TRIPS[0];
@@ -298,22 +300,47 @@ export const api = {
         qrCodeToken: `wabus:ticket:${pnr}`,
         whatsappDelivered: true
       };
-      return {
+      bookingResult = {
         success: true,
         booking,
         qrToken: booking.qrCodeToken,
         whatsAppDelivered: true
       };
     }
+
+    // Persist booking into local storage so customer booking history ALWAYS displays
+    try {
+      if (bookingResult && bookingResult.booking) {
+        const savedRaw = localStorage.getItem('wabus_user_bookings');
+        const existing: Booking[] = savedRaw ? JSON.parse(savedRaw) : [];
+        const updated = [bookingResult.booking, ...existing.filter(b => b.pnr !== bookingResult.booking.pnr)];
+        localStorage.setItem('wabus_user_bookings', JSON.stringify(updated));
+      }
+    } catch (e) {
+      console.warn('[STORAGE WARN] Could not save booking history:', e);
+    }
+
+    return bookingResult;
   },
 
   async getBookings(): Promise<Booking[]> {
+    let localBookings: Booking[] = [];
+    try {
+      const saved = localStorage.getItem('wabus_user_bookings');
+      if (saved) localBookings = JSON.parse(saved);
+    } catch {}
+
     try {
       const res = await fetch('/api/bookings');
-      return await safeParseJson(res, 'Failed to fetch bookings');
-    } catch {
-      return [];
-    }
+      const serverBookings = await safeParseJson(res, 'Failed to fetch bookings');
+      if (Array.isArray(serverBookings)) {
+        const pnrSet = new Set(serverBookings.map(b => b.pnr));
+        const merged = [...serverBookings, ...localBookings.filter(b => !pnrSet.has(b.pnr))];
+        return merged;
+      }
+    } catch {}
+
+    return localBookings;
   },
 
   async getBookingByPnr(pnr: string): Promise<Booking> {

@@ -37,11 +37,11 @@ export const ETicketView: React.FC<ETicketViewProps> = ({
 
   useEffect(() => {
     // Generate structured QR Code data containing bus vehicle mapping
-    const qrPayload = JSON.stringify({
+    const qrPayload = booking.qrCodeToken || booking.qrPayloadData || JSON.stringify({
       pnr: booking.pnr,
       vehicle: vehicleNumber,
       seats: booking.passengers.map(p => p.seatNumber),
-      operator: booking.trip.operatorName || (trip && trip.bus ? trip.bus.operatorName : 'OSRTC Volvo Premier'),
+      operator: booking.trip?.operatorName || (trip && trip.bus ? trip.bus.operatorName : 'OSRTC Volvo Premier'),
       status: booking.paymentStatus,
       hash: booking.qrPayloadHash
     });
@@ -56,13 +56,15 @@ export const ETicketView: React.FC<ETicketViewProps> = ({
     })
       .then(url => setQrCodeUrl(url))
       .catch(() => {
-        // Fallback
+        setQrCodeUrl(`https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(qrPayload)}`);
       });
   }, [booking, trip, vehicleNumber]);
 
   const handleShare = () => {
+    const origin = booking.trip?.originCity || (trip ? trip.originCity : 'Bhubaneswar');
+    const dest = booking.trip?.destinationCity || (trip ? trip.destinationCity : 'Puri');
     navigator.clipboard.writeText(
-      `wABus e-Ticket PNR: ${booking.pnr} | Vehicle: ${vehicleNumber} | ${trip.originCity} to ${trip.destinationCity} | Seats: ${booking.passengers.map(p => p.seatNumber).join(', ')}`
+      `wABus e-Ticket PNR: ${booking.pnr} | Vehicle: ${vehicleNumber} | ${origin} to ${dest} | Seats: ${booking.passengers.map(p => p.seatNumber).join(', ')}`
     );
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 2000);
