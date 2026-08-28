@@ -17,7 +17,7 @@ import { LiveBusTracker } from './LiveBusTracker';
 
 interface ETicketViewProps {
   booking: Booking;
-  trip: Trip;
+  trip?: Trip;
   onBookAnother: () => void;
   featureFlags: FeatureFlags;
 }
@@ -32,7 +32,7 @@ export const ETicketView: React.FC<ETicketViewProps> = ({
   const [isCopied, setIsCopied] = useState(false);
   const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
 
-  const vehicleNumber = booking.trip.busRegistrationNumber || trip.bus.registrationNumber || 'OD-02-AX-8910';
+  const vehicleNumber = booking.trip.busRegistrationNumber || (trip && trip.bus ? trip.bus.registrationNumber : 'OD-02-AX-8910');
   const isPaid = booking.paymentStatus === 'PAID_ONLINE' || booking.paymentStatus === 'PAID';
 
   useEffect(() => {
@@ -41,7 +41,7 @@ export const ETicketView: React.FC<ETicketViewProps> = ({
       pnr: booking.pnr,
       vehicle: vehicleNumber,
       seats: booking.passengers.map(p => p.seatNumber),
-      operator: booking.trip.operatorName || trip.bus.operatorName,
+      operator: booking.trip.operatorName || (trip && trip.bus ? trip.bus.operatorName : 'OSRTC Volvo Premier'),
       status: booking.paymentStatus,
       hash: booking.qrPayloadHash
     });
@@ -349,7 +349,7 @@ export const ETicketView: React.FC<ETicketViewProps> = ({
       {showLiveTracker && (
         <LiveBusTracker
           bookingId={booking.id}
-          trip={trip}
+          trip={booking.trip}
           onClose={() => setShowLiveTracker(false)}
         />
       )}

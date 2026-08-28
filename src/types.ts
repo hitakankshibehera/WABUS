@@ -3,7 +3,7 @@ export type TripCategory = 'DAY_COACH' | 'NIGHT_COACH';
 export type SeatTier = 'LOWER_BERTH' | 'UPPER_BERTH' | 'SEATER_WINDOW' | 'SEATER_AISLE';
 export type SeatGenderRestriction = 'ANY' | 'FEMALE_ONLY' | 'MALE_ONLY';
 export type SeatStatus = 'AVAILABLE' | 'LOCKED' | 'BOOKED' | 'CONDUCTOR_RESERVED';
-export type PaymentStatus = 'PAID_ONLINE' | 'PAY_ON_BOARDING_PENDING' | 'REFUNDED' | 'FAILED' | 'PENDING' | 'COMPLETED';
+export type PaymentStatus = 'PAID_ONLINE' | 'PAY_ON_BOARDING_PENDING' | 'REFUNDED' | 'FAILED' | 'PENDING' | 'COMPLETED' | 'PAID';
 export type CheckInStatus = 'CONFIRMED' | 'BOARDED' | 'NO_SHOW' | 'CANCELLED';
 export type PaymentMethod = 'UPI' | 'UPI_QR' | 'CARD' | 'CREDIT_DEBIT_CARD' | 'NET_BANKING' | 'GIFT_CARD' | 'PAY_ON_BOARDING_COD';
 
@@ -102,8 +102,9 @@ export interface Passenger {
   age: number;
   gender: 'MALE' | 'FEMALE' | 'OTHER';
   seatNumber: string;
-  seatId: string;
-  fare: number;
+  seatId?: string;
+  fare?: number;
+  isPrimaryContact?: boolean;
 }
 
 export type PassengerDetails = Passenger;

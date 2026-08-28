@@ -627,7 +627,7 @@ export const CancelTicketModal: React.FC<{
                     <div>
                       <div className="font-mono font-black text-slate-900 text-xs">{b.pnr}</div>
                       <div className="text-[11px] text-slate-500 font-medium">{b.trip.originCity} ➔ {b.trip.destinationCity}</div>
-                      <div className="text-[10px] text-slate-400 font-mono">Total Fare: ₹{b.totalPrice}</div>
+                      <div className="text-[10px] text-slate-400 font-mono">Total Fare: ₹{b.totalAmount}</div>
                     </div>
                     <button
                       type="button"
