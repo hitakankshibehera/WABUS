@@ -109,7 +109,8 @@ export const AuthModal: React.FC = () => {
 
   const handleSendOtp = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!email || !email.includes('@')) {
+    const cleanEmail = email.trim();
+    if (!cleanEmail || !cleanEmail.includes('@')) {
       setErrorMsg('Please enter a valid email address.');
       return;
     }
@@ -119,20 +120,29 @@ export const AuthModal: React.FC = () => {
     setSuccessMsg(null);
 
     try {
-      const res = await sendEmailOtp(email);
+      const res = await sendEmailOtp(cleanEmail);
       setOtpStep('OTP');
       setOtp('');
       startResendTimer(res.resendAllowedInSeconds || 45);
-      setSuccessMsg(`We sent a 6-digit verification code to ${res.email || email}`);
+      setSuccessMsg(`We sent a 6-digit verification code to ${res.email || cleanEmail}`);
     } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to send verification code. Please try again.');
+      const errMsg = err.message || '';
+      if (errMsg.toLowerCase().includes('wait') || errMsg.toLowerCase().includes('active verification')) {
+        setOtpStep('OTP');
+        setOtp('');
+        startResendTimer(45);
+        setSuccessMsg(`An active 6-digit verification code was already sent to ${cleanEmail}. Check your email inbox!`);
+      } else {
+        setErrorMsg(errMsg || 'Failed to send verification code. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleVerifyOtp = async (otpToVerify?: string) => {
-    const code = otpToVerify || otp;
+    if (isLoading) return;
+    const code = (otpToVerify || otp).trim();
     if (!code || code.length !== 6) {
       setErrorMsg('Please enter the complete 6-digit verification code.');
       return;
@@ -143,7 +153,8 @@ export const AuthModal: React.FC = () => {
     setSuccessMsg(null);
 
     try {
-      await verifyEmailOtp(email, code);
+      await verifyEmailOtp(email.trim(), code);
+      setSuccessMsg('Authentication successful! Logged in.');
     } catch (err: any) {
       setErrorMsg(err.message || 'Incorrect verification code. Please try again.');
     } finally {
@@ -152,17 +163,17 @@ export const AuthModal: React.FC = () => {
   };
 
   const handleResendOtp = async () => {
-    if (!canResend) return;
+    if (!canResend || isLoading) return;
 
     setIsLoading(true);
     setErrorMsg(null);
     setSuccessMsg(null);
 
     try {
-      const res = await resendEmailOtp(email);
+      const res = await resendEmailOtp(email.trim());
       setOtp('');
       startResendTimer(res.resendAllowedInSeconds || 45);
-      setSuccessMsg(`A new verification code was sent to ${email}`);
+      setSuccessMsg(`A new 6-digit verification code was sent to ${email.trim()}`);
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to resend code. Please try again later.');
     } finally {

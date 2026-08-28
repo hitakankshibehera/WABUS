@@ -132,20 +132,21 @@ function generate6DigitOtp(): string {
 
 async function sendOtpEmail(email: string, otp: string): Promise<{ success: boolean; sentViaSmtp: boolean }> {
   const emailHost = process.env.EMAIL_HOST || 'smtp.gmail.com';
-  const emailPort = process.env.EMAIL_PORT ? parseInt(process.env.EMAIL_PORT) : 465;
+  const emailPort = process.env.EMAIL_PORT ? parseInt(process.env.EMAIL_PORT) : 587;
   const emailUser = process.env.EMAIL_USER || 'wonderlightadventure@gmail.com';
-  const emailPassword = process.env.EMAIL_PASSWORD;
-  const emailFrom = process.env.EMAIL_FROM || `"Busivo Verification" <${emailUser}>`;
+  const rawPassword = process.env.EMAIL_PASSWORD || '';
+  const emailPassword = rawPassword.replace(/\s+/g, '');
+  const emailFrom = process.env.EMAIL_FROM || `"wABus Verification" <${emailUser}>`;
 
   if (emailUser && emailPassword && emailPassword.trim() !== '') {
     try {
       const transporter = nodemailer.createTransport({
-        host: 'smtp.gmail.com',
-        port: 587,
-        secure: false,
+        host: emailHost,
+        port: emailPort,
+        secure: emailPort === 465,
         auth: {
           user: emailUser,
-          pass: emailPassword.trim()
+          pass: emailPassword
         },
         tls: {
           rejectUnauthorized: false
@@ -153,39 +154,67 @@ async function sendOtpEmail(email: string, otp: string): Promise<{ success: bool
       });
 
       const logoPath = path.join(process.cwd(), 'public', 'logo.png');
+      const hasLogo = fs.existsSync(logoPath);
+
+      const htmlBody = `
+        <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 28px; border: 1px solid #e2e8f0; border-radius: 20px; background-color: #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+          <div style="text-align: center; margin-bottom: 24px;">
+            ${hasLogo ? '<img src="cid:wonderlight_logo" alt="wABus Logo" style="width: 90px; height: 90px; border-radius: 50%; object-fit: cover; margin: 0 auto 12px auto; display: block; border: 3px solid #f1f5f9; box-shadow: 0 4px 10px rgba(0,0,0,0.15);" />' : ''}
+            <h2 style="color: #D84E55; margin: 0; font-size: 22px; font-weight: 800;">wABus Verification Code</h2>
+            <p style="color: #64748b; font-size: 13px; margin: 4px 0 0 0; font-weight: 600;">Wonderlight Adventure Company</p>
+          </div>
+          <div style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); padding: 24px; border-radius: 16px; text-align: center; margin-bottom: 24px; border: 1px solid #e2e8f0;">
+            <p style="margin: 0 0 12px 0; font-size: 14px; color: #475569; font-weight: 600;">Your 6-digit verification code is:</p>
+            <div style="font-size: 38px; font-weight: 900; letter-spacing: 8px; color: #D84E55; margin: 12px 0; font-family: monospace;">${otp}</div>
+            <p style="margin: 12px 0 0 0; font-size: 12px; color: #ef4444; font-weight: 700;">⏰ Code expires in 5 minutes</p>
+          </div>
+          <p style="font-size: 12px; color: #94a3b8; text-align: center; margin: 0; line-height: 1.5;">Sent securely via wABus Identity Transporter (<strong style="color: #475569;">${emailUser}</strong>). Never share this code with anyone.</p>
+        </div>
+      `;
+
+      const attachments = hasLogo ? [{
+        filename: 'logo.png',
+        path: logoPath,
+        cid: 'wonderlight_logo'
+      }] : [];
 
       await transporter.sendMail({
         from: emailFrom,
         to: email,
-        subject: 'Your Verification Code - wABus',
-        text: `Your verification code is: ${otp}\n\nThis code will expire in 5 minutes.\nNever share this code with anyone.`,
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 28px; border: 1px solid #e2e8f0; border-radius: 20px; background-color: #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
-            <div style="text-align: center; margin-bottom: 24px;">
-              <img src="cid:wonderlight_logo" alt="Wonderlight Advanture Company" style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover; margin: 0 auto 12px auto; display: block; border: 3px solid #f1f5f9; box-shadow: 0 4px 10px rgba(0,0,0,0.15);" />
-              <h2 style="color: #D84E55; margin: 0; font-size: 22px; font-weight: 800;">wABus Verification Code</h2>
-              <p style="color: #64748b; font-size: 13px; margin: 4px 0 0 0; font-weight: 600;">Wonderlight Advanture Company</p>
-            </div>
-            <div style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); padding: 24px; border-radius: 16px; text-align: center; margin-bottom: 24px; border: 1px solid #e2e8f0;">
-              <p style="margin: 0 0 12px 0; font-size: 14px; color: #475569; font-weight: 600;">Your 6-digit verification code is:</p>
-              <div style="font-size: 36px; font-weight: 900; letter-spacing: 8px; color: #0f172a; margin: 12px 0; font-family: monospace;">${otp}</div>
-              <p style="margin: 12px 0 0 0; font-size: 12px; color: #ef4444; font-weight: 700;">⏰ Code expires in 5 minutes</p>
-            </div>
-            <p style="font-size: 12px; color: #94a3b8; text-align: center; margin: 0; line-height: 1.5;">Sent securely via wABus Identity Transporter (<strong style="color: #475569;">${emailUser}</strong>). Never share this code with anyone.</p>
-          </div>
-        `,
-        attachments: [
-          {
-            filename: 'logo.png',
-            path: logoPath,
-            cid: 'wonderlight_logo'
-          }
-        ]
+        subject: `${otp} is your 6-digit wABus Verification Code`,
+        text: `Your 6-digit wABus verification code is: ${otp}\n\nThis code will expire in 5 minutes. Never share this code with anyone.`,
+        html: htmlBody,
+        attachments
       });
       console.log(`[EMAIL SERVICE] ✉️ Real email sent from ${emailUser} to recipient ${email}`);
       return { success: true, sentViaSmtp: true };
     } catch (err: any) {
-      console.error(`[EMAIL SERVICE] ⚠️ SMTP Delivery failed for ${emailUser}:`, err?.message || err);
+      console.error(`[EMAIL SERVICE] ⚠️ Primary SMTP Delivery failed for ${emailUser}:`, err?.message || err);
+      // Fallback: Retry with direct 587 STARTTLS without attachments if primary fails
+      try {
+        const fallbackTransporter = nodemailer.createTransport({
+          host: 'smtp.gmail.com',
+          port: 587,
+          secure: false,
+          auth: {
+            user: emailUser,
+            pass: emailPassword
+          },
+          tls: { rejectUnauthorized: false }
+        });
+
+        await fallbackTransporter.sendMail({
+          from: emailFrom,
+          to: email,
+          subject: `${otp} is your 6-digit wABus Verification Code`,
+          text: `Your 6-digit wABus verification code is: ${otp}\n\nThis code will expire in 5 minutes. Never share this code with anyone.`,
+          html: `<div style="font-family: Arial; padding: 20px;"><h2>wABus Login Verification Code</h2><p style="font-size: 32px; font-weight: bold; color: #D84E55;">${otp}</p><p>Valid for 5 minutes.</p></div>`
+        });
+        console.log(`[EMAIL SERVICE] ✉️ Real email sent via fallback SMTP (port 587) to recipient ${email}`);
+        return { success: true, sentViaSmtp: true };
+      } catch (fallbackErr: any) {
+        console.error(`[EMAIL SERVICE] ⚠️ Fallback SMTP Delivery also failed:`, fallbackErr?.message || fallbackErr);
+      }
     }
   } else {
     console.log(`[EMAIL SERVICE] ℹ️ To send real emails to inbox: Add 16-character Gmail App Password to EMAIL_PASSWORD in .env file!`);
@@ -616,8 +645,9 @@ setInterval(() => {
   }
 }, 5000);
 
+export const app = express();
+
 async function startServer() {
-  const app = express();
   const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
 
   app.use(express.json());
@@ -2327,20 +2357,22 @@ async function startServer() {
     });
   });
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 Busivo Enterprise Bus Server running at http://0.0.0.0:${PORT}`);
-  });
+  if (!process.env.VERCEL) {
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`🚀 Busivo Enterprise Bus Server running at http://0.0.0.0:${PORT}`);
+    });
+  }
 
   // ==========================================
   // 11. VITE MIDDLEWARE / STATIC FILES
   // ==========================================
-  if (process.env.NODE_ENV !== 'production') {
+  if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
     });
     app.use(vite.middlewares);
-  } else {
+  } else if (!process.env.VERCEL) {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
     app.get('*', (req, res) => {
@@ -2352,3 +2384,5 @@ async function startServer() {
 startServer().catch(err => {
   console.error('Failed to start Busivo server:', err);
 });
+
+export default app;
