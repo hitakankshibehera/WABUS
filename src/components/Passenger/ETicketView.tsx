@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import QRCode from 'qrcode';
 import { Booking, Trip, FeatureFlags } from '../../types';
 import { api } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 import { 
   CheckCircle2, 
   Share2, 
@@ -14,7 +15,8 @@ import {
   ShieldCheck,
   UserCheck,
   Mail,
-  Loader2
+  Loader2,
+  Ticket
 } from 'lucide-react';
 import { LiveBusTracker } from './LiveBusTracker';
 
@@ -31,6 +33,7 @@ export const ETicketView: React.FC<ETicketViewProps> = ({
   onBookAnother,
   featureFlags,
 }) => {
+  const { openProfileModal } = useAuth();
   const [showLiveTracker, setShowLiveTracker] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
@@ -335,6 +338,15 @@ export const ETicketView: React.FC<ETicketViewProps> = ({
             >
               <Radio className="w-3.5 h-3.5 text-red-200 animate-pulse" />
               <span>🚌 Track My Bus</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => openProfileModal()}
+              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-xs transition cursor-pointer"
+            >
+              <Ticket className="w-3.5 h-3.5" />
+              <span>View in My Journeys</span>
             </button>
 
             <button

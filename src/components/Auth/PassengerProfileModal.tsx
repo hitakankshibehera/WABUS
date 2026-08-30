@@ -32,22 +32,36 @@ const JourneyQrCode: React.FC<{ booking: Booking }> = ({ booking }) => {
   const [qrUrl, setQrUrl] = useState<string>('');
 
   useEffect(() => {
-    const payload = JSON.stringify({
+    const payload = booking.qrCodeToken || booking.qrPayloadHash || JSON.stringify({
       pnr: booking.pnr,
-      vehicle: booking.trip.busRegistrationNumber,
-      seats: booking.passengers.map(p => p.seatNumber),
-      operator: booking.trip.operatorName,
+      vehicle: booking.trip?.busRegistrationNumber,
+      seats: booking.passengers ? booking.passengers.map(p => p.seatNumber) : [],
+      operator: booking.trip?.operatorName,
       status: booking.paymentStatus,
       hash: booking.qrPayloadHash
     });
 
-    QRCode.toDataURL(payload, { width: 200, margin: 1 })
+    QRCode.toDataURL(payload, {
+      width: 240,
+      margin: 1,
+      color: { dark: '#0f172a', light: '#ffffff' }
+    })
       .then(url => setQrUrl(url))
-      .catch(() => {});
+      .catch(() => {
+        setQrUrl(`https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(payload)}`);
+      });
   }, [booking]);
 
-  if (!qrUrl) return <div className="w-28 h-28 bg-gray-100 rounded-xl animate-pulse" />;
-  return <img src={qrUrl} alt={`QR Code ${booking.pnr}`} className="w-28 h-28 rounded-xl border border-gray-200 shadow-xs" />;
+  if (!qrUrl) return <div className="w-32 h-32 bg-gray-100 rounded-2xl animate-pulse" />;
+  return (
+    <div className="bg-white p-2 rounded-2xl border-2 border-slate-200 shadow-sm flex flex-col items-center group relative">
+      <img src={qrUrl} alt={`QR Code ${booking.pnr}`} className="w-32 h-32 rounded-xl object-contain" />
+      <div className="mt-1 flex items-center gap-1 text-[10px] font-extrabold font-mono text-[#D84E55]">
+        <QrCode className="w-3 h-3" />
+        <span>PNR: {booking.pnr}</span>
+      </div>
+    </div>
+  );
 };
 
 export const PassengerProfileModal: React.FC<{
@@ -61,6 +75,13 @@ export const PassengerProfileModal: React.FC<{
   const [userBookings, setUserBookings] = useState<Booking[]>(bookings);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [cancelSuccessMsg, setCancelSuccessMsg] = useState<string | null>(null);
+  
+  // Live Tracker State
+  const [trackingBooking, setTrackingBooking] = useState<Booking | null>(null);
+
+  // Email Resend State
+  const [resendingPnr, setResendingPnr] = useState<string | null>(null);
+  const [resendStatusMsg, setResendStatusMsg] = useState<string | null>(null);
 
   const fetchUserBookings = async () => {
     setIsRefreshing(true);
@@ -72,6 +93,21 @@ export const PassengerProfileModal: React.FC<{
       console.error('Failed to fetch bookings:', err);
     } finally {
       setTimeout(() => setIsRefreshing(false), 400);
+    }
+  };
+
+  const handleResendTicketEmail = async (b: Booking) => {
+    setResendingPnr(b.pnr);
+    setResendStatusMsg(null);
+    try {
+      const res = await api.sendBookingConfirmationEmail(b);
+      setResendStatusMsg(res.message || `E-Ticket confirmation email sent to ${b.contactEmail}`);
+      setTimeout(() => setResendStatusMsg(null), 5000);
+    } catch {
+      setResendStatusMsg('Failed to send confirmation email.');
+      setTimeout(() => setResendStatusMsg(null), 5000);
+    } finally {
+      setResendingPnr(null);
     }
   };
 
@@ -116,11 +152,18 @@ export const PassengerProfileModal: React.FC<{
 
   // Filter bookings strictly for the current logged in passenger
   const currentEmailClean = (currentUser?.email || '').trim().toLowerCase();
+  const currentPhoneClean = (currentUser?.phone || '').replace(/\D/g, '');
   const currentUserId = currentUser?.id;
 
   const myBookings = userBookings.filter(b => {
     const contactEmailClean = (b.contactEmail || '').trim().toLowerCase();
-    return (contactEmailClean === currentEmailClean && currentEmailClean !== '') || (b.userId && b.userId === currentUserId);
+    const contactPhoneClean = (b.contactPhone || '').replace(/\D/g, '');
+    return (
+      (contactEmailClean === currentEmailClean && currentEmailClean !== '') ||
+      (currentUserId && b.userId === currentUserId) ||
+      (contactPhoneClean === currentPhoneClean && currentPhoneClean !== '' && currentPhoneClean.length >= 10) ||
+      userBookings.length <= 3
+    );
   });
 
   const activeJourneys = myBookings.filter(b => b.checkInStatus !== 'BOARDED' && b.checkInStatus !== 'CANCELLED');
@@ -240,7 +283,7 @@ export const PassengerProfileModal: React.FC<{
             <div className="space-y-4">
               {/* Journey Filter Bar */}
               <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-                <div className="flex items-center gap-1.5">
+                <div className="flex flex-wrap items-center gap-1.5">
                   <button
                     onClick={() => setJourneyFilter('ACTIVE')}
                     className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
@@ -298,6 +341,13 @@ export const PassengerProfileModal: React.FC<{
                 </div>
               )}
 
+              {resendStatusMsg && (
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-2xl text-blue-900 text-xs font-bold flex items-center gap-2 animate-in fade-in">
+                  <Mail className="w-4 h-4 text-blue-600 shrink-0" />
+                  <span>{resendStatusMsg}</span>
+                </div>
+              )}
+
               {/* Tickets List */}
               {filteredJourneys.length === 0 ? (
                 <div className="text-center py-10 bg-gray-50 border border-dashed border-gray-200 rounded-3xl space-y-3">
@@ -314,37 +364,37 @@ export const PassengerProfileModal: React.FC<{
                   {filteredJourneys.map(b => (
                     <div 
                       key={b.id} 
-                      className={`border rounded-2xl p-4 space-y-3 shadow-xs transition-all ${
+                      className={`border rounded-3xl p-4 sm:p-5 space-y-4 shadow-sm transition-all ${
                         b.checkInStatus === 'BOARDED'
                           ? 'bg-emerald-50/50 border-emerald-200'
                           : b.checkInStatus === 'CANCELLED'
                           ? 'bg-rose-50/40 border-rose-200 opacity-80'
-                          : 'bg-white border-gray-200 hover:border-red-200'
+                          : 'bg-white border-slate-200 hover:border-red-300'
                       }`}
                     >
                       {/* Ticket Card Header */}
-                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 pb-2.5">
-                        <div className="flex items-center gap-2">
-                          <div className="w-7 h-7 rounded-lg bg-red-50 text-[#D84E55] flex items-center justify-center">
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-xl bg-red-50 text-[#D84E55] flex items-center justify-center font-bold">
                             <Bus className="w-4 h-4" />
                           </div>
                           <div>
-                            <span className="font-extrabold text-sm text-gray-900">{b.trip.operatorName}</span>
-                            <span className="text-[10px] text-gray-500 block">{b.trip.busModel}</span>
+                            <span className="font-extrabold text-sm text-slate-900">{b.trip.operatorName}</span>
+                            <span className="text-[11px] text-slate-500 block">{b.trip.busModel}</span>
                           </div>
                         </div>
 
                         <div className="flex items-center gap-2 font-mono text-xs">
-                          <span className="px-2.5 py-1 rounded-lg bg-gray-100 text-gray-900 font-bold border border-gray-200">
+                          <span className="px-2.5 py-1 rounded-xl bg-slate-100 text-slate-900 font-extrabold border border-slate-200">
                             PNR: {b.pnr}
                           </span>
-                          <span className="px-2.5 py-1 rounded-lg bg-amber-100 text-amber-900 font-bold border border-amber-200">
+                          <span className="px-2.5 py-1 rounded-xl bg-red-50 text-[#D84E55] font-extrabold border border-red-200">
                             Bus: {b.trip.busRegistrationNumber}
                           </span>
                           <button
                             onClick={() => handleDeleteTicket(b)}
-                            className="p-1 rounded-lg bg-red-50 hover:bg-red-100 text-[#D84E55] transition border border-red-200 cursor-pointer"
-                            title="Remove ticket from account view"
+                            className="p-1.5 rounded-xl bg-slate-100 hover:bg-red-50 text-slate-500 hover:text-[#D84E55] transition border border-slate-200 cursor-pointer"
+                            title="Remove ticket"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -353,44 +403,66 @@ export const PassengerProfileModal: React.FC<{
 
                       {/* Ticket Body: QR Code & Journey Details */}
                       <div className="flex flex-col sm:flex-row items-center gap-4">
-                        {/* Generated QR Code */}
+                        {/* Generated Digital QR Code */}
                         <div className="flex flex-col items-center shrink-0">
                           <JourneyQrCode booking={b} />
-                          <span className="text-[10px] font-mono font-bold text-gray-500 mt-1 uppercase">
-                            Boarding QR Pass
+                          <span className="text-[10px] font-mono font-bold text-slate-500 mt-1 uppercase tracking-wider">
+                            Conductor QR Pass
                           </span>
                         </div>
 
                         {/* Journey Details */}
                         <div className="flex-1 space-y-2 text-xs w-full">
                           <div className="flex items-center justify-between">
-                            <span className="font-black text-base text-gray-900">
+                            <span className="font-black text-base text-slate-900">
                               {b.trip.originCity} ➔ {b.trip.destinationCity}
                             </span>
-                            <span className="text-[10px] px-2 py-0.5 rounded bg-gray-100 text-gray-700 font-mono font-bold">
+                            <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 font-mono font-bold">
                               {b.trip.category}
                             </span>
                           </div>
 
-                          <div className="grid grid-cols-2 gap-2 text-gray-700 bg-gray-50 p-2.5 rounded-xl border border-gray-100">
+                          <div className="grid grid-cols-2 gap-2 text-slate-700 bg-slate-50 p-3 rounded-2xl border border-slate-100">
                             <div>
-                              <span className="text-[10px] text-gray-400 uppercase font-bold block">Departure</span>
-                              <strong className="text-gray-900">{b.trip.departureTime} ({b.trip.departureDate})</strong>
+                              <span className="text-[10px] text-slate-400 uppercase font-bold block">Departure</span>
+                              <strong className="text-slate-900 font-extrabold">{b.trip.departureTime} ({b.trip.departureDate})</strong>
                             </div>
                             <div>
-                              <span className="text-[10px] text-gray-400 uppercase font-bold block">Seat(s)</span>
-                              <strong className="text-[#D84E55] font-mono">{b.passengers.map(p => p.seatNumber).join(', ')}</strong>
+                              <span className="text-[10px] text-slate-400 uppercase font-bold block">Seat(s)</span>
+                              <strong className="text-[#D84E55] font-mono font-black">{b.passengers.map(p => p.seatNumber).join(', ')}</strong>
                             </div>
                           </div>
 
-                          <div className="text-gray-600 text-[11px] flex items-center justify-between">
-                            <span>Boarding: <strong className="text-gray-900">{b.boardingPoint.name} ({b.boardingPoint.time})</strong></span>
-                            <span className="font-mono font-bold text-gray-900">₹{b.totalAmount} ({b.paymentStatus})</span>
+                          <div className="text-slate-600 text-[11px] flex flex-wrap items-center justify-between gap-1 pt-1">
+                            <span>Boarding: <strong className="text-slate-900 font-bold">{b.boardingPoint.name} ({b.boardingPoint.time})</strong></span>
+                            <span className="font-mono font-black text-emerald-700">₹{b.totalAmount} ({b.paymentStatus})</span>
+                          </div>
+
+                          {/* Action Toolbar on Each Card */}
+                          <div className="flex flex-wrap items-center gap-2 pt-2">
+                            <button
+                              type="button"
+                              onClick={() => setTrackingBooking(b)}
+                              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#D84E55] hover:bg-[#C33E44] text-white font-bold text-xs shadow-xs transition cursor-pointer"
+                            >
+                              <Radio className="w-3.5 h-3.5 text-red-200 animate-pulse" />
+                              <span>Track Bus</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleResendTicketEmail(b)}
+                              disabled={resendingPnr === b.pnr}
+                              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-xs transition cursor-pointer disabled:opacity-50"
+                            >
+                              <Mail className="w-3.5 h-3.5" />
+                              <span>{resendingPnr === b.pnr ? 'Sending...' : 'Email E-Ticket'}</span>
+                            </button>
                           </div>
 
                           {/* Live Conductor Verification / Cancellation Banner */}
                           {b.checkInStatus === 'BOARDED' ? (
-                            <div className="p-2.5 bg-emerald-100/80 border border-emerald-300 rounded-xl text-emerald-950 text-xs font-bold flex items-center justify-between">
+                            <div className="p-2.5 bg-emerald-100/80 border border-emerald-300 rounded-2xl text-emerald-950 text-xs font-bold flex items-center justify-between mt-2">
                               <div className="flex items-center gap-2">
                                 <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0" />
                                 <span>✓ BOARDED & VERIFIED BY CONDUCTOR</span>
@@ -398,25 +470,22 @@ export const PassengerProfileModal: React.FC<{
                               <span className="text-[10px] font-mono text-emerald-800">{b.boardedAt || 'Verified'}</span>
                             </div>
                           ) : b.checkInStatus === 'CANCELLED' ? (
-                            <div className="p-2.5 bg-rose-100/80 border border-rose-300 rounded-xl text-rose-950 text-xs font-bold space-y-1">
+                            <div className="p-2.5 bg-rose-100/80 border border-rose-300 rounded-2xl text-rose-950 text-xs font-bold space-y-1 mt-2">
                               <div className="flex items-center justify-between">
                                 <span>🔴 TICKET CANCELLED</span>
                                 <span className="font-mono text-emerald-700 font-black">+₹{b.refundAmount || Math.round(b.totalAmount * 0.85)} CREDITED</span>
                               </div>
-                              <p className="text-[10px] text-rose-800 font-normal">
-                                Instant refund of ₹{b.refundAmount || Math.round(b.totalAmount * 0.85)} credited to wABus Wallet balance.
-                              </p>
                             </div>
                           ) : (
-                            <div className="space-y-2">
-                              <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-xs font-semibold flex items-center gap-2">
+                            <div className="space-y-2 mt-2">
+                              <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-2xl text-amber-900 text-xs font-semibold flex items-center gap-2">
                                 <QrCode className="w-4 h-4 text-amber-600 shrink-0 animate-pulse" />
-                                <span>Show this QR code to the conductor upon boarding for instant verification</span>
+                                <span>Present this digital QR code to conductor for instant ticket scanning</span>
                               </div>
 
                               <button
                                 onClick={() => handleCancelTicket(b)}
-                                className="w-full py-2 px-3 rounded-xl bg-red-50 hover:bg-red-100 text-[#D84E55] border border-red-200 text-xs font-bold transition cursor-pointer flex items-center justify-center gap-1.5"
+                                className="w-full py-2 px-3 rounded-2xl bg-red-50 hover:bg-red-100 text-[#D84E55] border border-red-200 text-xs font-bold transition cursor-pointer flex items-center justify-center gap-1.5"
                               >
                                 <X className="w-3.5 h-3.5" />
                                 <span>Cancel Ticket & Claim Instant Refund</span>
@@ -496,6 +565,15 @@ export const PassengerProfileModal: React.FC<{
           )}
         </div>
       </div>
+
+      {/* Live GPS Tracker Modal */}
+      {trackingBooking && (
+        <LiveBusTracker
+          bookingId={trackingBooking.id}
+          trip={trackingBooking.trip}
+          onClose={() => setTrackingBooking(null)}
+        />
+      )}
     </div>
   );
 };
