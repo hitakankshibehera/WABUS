@@ -269,10 +269,17 @@ async function sendBookingConfirmationEmail(booking: any): Promise<{ success: bo
           <p style="margin: 10px 0 0 0; font-size: 11px; color: #64748b;">Show this digital QR code to the conductor upon boarding for instant ticket scanning.</p>
         </div>
 
+        <!-- Footer Action Button -->
+        <div style="text-align: center; margin: 24px 0 12px 0;">
+          <a href="https://busivo.vercel.app/" target="_blank" style="display: inline-block; background-color: #D84E55; color: #ffffff; padding: 14px 28px; border-radius: 14px; font-weight: 900; font-size: 14px; text-decoration: none; box-shadow: 0 4px 14px rgba(216,78,85,0.3);">
+            🚌 View My Journey & Live GPS on busivo.vercel.app
+          </a>
+        </div>
+
         <div style="text-align: center; border-top: 1px solid #f1f5f9; padding-top: 16px;">
           <p style="margin: 0; font-size: 12px; color: #94a3b8;">
             Dispatched from <strong>Wonderlight Adventure Official API</strong> (${emailUser}).<br/>
-            WhatsApp Support & Updates: <strong>+91 94383 18821</strong>
+            Official Website: <a href="https://busivo.vercel.app/" target="_blank" style="color: #D84E55; font-weight: bold; text-decoration: underline;">https://busivo.vercel.app/</a> &bull; Support: <strong>+91 94383 18821</strong>
           </p>
         </div>
       </div>
@@ -371,26 +378,24 @@ async function sendGiftCardEmail(recipientEmail: string, card: any): Promise<{ s
           <div style="font-size: 13px; font-weight: 800; color: #16a34a; margin-top: 6px;">Gift Value: ₹${card.amount}</div>
         </div>
 
-        <!-- Direct Website CTA Link Button -->
-        <div style="text-align: center; margin: 24px 0;">
-          <a href="https://busivo.vercel.app/" target="_blank" style="display: inline-block; background-color: #D84E55; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 12px; font-weight: 800; font-size: 15px; box-shadow: 0 4px 12px rgba(216,78,85,0.35);">
-            🎟️ Visit Website & Redeem Gift Card Now
-          </a>
-          <p style="margin: 8px 0 0 0; font-size: 12px; color: #64748b;">
-            Website Link: <a href="https://busivo.vercel.app/" target="_blank" style="color: #D84E55; font-weight: bold; text-decoration: underline;">https://busivo.vercel.app/</a>
-          </p>
-        </div>
-
-        <h3 style="font-size: 14px; font-weight: 800; color: #0f172a; margin-bottom: 8px;">How to Redeem Your Voucher:</h3>
-        <ol style="font-size: 13px; color: #475569; padding-left: 20px; margin: 0 0 20px 0; line-height: 1.8;">
-          <li>Click the official website link: <a href="https://busivo.vercel.app/" target="_blank" style="color: #D84E55; font-weight: bold; text-decoration: underline;">https://busivo.vercel.app/</a>.</li>
+        <h3 style="font-size: 14px; font-weight: 800; color: #0f172a; margin-bottom: 8px;">How to Redeem:</h3>
+        <ol style="font-size: 13px; color: #475569; padding-left: 20px; margin: 0 0 20px 0; line-height: 1.6;">
+          <li>Click the button below or visit <a href="https://busivo.vercel.app/" target="_blank" style="color: #D84E55; font-weight: bold; text-decoration: underline;">https://busivo.vercel.app/</a>.</li>
           <li>Click Account Profile ➔ <strong>Redeem Gift Card / Offer Code</strong>.</li>
-          <li>Enter Gift Card Number <strong style="font-family: monospace; color: #0f172a;">${card.code}</strong> and PIN <strong style="font-family: monospace; color: #0f172a;">${card.pin}</strong>.</li>
-          <li>₹${card.amount} will be added instantly to your wABus Wallet balance!</li>
+          <li>Enter Gift Card Number <strong style="font-family: monospace;">${card.code}</strong> and PIN <strong style="font-family: monospace;">${card.pin}</strong>.</li>
+          <li>₹${card.amount} will be credited instantly to your wABus Wallet balance!</li>
         </ol>
 
+        <!-- Direct Link Button -->
+        <div style="text-align: center; margin: 24px 0 12px 0;">
+          <a href="https://busivo.vercel.app/" target="_blank" style="display: inline-block; background-color: #D84E55; color: #ffffff; padding: 14px 28px; border-radius: 14px; font-weight: 900; font-size: 14px; text-decoration: none; box-shadow: 0 4px 14px rgba(216,78,85,0.3);">
+            🎁 Visit Website & Redeem Gift Card (busivo.vercel.app)
+          </a>
+        </div>
+
         <p style="font-size: 12px; color: #94a3b8; border-top: 1px solid #f1f5f9; padding-top: 16px; margin-top: 20px;">
-          Valid until 31-Dec-2030. Issued by Wonderlight Adventure Co. (${emailUser}).
+          Valid until 31-Dec-2030. Issued by Wonderlight Adventure Co. (${emailUser}).<br/>
+          Official Website: <a href="https://busivo.vercel.app/" target="_blank" style="color: #D84E55; font-weight: bold; text-decoration: underline;">https://busivo.vercel.app/</a>
         </p>
       </div>
     </div>
