@@ -1247,7 +1247,16 @@ app.use(express.json());
     const isPayOnBoarding = paymentMethod === 'PAY_ON_BOARDING_COD';
 
     const authUser = getAuthenticatedUserFromReq(req);
-    const cleanContactEmail = String(contactEmail || (authUser ? authUser.email : '')).trim().toLowerCase();
+    let cleanContactEmail = String(
+      (contactEmail && String(contactEmail).trim() !== '')
+        ? contactEmail
+        : (authUser && authUser.email ? authUser.email : '')
+    ).trim().toLowerCase();
+
+    if ((!cleanContactEmail || !cleanContactEmail.includes('@')) && Array.isArray(passengers)) {
+      const pWithEmail = (passengers as any[]).find(p => p && p.email && typeof p.email === 'string' && p.email.includes('@'));
+      if (pWithEmail) cleanContactEmail = pWithEmail.email.trim().toLowerCase();
+    }
 
     const newBooking: Booking = {
       id: `bk-${Date.now()}`,

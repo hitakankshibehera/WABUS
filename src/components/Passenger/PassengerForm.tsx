@@ -153,12 +153,17 @@ export const PassengerForm: React.FC<PassengerFormProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const cleanEmail = contactEmail.trim().toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('.')) {
+      alert('Please enter a valid email address to receive your E-Ticket confirmation.');
+      return;
+    }
     onProceedToCheckout({
       passengers,
       boardingPoint: selectedBoarding,
       droppingPoint: selectedDropping,
-      contactEmail,
-      contactPhone,
+      contactEmail: cleanEmail,
+      contactPhone: contactPhone.trim(),
       optInWhatsApp,
       appliedCoupon,
     });
