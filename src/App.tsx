@@ -479,24 +479,24 @@ export default function App() {
       {/* 24x7 Customer Support & FAQs Modal */}
       <CustomerSupportModal isOpen={isSupportOpen} onClose={() => setIsSupportOpen(false)} />
 
-      {/* wABus Authentic Footer */}
+      {/* MargPath Authentic Footer */}
       <footer className="border-t border-gray-200 bg-white py-8 text-xs text-gray-500 mt-auto">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
             <div>
               <div className="flex items-center space-x-2.5 mb-2">
-                <div className="w-8 h-8 rounded-xl bg-gray-900 overflow-hidden shadow-xs border border-gray-200 shrink-0">
-                  <img src="/logo.png" alt="Wonderlight Adventure Co." className="w-full h-full object-cover" />
+                <div className="w-9 h-9 rounded-xl bg-white overflow-hidden shadow-xs border border-gray-200 shrink-0">
+                  <img src="/logo.png" alt="MargPath Logo" className="w-full h-full object-cover" />
                 </div>
                 <div>
                   <span className="font-black text-lg text-gray-900 block leading-none">
-                    Bus<span className="text-[#D84E55]">ivo</span>
+                    Marg<span className="text-[#D84E55]">Path</span>
                   </span>
-                  <span className="text-[9px] uppercase font-bold text-gray-500">Wonderlight Adventure Co.</span>
+                  <span className="text-[9px] uppercase font-bold text-gray-500">Explore. Connect. Experience.</span>
                 </div>
               </div>
               <p className="text-[11px] text-gray-500 leading-relaxed">
-                Busivo is Wonderlight Adventure Company&apos;s automated bus ticketing ecosystem trusted by over 25+ million satisfied passengers.
+                MargPath is India&apos;s leading next-generation journey & bus ticketing ecosystem. India in Every Journey.
               </p>
             </div>
 
@@ -523,14 +523,14 @@ export default function App() {
             <div>
               <h4 className="font-bold text-gray-900 mb-2">Architecture & Stack</h4>
               <p className="text-[11px] text-gray-500 leading-relaxed">
-                React 19 &bull; Tailwind CSS &bull; Redis 10m TTL Lock Engine &bull; PostgreSQL 15 DDL &bull; Razorpay / Stripe Webhook Validation &bull; AIS-140 GPS
+                React 19 &bull; Tailwind CSS &bull; Redis 10m TTL Lock Engine &bull; PostgreSQL 15 DDL &bull; WhatsApp Cloud API &bull; AIS-140 GPS
               </p>
             </div>
           </div>
 
           <div className="pt-4 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-gray-400">
             <div>
-              &copy; {new Date().getFullYear()} wABus India. All Rights Reserved.
+              &copy; {new Date().getFullYear()} MargPath India. All Rights Reserved.
             </div>
             <div className="flex items-center gap-4">
               <span>Privacy Policy</span>

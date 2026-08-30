@@ -104,22 +104,22 @@ export const Header: React.FC<HeaderProps> = ({
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-18">
-          {/* wABus Iconic Logo & Name with Floating Micro-Animation */}
+          {/* MargPath Iconic Logo & Name */}
           <div className="flex items-center space-x-3 cursor-pointer select-none group" onClick={() => setActiveTab('PASSENGER')}>
-            <div className="w-11 h-11 rounded-2xl bg-gray-900 overflow-hidden shadow-md border border-gray-200 transition-all duration-300 group-hover:scale-110 group-hover:rotate-3 shrink-0 flex items-center justify-center animate-float-slow">
-              <img src="/logo.png" alt="Wonderlight Adventure WA Logo" className="w-full h-full object-cover" />
+            <div className="w-12 h-12 rounded-2xl bg-white overflow-hidden shadow-md border border-gray-200 transition-all duration-300 group-hover:scale-105 shrink-0 flex items-center justify-center">
+              <img src="/logo.png" alt="MargPath Official Logo" className="w-full h-full object-cover" />
             </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="font-black text-2xl tracking-tighter text-gray-900 transition-colors group-hover:text-[#D84E55]">
-                  Bus<span className="text-[#D84E55] font-extrabold">ivo</span>
+                <span className="font-black text-2xl tracking-tight text-slate-900 transition-colors group-hover:text-[#D84E55]">
+                  Marg<span className="text-[#D84E55] font-extrabold">Path</span>
                 </span>
                 <span className="text-[9px] uppercase font-extrabold tracking-wider px-1.5 py-0.5 rounded bg-red-50 text-[#D84E55] border border-red-200 flex items-center gap-1 shadow-2xs">
                   <span className="w-1.5 h-1.5 rounded-full bg-[#D84E55] animate-ping"></span>
                   <span>India</span>
                 </span>
               </div>
-              <p className="text-[11px] text-gray-500 font-medium -mt-1 hidden sm:block">Wonderlight Adventure Co. Ecosystem</p>
+              <p className="text-[11px] text-gray-500 font-medium -mt-1 hidden sm:block">Explore. Connect. Experience.</p>
             </div>
           </div>
 

@@ -130,7 +130,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               <div className="flex items-center gap-2">
                 <h3 className="text-sm sm:text-base font-bold tracking-tight">Select Payment Option</h3>
                 <span className="text-[10px] uppercase font-bold px-1.5 py-0.2 rounded bg-white/20">
-                  Busivo Pay
+                  MargPath Pay
                 </span>
               </div>
               <p className="text-[11px] text-red-100">PCI-DSS 256-Bit Encrypted Payment Gateway</p>

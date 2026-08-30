@@ -483,8 +483,8 @@ export const AboutModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
               <Building2 className="w-5 h-5 text-[#D84E55]" />
             </div>
             <div>
-              <h3 className="font-extrabold text-base leading-tight">Know About wABus</h3>
-              <p className="text-[11px] text-slate-300">Wonderlight Adventure Company</p>
+              <h3 className="font-extrabold text-base leading-tight">Know About MargPath</h3>
+              <p className="text-[11px] text-slate-300">Explore. Connect. Experience.</p>
             </div>
           </div>
           <button 
@@ -497,7 +497,7 @@ export const AboutModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
 
         <div className="p-5 space-y-4 text-xs text-slate-600 leading-relaxed max-h-[75vh] overflow-y-auto">
           <p>
-            <strong className="text-slate-900 font-bold">wABus</strong> by Wonderlight Adventure Company is India&apos;s leading next-generation automated bus ticketing ecosystem serving over 25+ million passengers across 100+ cities.
+            <strong className="text-slate-900 font-bold">MargPath</strong> is India&apos;s leading next-generation journey & bus ticketing ecosystem serving over 25+ million passengers across 100+ cities. India in Every Journey.
           </p>
 
           <div className="space-y-2 pt-1 border-t border-slate-100">

@@ -41,8 +41,8 @@ function generateTicketPdfBuffer(booking: any, qrBuffer: Buffer): Promise<Buffer
 
       // Top Header
       doc.rect(40, 40, 515, 60).fill('#D84E55');
-      doc.fillColor('#FFFFFF').fontSize(22).font('Helvetica-Bold').text('wABus OFFICIAL E-TICKET', 60, 52);
-      doc.fontSize(10).font('Helvetica').text('Wonderlight Adventure Company • Digital Boarding Pass', 60, 78);
+      doc.fillColor('#FFFFFF').fontSize(22).font('Helvetica-Bold').text('MargPath OFFICIAL E-TICKET', 60, 52);
+      doc.fontSize(10).font('Helvetica').text('MargPath Official Boarding Pass • India in Every Journey', 60, 78);
 
       // PNR Ribbon Box
       doc.rect(40, 110, 515, 45).fill('#F8FAFC').stroke('#E2E8F0');

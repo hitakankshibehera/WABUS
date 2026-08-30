@@ -34,7 +34,7 @@ const FAQS: FAQItem[] = [
     id: 'faq-1',
     category: 'QR_CHECKIN',
     question: 'How does digital QR Code conductor verification work on boarding?',
-    answer: 'Once your payment is confirmed, an encrypted cryptographic QR Code is generated on your E-Ticket. When boarding the bus, simply present this QR code to the conductor. The conductor scans it using the wABus Conductor App to mark your check-in status as "✓ BOARDED & VERIFIED".'
+    answer: 'Once your payment is confirmed, an encrypted cryptographic QR Code is generated on your E-Ticket. When boarding the bus, simply present this QR code to the conductor. The conductor scans it using the MargPath Conductor App to mark your check-in status as "✓ BOARDED & VERIFIED".'
   },
   {
     id: 'faq-2',
@@ -46,19 +46,19 @@ const FAQS: FAQItem[] = [
     id: 'faq-3',
     category: 'WOMEN_SAFETY',
     question: 'What is the Women Booking Feature and female adjacent seat policy?',
-    answer: 'For female passengers traveling alone, wABus reserves specific seats highlighted in pink/purple. To ensure comfort and safety, male passengers are automatically restricted from selecting seats adjacent to single female travelers.'
+    answer: 'For female passengers traveling alone, MargPath reserves specific seats highlighted in pink/purple. To ensure comfort and safety, male passengers are automatically restricted from selecting seats adjacent to single female travelers.'
   },
   {
     id: 'faq-4',
     category: 'BOOKING',
     question: 'What happens when I select a seat? Is my seat locked from other users?',
-    answer: 'Yes! wABus utilizes an enterprise Redis 10-Minute Distributed Seat Lock engine. As soon as you select a seat, it is locked strictly for your session for 10 minutes, preventing double-booking across all devices nationwide.'
+    answer: 'Yes! MargPath utilizes an enterprise Redis 10-Minute Distributed Seat Lock engine. As soon as you select a seat, it is locked strictly for your session for 10 minutes, preventing double-booking across all devices nationwide.'
   },
   {
     id: 'faq-5',
     category: 'REFUNDS',
     question: 'How long does it take for ticket refund credit to appear?',
-    answer: 'Instant refunds to your wABus Wallet Balance are credited within 30 seconds! Bank/UPI account transfers take 1-3 business days depending on your bank.'
+    answer: 'Instant refunds to your MargPath Wallet Balance are credited within 30 seconds! Bank/UPI account transfers take 1-3 business days depending on your bank.'
   }
 ];
 
