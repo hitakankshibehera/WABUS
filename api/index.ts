@@ -35,7 +35,7 @@ function generateTicketPdfBuffer(booking: any, qrBuffer: Buffer): Promise<Buffer
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', err => reject(err));
 
-      // Top Red Header
+      // Top Header
       doc.rect(40, 40, 515, 60).fill('#D84E55');
       doc.fillColor('#FFFFFF').fontSize(22).font('Helvetica-Bold').text('wABus OFFICIAL E-TICKET', 60, 52);
       doc.fontSize(10).font('Helvetica').text('Wonderlight Adventure Company • Digital Boarding Pass', 60, 78);
@@ -125,9 +125,9 @@ async function sendOtpEmail(email: string, otp: string): Promise<{ success: bool
     const transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: { user: emailUser, pass: emailPassword },
-      connectionTimeout: 8000,
-      greetingTimeout: 4000,
-      socketTimeout: 8000,
+      connectionTimeout: 5000,
+      greetingTimeout: 3000,
+      socketTimeout: 5000,
       tls: { rejectUnauthorized: false }
     });
 
@@ -139,16 +139,16 @@ async function sendOtpEmail(email: string, otp: string): Promise<{ success: bool
       html: htmlBody
     });
     return { success: true, sentViaSmtp: true };
-  } catch (err: any) {
+  } catch {
     try {
       const fallbackTransporter = nodemailer.createTransport({
         host: 'smtp.gmail.com',
         port: 465,
         secure: true,
         auth: { user: emailUser, pass: emailPassword },
-        connectionTimeout: 8000,
-        greetingTimeout: 4000,
-        socketTimeout: 8000,
+        connectionTimeout: 5000,
+        greetingTimeout: 3000,
+        socketTimeout: 5000,
         tls: { rejectUnauthorized: false }
       });
       await fallbackTransporter.sendMail({
@@ -294,6 +294,9 @@ async function sendBookingConfirmationEmail(booking: any): Promise<{ success: bo
       const transporter = nodemailer.createTransport({
         service: 'gmail',
         auth: { user: emailUser, pass: emailPassword },
+        connectionTimeout: 5000,
+        greetingTimeout: 3000,
+        socketTimeout: 5000,
         tls: { rejectUnauthorized: false }
       });
       await transporter.sendMail({
@@ -312,9 +315,9 @@ async function sendBookingConfirmationEmail(booking: any): Promise<{ success: bo
         port: 465,
         secure: true,
         auth: { user: emailUser, pass: emailPassword },
-        connectionTimeout: 8000,
-        greetingTimeout: 4000,
-        socketTimeout: 8000,
+        connectionTimeout: 5000,
+        greetingTimeout: 3000,
+        socketTimeout: 5000,
         tls: { rejectUnauthorized: false }
       });
       await fallbackTransporter.sendMail({
@@ -407,9 +410,9 @@ async function sendGiftCardEmail(recipientEmail: string, card: any): Promise<{ s
         port: 465,
         secure: true,
         auth: { user: emailUser, pass: emailPassword },
-        connectionTimeout: 8000,
-        greetingTimeout: 4000,
-        socketTimeout: 8000,
+        connectionTimeout: 5000,
+        greetingTimeout: 3000,
+        socketTimeout: 5000,
         tls: { rejectUnauthorized: false }
       });
 
@@ -550,18 +553,28 @@ app.post(['/api/auth/resend-otp', '/auth/resend-otp'], async (req, res) => {
 // 4. Booking E-Ticket Confirmation Dispatch Endpoint for Vercel
 app.post(['/api/bookings/send-confirmation', '/bookings/send-confirmation'], async (req, res) => {
   try {
-    const booking = req.body;
-    if (!booking || !booking.pnr) {
-      return res.status(400).json({ error: 'Valid booking object with PNR reference is required.' });
+    const { booking, pnr, email } = req.body || {};
+    let targetBooking = (booking || (req.body && req.body.pnr ? req.body : undefined)) as any;
+
+    if (!targetBooking && pnr) {
+      targetBooking = { pnr };
     }
 
-    const mailResult = await sendBookingConfirmationEmail(booking);
+    if (!targetBooking || !targetBooking.pnr) {
+      return res.status(400).json({ error: 'Valid booking object or PNR reference is required.' });
+    }
+
+    if (email && typeof email === 'string' && email.includes('@')) {
+      targetBooking = { ...targetBooking, contactEmail: email.trim().toLowerCase() };
+    }
+
+    const mailResult = await sendBookingConfirmationEmail(targetBooking);
 
     return res.json({
       success: true,
       message: mailResult.duplicateSkipped
-        ? `Confirmation email for PNR ${booking.pnr} was already sent.`
-        : `E-Ticket confirmation email for PNR ${booking.pnr} sent to ${booking.contactEmail || 'customer'}.`,
+        ? `Confirmation email for PNR ${targetBooking.pnr} was already sent.`
+        : `E-Ticket confirmation email for PNR ${targetBooking.pnr} sent to ${targetBooking.contactEmail || 'customer'}.`,
       sentViaSmtp: mailResult.sentViaSmtp,
       duplicateSkipped: mailResult.duplicateSkipped
     });
