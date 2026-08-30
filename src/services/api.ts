@@ -24,6 +24,74 @@ async function safeParseJson(res: Response, defaultError: string): Promise<any> 
   throw new Error(`Invalid response format from server.`);
 }
 
+/**
+ * Helper to synchronize confirmed bookings from local storage and memory
+ * into the seat matrices of all trips, marking booked seats as 'BOOKED'.
+ */
+function syncBookedSeatsIntoTrips(tripsList: Trip[]): Trip[] {
+  let userBookings: Booking[] = [];
+  try {
+    const saved = localStorage.getItem('wabus_user_bookings');
+    if (saved) userBookings = JSON.parse(saved);
+  } catch {}
+
+  let bookedSeatsMap: Record<string, { seatNumber: string; gender?: string }[]> = {};
+  try {
+    const savedMap = localStorage.getItem('wabus_booked_seats_map');
+    if (savedMap) bookedSeatsMap = JSON.parse(savedMap);
+  } catch {}
+
+  return tripsList.map(trip => {
+    const bookedSeatMap = new Map<string, string>(); // seatNumber -> gender
+
+    // 1. From stored map
+    if (bookedSeatsMap[trip.id]) {
+      bookedSeatsMap[trip.id].forEach(item => {
+        if (item && item.seatNumber) {
+          bookedSeatMap.set(String(item.seatNumber).toUpperCase(), item.gender || 'MALE');
+        }
+      });
+    }
+
+    // 2. From confirmed user bookings
+    userBookings.forEach(b => {
+      if (b.checkInStatus !== 'CANCELLED' && (b.tripId === trip.id || (b.trip && b.trip.busRegistrationNumber === trip.bus.registrationNumber))) {
+        if (b.passengers && Array.isArray(b.passengers)) {
+          b.passengers.forEach(p => {
+            if (p && p.seatNumber) {
+              bookedSeatMap.set(String(p.seatNumber).toUpperCase(), p.gender || 'MALE');
+            }
+          });
+        }
+      }
+    });
+
+    const updatedSeats = trip.seats.map(seat => {
+      const seatNumUpper = seat.number.toUpperCase();
+      const seatIdUpper = seat.id.toUpperCase();
+      const isBooked = seat.status === 'BOOKED' || bookedSeatMap.has(seatNumUpper) || bookedSeatMap.has(seatIdUpper);
+
+      if (isBooked) {
+        const bookedGender = bookedSeatMap.get(seatNumUpper) || bookedSeatMap.get(seatIdUpper) || seat.bookedGender || 'MALE';
+        return {
+          ...seat,
+          status: 'BOOKED' as const,
+          bookedGender: bookedGender as any
+        };
+      }
+      return seat;
+    });
+
+    const availableSeatsCount = updatedSeats.filter(s => s.status === 'AVAILABLE').length;
+
+    return {
+      ...trip,
+      seats: updatedSeats,
+      availableSeatsCount
+    };
+  });
+}
+
 export const api = {
   // Auth OTP Endpoints
   async sendOtp(email: string): Promise<OtpSessionResponse> {
@@ -191,7 +259,8 @@ export const api = {
       if (params?.busType) query.set('busType', params.busType);
 
       const res = await fetch(`/api/trips?${query.toString()}`);
-      return await safeParseJson(res, 'Failed to fetch trips');
+      const serverTrips = await safeParseJson(res, 'Failed to fetch trips');
+      return syncBookedSeatsIntoTrips(serverTrips);
     } catch {
       // Return filtered mock trips so bus searching ALWAYS works
       let results = [...INITIAL_TRIPS];
@@ -204,18 +273,20 @@ export const api = {
       if (params?.category && params.category !== 'ALL') {
         results = results.filter(t => t.category === params.category);
       }
-      return results.length > 0 ? results : INITIAL_TRIPS;
+      const rawList = results.length > 0 ? results : INITIAL_TRIPS;
+      return syncBookedSeatsIntoTrips(rawList);
     }
   },
 
   async getTripById(id: string): Promise<Trip> {
     try {
       const res = await fetch(`/api/trips/${id}`);
-      return await safeParseJson(res, 'Trip not found');
+      const serverTrip = await safeParseJson(res, 'Trip not found');
+      return syncBookedSeatsIntoTrips([serverTrip])[0];
     } catch {
       const found = INITIAL_TRIPS.find(t => t.id === id);
-      if (!found) return INITIAL_TRIPS[0];
-      return found;
+      const target = found || INITIAL_TRIPS[0];
+      return syncBookedSeatsIntoTrips([target])[0];
     }
   },
 
@@ -325,16 +396,40 @@ export const api = {
       api.sendBookingConfirmationEmail(booking).catch(() => {});
     }
 
-    // Persist booking into local storage so customer booking history ALWAYS displays
+    // Instantly mark seats as BOOKED in localStorage map & in-memory INITIAL_TRIPS
     try {
       if (bookingResult && bookingResult.booking) {
         const savedRaw = localStorage.getItem('wabus_user_bookings');
         const existing: Booking[] = savedRaw ? JSON.parse(savedRaw) : [];
         const updated = [bookingResult.booking, ...existing.filter(b => b.pnr !== bookingResult.booking.pnr)];
         localStorage.setItem('wabus_user_bookings', JSON.stringify(updated));
+
+        // Save seat numbers to wabus_booked_seats_map
+        const savedMapRaw = localStorage.getItem('wabus_booked_seats_map');
+        const map: Record<string, { seatNumber: string; gender?: string }[]> = savedMapRaw ? JSON.parse(savedMapRaw) : {};
+        const currentForTrip = map[payload.tripId] || [];
+        const newBookedItems = payload.passengers.map(p => ({
+          seatNumber: String(p.seatNumber).toUpperCase(),
+          gender: p.gender || 'MALE'
+        }));
+        map[payload.tripId] = [...currentForTrip, ...newBookedItems];
+        localStorage.setItem('wabus_booked_seats_map', JSON.stringify(map));
+
+        // Mutate INITIAL_TRIPS in-memory
+        const matchTrip = INITIAL_TRIPS.find(t => t.id === payload.tripId);
+        if (matchTrip) {
+          payload.passengers.forEach(p => {
+            const seat = matchTrip.seats.find(s => s.number.toUpperCase() === String(p.seatNumber).toUpperCase() || s.id.toUpperCase() === String(p.seatId || '').toUpperCase());
+            if (seat) {
+              seat.status = 'BOOKED';
+              seat.bookedGender = p.gender;
+            }
+          });
+          matchTrip.availableSeatsCount = matchTrip.seats.filter(s => s.status === 'AVAILABLE').length;
+        }
       }
     } catch (e) {
-      console.warn('[STORAGE WARN] Could not save booking history:', e);
+      console.warn('[STORAGE SEAT UPDATE WARN]', e);
     }
 
     return bookingResult;

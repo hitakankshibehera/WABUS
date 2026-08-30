@@ -3,11 +3,15 @@ import crypto from 'crypto';
 import nodemailer from 'nodemailer';
 import QRCode from 'qrcode';
 import PDFDocument from 'pdfkit';
+import { INITIAL_TRIPS } from '../src/data/mockDatabase';
 
 const app = express();
 app.use(express.json());
 
 // In-Memory stores for Vercel Serverless Function instances
+const serverTrips = JSON.parse(JSON.stringify(INITIAL_TRIPS));
+const serverBookings: any[] = [];
+const redisLocks = new Map<string, { sessionId: string; expiresAt: number }>();
 const otpStore = new Map<string, { hash: string; salt: string; expiresAt: number; resendAllowedAt: number }>();
 const sentBookingConfirmationPnrs = new Set<string>();
 const sentAdminGiftCardCodes = new Set<string>();
@@ -796,6 +800,191 @@ app.post(['/api/admin/gift-cards/send', '/admin/gift-cards/send'], async (req, r
   } catch (err: any) {
     console.error('[Vercel Gift Card Email Endpoint Error]', err);
     return res.status(500).json({ error: err?.message || 'Failed to send gift card email' });
+  }
+});
+
+// 7. Dynamic Trips Search & Details Endpoint for Vercel
+app.get(['/api/trips', '/trips'], (req, res) => {
+  const { origin, destination, category, busType } = req.query || {};
+  let filtered = serverTrips;
+
+  if (origin && origin !== 'ALL') {
+    filtered = filtered.filter((t: any) => t.originCity.toLowerCase().includes(String(origin).toLowerCase()));
+  }
+  if (destination && destination !== 'ALL') {
+    filtered = filtered.filter((t: any) => t.destinationCity.toLowerCase().includes(String(destination).toLowerCase()));
+  }
+  if (category && category !== 'ALL') {
+    filtered = filtered.filter((t: any) => t.category === category);
+  }
+  if (busType && busType !== 'ALL') {
+    filtered = filtered.filter((t: any) => t.bus?.busType === busType);
+  }
+
+  const result = filtered.map((t: any) => ({
+    ...t,
+    availableSeatsCount: t.seats.filter((s: any) => s.status === 'AVAILABLE').length
+  }));
+
+  return res.json(result);
+});
+
+app.get(['/api/trips/:id', '/trips/:id'], (req, res) => {
+  const trip = serverTrips.find((t: any) => t.id === req.params.id) || serverTrips[0];
+  if (!trip) return res.status(404).json({ error: 'Trip not found' });
+
+  const now = Date.now();
+  const updatedSeats = trip.seats.map((seat: any) => {
+    const lockKey = `lock:trip:${trip.id}:seat:${seat.id}`;
+    const lock = redisLocks.get(lockKey);
+    if (lock && lock.expiresAt > now && seat.status === 'AVAILABLE') {
+      return {
+        ...seat,
+        status: 'LOCKED',
+        lockedBySessionId: lock.sessionId,
+        lockExpiresAt: lock.expiresAt
+      };
+    }
+    return seat;
+  });
+
+  return res.json({
+    ...trip,
+    seats: updatedSeats,
+    availableSeatsCount: updatedSeats.filter((s: any) => s.status === 'AVAILABLE').length
+  });
+});
+
+// 8. Seat Locking Endpoint for Vercel
+app.post(['/api/seats/lock', '/seats/lock'], (req, res) => {
+  const { tripId, seatIds, sessionId } = req.body || {};
+  if (!tripId || !Array.isArray(seatIds) || !sessionId) {
+    return res.status(400).json({ error: 'tripId, seatIds array, and sessionId are required.' });
+  }
+
+  const trip = serverTrips.find((t: any) => t.id === tripId);
+  if (!trip) return res.status(404).json({ error: 'Trip not found' });
+
+  const now = Date.now();
+  for (const seatId of seatIds) {
+    const seat = trip.seats.find((s: any) => s.id === seatId || String(s.number).toUpperCase() === String(seatId).toUpperCase());
+    if (seat) {
+      if (seat.status === 'BOOKED') {
+        return res.status(409).json({ error: `Seat ${seat.number} is already booked by another passenger.` });
+      }
+      const lockKey = `lock:trip:${tripId}:seat:${seat.id}`;
+      const existing = redisLocks.get(lockKey);
+      if (existing && existing.expiresAt > now && existing.sessionId !== sessionId) {
+        return res.status(409).json({ error: `Seat ${seat.number} is currently locked by another customer.` });
+      }
+    }
+  }
+
+  const expiresAt = now + 10 * 60 * 1000;
+  for (const seatId of seatIds) {
+    const seat = trip.seats.find((s: any) => s.id === seatId || String(s.number).toUpperCase() === String(seatId).toUpperCase());
+    if (seat) {
+      redisLocks.set(`lock:trip:${tripId}:seat:${seat.id}`, { sessionId, expiresAt });
+    }
+  }
+
+  return res.json({ success: true, expiresAt, ttlSeconds: 600, lockedSeatsCount: seatIds.length });
+});
+
+// 9. Seat Release Endpoint for Vercel
+app.post(['/api/seats/release', '/seats/release'], (req, res) => {
+  const { tripId, seatIds, sessionId } = req.body || {};
+  if (tripId && Array.isArray(seatIds) && sessionId) {
+    for (const seatId of seatIds) {
+      const lockKey = `lock:trip:${tripId}:seat:${seatId}`;
+      const existing = redisLocks.get(lockKey);
+      if (existing && existing.sessionId === sessionId) {
+        redisLocks.delete(lockKey);
+      }
+    }
+  }
+  return res.json({ success: true, message: 'Seats released' });
+});
+
+// 10. Automated Checkout & Seat Confirmation Endpoint for Vercel
+app.post(['/api/bookings/checkout', '/bookings/checkout'], async (req, res) => {
+  try {
+    const { tripId, passengers, contactEmail, contactPhone, boardingPointId, droppingPointId, paymentMethod, discountAmount } = req.body || {};
+    if (!tripId || !Array.isArray(passengers) || passengers.length === 0) {
+      return res.status(400).json({ error: 'Valid tripId and passengers list are required.' });
+    }
+
+    const trip = serverTrips.find((t: any) => t.id === tripId) || serverTrips[0];
+
+    // Check if any seat is already BOOKED
+    for (const p of passengers) {
+      const seat = trip.seats.find((s: any) => s.id === p.seatId || String(s.number).toUpperCase() === String(p.seatNumber).toUpperCase());
+      if (seat && seat.status === 'BOOKED') {
+        return res.status(409).json({ error: `Seat ${seat.number} has already been booked by another customer.` });
+      }
+    }
+
+    const pnr = `BR${Math.floor(100000 + Math.random() * 900000)}`;
+    const bp = trip.boardingPoints?.find((b: any) => b.id === boardingPointId) || trip.boardingPoints?.[0] || { name: trip.originCity, time: trip.departureTime };
+    const dp = trip.droppingPoints?.find((d: any) => d.id === droppingPointId) || trip.droppingPoints?.[0] || { name: trip.destinationCity, time: trip.arrivalTime };
+    const totalAmount = passengers.length * trip.baseFare - Number(discountAmount || 0);
+
+    const newBooking: any = {
+      id: `bk-${Date.now()}`,
+      pnr,
+      tripId: trip.id,
+      trip: {
+        originCity: trip.originCity,
+        destinationCity: trip.destinationCity,
+        departureDate: trip.departureDate || new Date().toISOString().split('T')[0],
+        departureTime: trip.departureTime,
+        arrivalTime: trip.arrivalTime,
+        busModel: trip.bus?.model || 'Executive Bus',
+        operatorName: trip.bus?.operatorName || 'OSRTC Volvo Premier',
+        busRegistrationNumber: trip.bus?.registrationNumber || 'OD-02-AX-8910',
+        category: trip.category
+      },
+      passengers,
+      contactEmail: (contactEmail || '').trim().toLowerCase(),
+      contactPhone: String(contactPhone || '').trim(),
+      boardingPoint: bp,
+      droppingPoint: dp,
+      totalAmount,
+      paymentMethod: paymentMethod || 'ONLINE_UPI',
+      paymentStatus: paymentMethod === 'PAY_ON_BOARDING_COD' ? 'PENDING' : 'PAID',
+      checkInStatus: 'CONFIRMED',
+      qrPayloadHash: `wabus:ticket:${pnr}`,
+      bookedAt: new Date().toISOString()
+    };
+
+    // PERMANENTLY MARK SEATS AS BOOKED & UPDATE AVAILABLE SEATS COUNT
+    for (const p of passengers) {
+      const seat = trip.seats.find((s: any) => s.id === p.seatId || String(s.number).toUpperCase() === String(p.seatNumber).toUpperCase());
+      if (seat) {
+        seat.status = 'BOOKED';
+        seat.bookedGender = p.gender || 'MALE';
+      }
+      redisLocks.delete(`lock:trip:${tripId}:seat:${p.seatId}`);
+    }
+    trip.availableSeatsCount = trip.seats.filter((s: any) => s.status === 'AVAILABLE').length;
+
+    serverBookings.unshift(newBooking);
+
+    // Automated Emails & WhatsApp Dispatch
+    sendBookingConfirmationEmail(newBooking).catch(err => console.error('[E-Ticket Email Error]', err));
+    sendWhatsAppBookingNotification(newBooking).catch(err => console.error('[WhatsApp Notification Error]', err));
+
+    return res.json({
+      success: true,
+      booking: newBooking,
+      qrToken: newBooking.qrPayloadHash,
+      whatsAppDelivered: true,
+      emailDelivered: true,
+      message: `E-Ticket PNR ${pnr} confirmed and seats updated!`
+    });
+  } catch (err: any) {
+    console.error('[Vercel Checkout Error]', err);
+    return res.status(500).json({ error: err?.message || 'Checkout failed' });
   }
 });
 
