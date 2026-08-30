@@ -149,6 +149,14 @@ export interface Booking {
   qrPayloadData?: string;
   qrCodeToken?: string;
   whatsappDelivered?: boolean;
+  whatsappNotificationStatus?: 'PENDING' | 'SENT' | 'FAILED';
+  whatsappMessageId?: string;
+  whatsappSentAt?: string;
+  whatsappError?: string;
+  whatsappRetryCount?: number;
+  emailNotificationStatus?: 'PENDING' | 'SENT' | 'FAILED';
+  emailSentAt?: string;
+  emailError?: string;
   bookedAt?: string;
   cancellationPolicy?: {
     refundPercentage: number;

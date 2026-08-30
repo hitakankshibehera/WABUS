@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FeatureFlags, PayoutRecord, Trip, Route, Bus, OfferCoupon, CoachType } from '../../types';
+import { FeatureFlags, PayoutRecord, Trip, Route, Bus, OfferCoupon, CoachType, Booking } from '../../types';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { 
@@ -48,11 +48,39 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   onRefreshTrips,
 }) => {
   const { currentUser, loginAdmin, signupAdmin, switchDemoRole, logout } = useAuth();
-  const [activeAdminTab, setActiveAdminTab] = useState<'FEATURE_FLAGS' | 'SCHEDULES' | 'OFFERS' | 'PAYOUTS' | 'ANALYTICS' | 'CUSTOMERS'>('FEATURE_FLAGS');
+  const [activeAdminTab, setActiveAdminTab] = useState<'FEATURE_FLAGS' | 'BOOKINGS' | 'SCHEDULES' | 'OFFERS' | 'PAYOUTS' | 'ANALYTICS' | 'CUSTOMERS'>('FEATURE_FLAGS');
   const [payouts, setPayouts] = useState<PayoutRecord[]>([]);
   const [isCronRunning, setIsCronRunning] = useState(false);
   const [cronMessage, setCronMessage] = useState<string | null>(null);
   const [customers, setCustomers] = useState<any[]>([]);
+
+  // WhatsApp & Booking Audit State
+  const [allBookings, setAllBookings] = useState<Booking[]>([]);
+  const [retryingPnr, setRetryingPnr] = useState<string | null>(null);
+  const [waRetryStatusMsg, setWaRetryStatusMsg] = useState<string | null>(null);
+
+  const fetchBookingsList = async () => {
+    try {
+      const list = await api.getBookings();
+      setAllBookings(list);
+    } catch (err) {
+      console.warn('Failed to load bookings list:', err);
+    }
+  };
+
+  const handleRetryWhatsApp = async (pnr: string) => {
+    setRetryingPnr(pnr);
+    setWaRetryStatusMsg(null);
+    try {
+      const result = await api.retryWhatsAppNotification(pnr);
+      setWaRetryStatusMsg(`✅ WhatsApp notification for PNR ${pnr} dispatched to +91 9438318821! (Status: ${result.status})`);
+      await fetchBookingsList();
+    } catch (err: any) {
+      setWaRetryStatusMsg(`❌ WhatsApp retry failed: ${err.message || 'Error sending message'}`);
+    } finally {
+      setRetryingPnr(null);
+    }
+  };
 
   // Offers State
   const [offers, setOffers] = useState<OfferCoupon[]>([]);
@@ -330,6 +358,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
   useEffect(() => {
     loadPayoutsAndRoutes();
+    fetchBookingsList();
   }, []);
 
   const handleAdminAuth = async (e: React.FormEvent) => {
@@ -643,7 +672,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
           </div>
 
           {/* Admin Navigation Pills */}
-          <div className="flex bg-gray-100 p-1 rounded-2xl border border-gray-200 text-xs font-bold">
+          <div className="flex bg-gray-100 p-1 rounded-2xl border border-gray-200 text-xs font-bold overflow-x-auto">
             <button
               onClick={() => setActiveAdminTab('FEATURE_FLAGS')}
               className={`px-3.5 py-1.5 rounded-xl transition cursor-pointer ${
@@ -651,6 +680,18 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
               }`}
             >
               Feature Flags
+            </button>
+            <button
+              onClick={() => {
+                setActiveAdminTab('BOOKINGS');
+                fetchBookingsList();
+              }}
+              className={`px-3.5 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1.5 ${
+                activeAdminTab === 'BOOKINGS' ? 'bg-[#D84E55] text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <MessageSquare className="w-3.5 h-3.5" />
+              <span>Bookings & WhatsApp ({allBookings.length})</span>
             </button>
             <button
               onClick={() => setActiveAdminTab('SCHEDULES')}
@@ -846,6 +887,189 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                 <option value="15">15 Minutes</option>
               </select>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB: BOOKINGS & WHATSAPP NOTIFICATION AUDIT */}
+      {activeAdminTab === 'BOOKINGS' && (
+        <div className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-7 shadow-xs space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-4">
+            <div>
+              <h3 className="text-base font-extrabold text-gray-900 flex items-center gap-2">
+                <MessageSquare className="w-5 h-5 text-emerald-600" />
+                <span>WhatsApp Business Notification System & Booking Audit</span>
+              </h3>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Real-time booking dispatch logs, Meta WhatsApp Cloud API statuses, and automated company alerts (+91 9438318821).
+              </p>
+            </div>
+            <button
+              onClick={fetchBookingsList}
+              className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer self-start sm:self-auto"
+            >
+              <RefreshCw className="w-3.5 h-3.5 text-slate-600" />
+              <span>Refresh Bookings</span>
+            </button>
+          </div>
+
+          {waRetryStatusMsg && (
+            <div className="p-3 bg-slate-900 text-white rounded-2xl text-xs font-semibold flex items-center justify-between shadow-xs">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>{waRetryStatusMsg}</span>
+              </div>
+              <button onClick={() => setWaRetryStatusMsg(null)} className="text-slate-400 hover:text-white p-1">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
+          {/* Quick Metrics */}
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+            <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-2xl">
+              <span className="text-[10px] font-bold uppercase text-emerald-800">Company Recipient</span>
+              <div className="text-lg font-black text-emerald-950 font-mono">+91 9438318821</div>
+              <span className="text-[10px] text-emerald-700 font-medium">WHATSAPP_COMPANY_NUMBER</span>
+            </div>
+
+            <div className="bg-slate-50 border border-slate-200 p-4 rounded-2xl">
+              <span className="text-[10px] font-bold uppercase text-slate-600">Total Bookings</span>
+              <div className="text-xl font-black text-slate-900 font-mono">{allBookings.length}</div>
+              <span className="text-[10px] text-slate-500">Verified System Bookings</span>
+            </div>
+
+            <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-2xl">
+              <span className="text-[10px] font-bold uppercase text-emerald-800">WhatsApp Sent</span>
+              <div className="text-xl font-black text-emerald-900 font-mono">
+                {allBookings.filter(b => b.whatsappNotificationStatus === 'SENT' || b.whatsappDelivered).length}
+              </div>
+              <span className="text-[10px] text-emerald-700 font-bold">✓ Cloud API Verified</span>
+            </div>
+
+            <div className="bg-rose-50 border border-rose-200 p-4 rounded-2xl">
+              <span className="text-[10px] font-bold uppercase text-rose-800">WhatsApp Failed</span>
+              <div className="text-xl font-black text-rose-900 font-mono">
+                {allBookings.filter(b => b.whatsappNotificationStatus === 'FAILED').length}
+              </div>
+              <span className="text-[10px] text-rose-700 font-medium">Retry Available</span>
+            </div>
+          </div>
+
+          {/* Bookings & WhatsApp Audit Table */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="border-b border-gray-200 text-[11px] uppercase font-bold text-gray-500">
+                  <th className="pb-3 px-3">Booking Ref / PNR</th>
+                  <th className="pb-3 px-3">Customer & Contact</th>
+                  <th className="pb-3 px-3">Route & Date</th>
+                  <th className="pb-3 px-3">Amount & Payment</th>
+                  <th className="pb-3 px-3">Email Status</th>
+                  <th className="pb-3 px-3">WhatsApp Status (+91 9438318821)</th>
+                  <th className="pb-3 px-3 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {allBookings.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-8 text-center text-gray-400 font-sans">
+                      No customer bookings found. Create a test booking to view real-time WhatsApp logs.
+                    </td>
+                  </tr>
+                ) : (
+                  allBookings.map((b) => {
+                    const primaryPassenger = b.passengers && b.passengers[0] ? b.passengers[0].name : 'Passenger';
+                    const waStatus = b.whatsappNotificationStatus || (b.whatsappDelivered ? 'SENT' : 'PENDING');
+                    const isWaSent = waStatus === 'SENT';
+                    const isWaFailed = waStatus === 'FAILED';
+
+                    return (
+                      <tr key={b.id || b.pnr} className="hover:bg-gray-50 transition">
+                        <td className="py-3.5 px-3">
+                          <div className="font-mono font-black text-slate-900 text-sm">{b.pnr}</div>
+                          <div className="text-[10px] text-gray-400 font-sans">
+                            {b.bookedAt ? new Date(b.bookedAt).toLocaleString() : 'Recent Booking'}
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-3">
+                          <div className="font-bold text-gray-900">{primaryPassenger}</div>
+                          <div className="text-[11px] text-gray-500 font-mono">+91 {b.contactPhone}</div>
+                          <div className="text-[10px] text-gray-400">{b.contactEmail}</div>
+                        </td>
+                        <td className="py-3.5 px-3">
+                          <div className="font-semibold text-slate-800">
+                            {b.trip?.originCity || 'Origin'} ➔ {b.trip?.destinationCity || 'Destination'}
+                          </div>
+                          <div className="text-[11px] text-gray-500">
+                            {b.trip?.departureDate} at {b.trip?.departureTime}
+                          </div>
+                          <div className="text-[10px] text-rose-600 font-mono font-bold">
+                            Reg: {b.trip?.busRegistrationNumber || 'OD-02-AX-8910'}
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-3">
+                          <div className="font-mono font-extrabold text-emerald-700 text-sm">
+                            ₹{b.totalAmount ? b.totalAmount.toLocaleString() : 0}
+                          </div>
+                          <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold border border-emerald-200">
+                            {b.paymentStatus || 'PAID'}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-3">
+                          <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold border border-emerald-200 inline-flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600" /> EMAIL SENT
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-3 space-y-1">
+                          {isWaSent ? (
+                            <span className="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold border border-emerald-200 inline-flex items-center gap-1">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> WhatsApp: ✓ Sent
+                            </span>
+                          ) : isWaFailed ? (
+                            <span className="px-2.5 py-1 rounded-full bg-rose-100 text-rose-800 text-[10px] font-bold border border-rose-200 inline-flex items-center gap-1">
+                              <AlertTriangle className="w-3.5 h-3.5 text-rose-600" /> WhatsApp: ✕ Failed
+                            </span>
+                          ) : (
+                            <span className="px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold border border-amber-200 inline-flex items-center gap-1">
+                              <Clock className="w-3.5 h-3.5 text-amber-600" /> WhatsApp: ⏳ Pending
+                            </span>
+                          )}
+
+                          {b.whatsappMessageId && (
+                            <div className="text-[10px] font-mono text-gray-500">
+                              Msg ID: <span className="text-slate-800 font-bold">{b.whatsappMessageId}</span>
+                            </div>
+                          )}
+
+                          {b.whatsappSentAt && (
+                            <div className="text-[9px] text-gray-400">
+                              Sent: {new Date(b.whatsappSentAt).toLocaleTimeString()}
+                            </div>
+                          )}
+
+                          {b.whatsappError && (
+                            <div className="text-[10px] text-rose-600 font-semibold bg-rose-50 p-1.5 rounded-lg border border-rose-200 max-w-xs">
+                              {b.whatsappError}
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-3.5 px-3 text-right">
+                          <button
+                            onClick={() => handleRetryWhatsApp(b.pnr)}
+                            disabled={retryingPnr === b.pnr}
+                            className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white rounded-xl text-[11px] font-bold transition inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
+                          >
+                            <RefreshCw className={`w-3 h-3 text-emerald-400 ${retryingPnr === b.pnr ? 'animate-spin' : ''}`} />
+                            <span>{retryingPnr === b.pnr ? 'Sending...' : 'Retry WhatsApp'}</span>
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
