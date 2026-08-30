@@ -371,11 +371,21 @@ async function sendGiftCardEmail(recipientEmail: string, card: any): Promise<{ s
           <div style="font-size: 13px; font-weight: 800; color: #16a34a; margin-top: 6px;">Gift Value: ₹${card.amount}</div>
         </div>
 
-        <h3 style="font-size: 14px; font-weight: 800; color: #0f172a; margin-bottom: 8px;">How to Redeem:</h3>
-        <ol style="font-size: 13px; color: #475569; padding-left: 20px; margin: 0 0 20px 0;">
-          <li>Visit the <strong style="color: #D84E55;">wABus Official Platform</strong>.</li>
+        <!-- Direct Website CTA Link Button -->
+        <div style="text-align: center; margin: 24px 0;">
+          <a href="https://busivo.vercel.app/" target="_blank" style="display: inline-block; background-color: #D84E55; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 12px; font-weight: 800; font-size: 15px; box-shadow: 0 4px 12px rgba(216,78,85,0.35);">
+            🎟️ Visit Website & Redeem Gift Card Now
+          </a>
+          <p style="margin: 8px 0 0 0; font-size: 12px; color: #64748b;">
+            Website Link: <a href="https://busivo.vercel.app/" target="_blank" style="color: #D84E55; font-weight: bold; text-decoration: underline;">https://busivo.vercel.app/</a>
+          </p>
+        </div>
+
+        <h3 style="font-size: 14px; font-weight: 800; color: #0f172a; margin-bottom: 8px;">How to Redeem Your Voucher:</h3>
+        <ol style="font-size: 13px; color: #475569; padding-left: 20px; margin: 0 0 20px 0; line-height: 1.8;">
+          <li>Click the official website link: <a href="https://busivo.vercel.app/" target="_blank" style="color: #D84E55; font-weight: bold; text-decoration: underline;">https://busivo.vercel.app/</a>.</li>
           <li>Click Account Profile ➔ <strong>Redeem Gift Card / Offer Code</strong>.</li>
-          <li>Enter Gift Card Number <strong>${card.code}</strong> and PIN <strong>${card.pin}</strong>.</li>
+          <li>Enter Gift Card Number <strong style="font-family: monospace; color: #0f172a;">${card.code}</strong> and PIN <strong style="font-family: monospace; color: #0f172a;">${card.pin}</strong>.</li>
           <li>₹${card.amount} will be added instantly to your wABus Wallet balance!</li>
         </ol>
 
