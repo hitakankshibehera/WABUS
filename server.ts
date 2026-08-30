@@ -19,6 +19,7 @@ import path from 'path';
 import crypto from 'crypto';
 import nodemailer from 'nodemailer';
 import QRCode from 'qrcode';
+import PDFDocument from 'pdfkit';
 import { 
   DEFAULT_FEATURE_FLAGS, 
   INITIAL_TRIPS, 
@@ -224,7 +225,89 @@ async function sendOtpEmail(email: string, otp: string): Promise<{ success: bool
   return { success: true, sentViaSmtp: false };
 }
 
-async function sendBookingConfirmationEmail(booking: Booking): Promise<{ success: boolean; sentViaSmtp: boolean }> {
+// Idempotency tracking sets to prevent duplicate email dispatches
+const sentBookingConfirmationPnrs = new Set<string>();
+const sentAdminGiftCardCodes = new Set<string>();
+
+/**
+ * Generate a PDF E-Ticket Buffer using PDFKit
+ */
+function generateTicketPdfBuffer(booking: Booking, qrBuffer: Buffer): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    try {
+      const doc = new PDFDocument({ size: 'A4', margin: 40 });
+      const chunks: Buffer[] = [];
+
+      doc.on('data', chunk => chunks.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', err => reject(err));
+
+      // Header Ribbon
+      doc.rect(40, 40, 515, 60).fill('#D84E55');
+      doc.fillColor('#FFFFFF').fontSize(22).font('Helvetica-Bold').text('wABus OFFICIAL E-TICKET', 60, 52);
+      doc.fontSize(10).font('Helvetica').text('Wonderlight Adventure Company • Digital Boarding Pass', 60, 78);
+
+      // PNR Ribbon Box
+      doc.rect(40, 110, 515, 45).fill('#F8FAFC').stroke('#E2E8F0');
+      doc.fillColor('#64748B').fontSize(9).font('Helvetica-Bold').text('BOOKING REFERENCE PNR', 55, 118);
+      doc.fillColor('#D84E55').fontSize(20).font('Helvetica-Bold').text(booking.pnr, 55, 130);
+
+      const busReg = booking.trip?.busRegistrationNumber || 'OD-02-AX-8910';
+      doc.fillColor('#64748B').fontSize(9).font('Helvetica-Bold').text('BUS REGISTRATION NO.', 350, 118);
+      doc.fillColor('#0F172A').fontSize(14).font('Helvetica-Bold').text(busReg, 350, 132);
+
+      // Journey Details Table
+      let y = 170;
+      doc.rect(40, y, 515, 230).fill('#FFFFFF').stroke('#E2E8F0');
+
+      const seatsText = booking.passengers ? booking.passengers.map(p => p.seatNumber).join(', ') : 'N/A';
+      const passengerNames = booking.passengers ? booking.passengers.map(p => `${p.name} (${p.gender ? p.gender[0] : ''}${p.age ? ', ' + p.age + 'y' : ''})`).join(', ') : 'Passenger';
+      const origin = booking.trip?.originCity || 'Boarding Point';
+      const dest = booking.trip?.destinationCity || 'Destination';
+      const depDate = booking.trip?.departureDate || 'Travel Date';
+      const depTime = booking.trip?.departureTime || '';
+      const operator = booking.trip?.operatorName || 'OSRTC Volvo Premier';
+
+      const rows = [
+        ['Journey Route:', `${origin} -> ${dest}`],
+        ['Departure Date & Time:', `${depDate} at ${depTime}`],
+        ['Coach Operator:', `${operator} (${booking.trip?.busModel || 'Executive'})`],
+        ['Confirmed Seats:', seatsText],
+        ['Passenger(s):', passengerNames],
+        ['Boarding Point:', `${booking.boardingPoint?.name || origin} (${booking.boardingPoint?.time || depTime})`],
+        ['Dropping Point:', `${booking.droppingPoint?.name || dest} (${booking.droppingPoint?.time || ''})`],
+        ['Total Amount Paid:', `INR ${booking.totalAmount} (${booking.paymentMethod || 'ONLINE'})`]
+      ];
+
+      let rowY = y + 15;
+      rows.forEach(([label, value]) => {
+        doc.fillColor('#64748B').font('Helvetica-Bold').fontSize(10).text(label, 55, rowY);
+        doc.fillColor('#0F172A').font('Helvetica-Bold').fontSize(10).text(value, 200, rowY, { width: 340 });
+        rowY += 24;
+      });
+
+      // Conductor Verification QR Code Card
+      doc.rect(40, 420, 515, 170).fill('#FAFAFA').stroke('#CBD5E1');
+      if (qrBuffer) {
+        doc.image(qrBuffer, 60, 435, { width: 140, height: 140 });
+      }
+
+      doc.fillColor('#0F172A').fontSize(12).font('Helvetica-Bold').text('Conductor Verification QR Code', 220, 445);
+      doc.fillColor('#475569').fontSize(9).font('Helvetica').text('Show this QR code to the conductor upon boarding for instant ticket scanning.', 220, 465, { width: 310 });
+      doc.fillColor('#D84E55').fontSize(9).font('Helvetica-Bold').text(`Verified Token: ${booking.qrPayloadHash || booking.pnr}`, 220, 495, { width: 310 });
+      doc.fillColor('#16A34A').fontSize(10).font('Helvetica-Bold').text('Status: CONFIRMED & PAID', 220, 515);
+
+      // Footer
+      doc.fontSize(8).fillColor('#94A3B8').font('Helvetica').text('Dispatched by Wonderlight Adventure Company Official API Gateway (+91 94383 18821).', 40, 610, { align: 'center', width: 515 });
+
+      doc.end();
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+async function sendBookingConfirmationEmail(booking: Booking): Promise<{ success: boolean; sentViaSmtp: boolean; duplicateSkipped?: boolean }> {
   const emailHost = process.env.EMAIL_HOST || 'smtp.gmail.com';
   const emailUser = process.env.EMAIL_USER || 'wonderlightadventure@gmail.com';
   const rawBookingPass = process.env.EMAIL_PASSWORD || 'yvlf rizi yibe ieny';
@@ -244,13 +327,28 @@ async function sendBookingConfirmationEmail(booking: Booking): Promise<{ success
     return { success: false, sentViaSmtp: false };
   }
 
+  // Idempotency Check: Avoid sending duplicate confirmation emails if triggered multiple times
+  if (booking.pnr && sentBookingConfirmationPnrs.has(booking.pnr)) {
+    console.log(`[E-TICKET EMAIL IDEMPOTENCY] Email for PNR ${booking.pnr} already dispatched. Skipping duplicate email.`);
+    return { success: true, sentViaSmtp: true, duplicateSkipped: true };
+  }
+
   try {
     const qrPayloadStr = booking.qrCodeToken || booking.qrPayloadHash || JSON.stringify({
       pnr: booking.pnr,
       vehicle: booking.trip?.busRegistrationNumber,
-      seats: booking.passengers ? booking.passengers.map(p => p.seatNumber) : []
+      seats: booking.passengers ? booking.passengers.map(p => p.seatNumber) : [],
+      status: booking.paymentStatus,
+      hash: booking.qrPayloadHash
     });
     const qrBuffer = await QRCode.toBuffer(qrPayloadStr, { width: 300, margin: 2 });
+    
+    // Generate attached PDF Document
+    const pdfBuffer = await generateTicketPdfBuffer(booking, qrBuffer).catch(err => {
+      console.warn('[PDF GENERATION WARN] Could not generate PDF attachment:', err?.message);
+      return null;
+    });
+
     const logoPath = path.join(process.cwd(), 'public', 'logo.png');
     const hasLogo = fs.existsSync(logoPath);
 
@@ -347,6 +445,14 @@ async function sendBookingConfirmationEmail(booking: Booking): Promise<{ success
       }
     ];
 
+    if (pdfBuffer) {
+      attachments.push({
+        filename: `E-Ticket-${booking.pnr}.pdf`,
+        content: pdfBuffer,
+        contentType: 'application/pdf'
+      });
+    }
+
     if (hasLogo) {
       attachments.push({
         filename: 'logo.png',
@@ -378,7 +484,8 @@ async function sendBookingConfirmationEmail(booking: Booking): Promise<{ success
           attachments
         });
 
-        console.log(`[E-TICKET EMAIL DISPATCH] ✉️ Transmitted confirmed E-Ticket PNR: ${booking.pnr} via Gmail service to ${targetEmail}`);
+        sentBookingConfirmationPnrs.add(booking.pnr);
+        console.log(`[E-TICKET EMAIL DISPATCH] ✉️ Transmitted confirmed E-Ticket PNR: ${booking.pnr} (with PDF attachment) via Gmail service to ${targetEmail}`);
         return { success: true, sentViaSmtp: true };
       } catch (serviceErr: any) {
         console.warn(`[E-TICKET EMAIL DISPATCH] ⚠️ Gmail service attempt failed: ${serviceErr.message}. Trying direct SMTP port 465 fallback...`);
@@ -409,7 +516,8 @@ async function sendBookingConfirmationEmail(booking: Booking): Promise<{ success
             attachments
           });
 
-          console.log(`[E-TICKET EMAIL DISPATCH] ✉️ Transmitted confirmed E-Ticket PNR: ${booking.pnr} via Port 465 to ${targetEmail}`);
+          sentBookingConfirmationPnrs.add(booking.pnr);
+          console.log(`[E-TICKET EMAIL DISPATCH] ✉️ Transmitted confirmed E-Ticket PNR: ${booking.pnr} (with PDF attachment) via Port 465 to ${targetEmail}`);
           return { success: true, sentViaSmtp: true };
         } catch (smtpErr: any) {
           console.error(`[E-TICKET EMAIL DISPATCH ERROR] ⚠️ Direct SMTP Port 465 failed: ${smtpErr.message}`);
@@ -423,58 +531,69 @@ async function sendBookingConfirmationEmail(booking: Booking): Promise<{ success
   return { success: false, sentViaSmtp: false };
 }
 
-async function sendGiftCardEmail(recipientEmail: string, card: GiftCard): Promise<{ success: boolean; sentViaSmtp: boolean; previewUrl?: string; smtpMessageId?: string; smtpResponse?: string }> {
+async function sendGiftCardEmail(recipientEmail: string, card: GiftCard): Promise<{ success: boolean; sentViaSmtp: boolean; previewUrl?: string; smtpMessageId?: string; smtpResponse?: string; duplicateSkipped?: boolean }> {
   const emailHost = process.env.EMAIL_HOST || 'smtp.gmail.com';
-  const emailPort = process.env.EMAIL_PORT ? parseInt(process.env.EMAIL_PORT) : 465;
   const emailUser = process.env.EMAIL_USER || 'wonderlightadventure@gmail.com';
-  const emailPassword = process.env.EMAIL_PASSWORD;
-  const emailFrom = process.env.EMAIL_FROM || `"Wonderlight Adventure Co." <${emailUser}>`;
+  const rawPassword = process.env.EMAIL_PASSWORD || 'yvlf rizi yibe ieny';
+  const emailPassword = rawPassword.replace(/\s+/g, '');
+  const emailFrom = process.env.EMAIL_FROM || `"wABus Gift Cards" <${emailUser}>`;
+
+  const cleanEmail = (recipientEmail || '').trim().toLowerCase();
+  if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('.')) {
+    console.warn(`[GIFT CARD EMAIL WARNING] Invalid recipient email address: ${recipientEmail}`);
+    return { success: false, sentViaSmtp: false };
+  }
+
+  // Idempotency Check: Avoid sending duplicate gift card emails if triggered multiple times
+  if (card.code && sentAdminGiftCardCodes.has(card.code.trim().toUpperCase())) {
+    console.log(`[GIFT CARD EMAIL IDEMPOTENCY] Email for Gift Card ${card.code} was already sent. Skipping duplicate dispatch.`);
+    return { success: true, sentViaSmtp: true, duplicateSkipped: true };
+  }
 
   const cardImageHtml = card.imageUrl 
     ? `<div style="text-align: center; margin: 16px 0;"><img src="${card.imageUrl}" alt="Gift Card Theme" style="width: 100%; max-height: 200px; object-fit: cover; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);" /></div>` 
     : '';
 
   const htmlContent = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; background: #ffffff;">
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 20px; overflow: hidden; background: #ffffff; box-shadow: 0 4px 14px rgba(0,0,0,0.06);">
       <div style="background: linear-gradient(135deg, #D84E55, #B83238); padding: 24px; text-align: center; color: #ffffff;">
         <h1 style="margin: 0; font-size: 24px; font-weight: 900;">🎁 ${card.title || 'Special Gift Card for You!'}</h1>
-        <p style="margin: 4px 0 0 0; font-size: 14px; opacity: 0.9;">From Busivo (Wonderlight Adventure Co.)</p>
+        <p style="margin: 4px 0 0 0; font-size: 14px; opacity: 0.9;">From wABus (Wonderlight Adventure Company)</p>
       </div>
 
       <div style="padding: 24px; color: #1e293b; line-height: 1.6;">
         <p style="font-size: 15px;">Hello!</p>
-        <p style="font-size: 14px;">Master Admin (<strong style="color: #D84E55;">wonderlightadventure@gmail.com</strong>) has issued a <strong>₹${card.amount}</strong> Busivo Gift Card for you!</p>
+        <p style="font-size: 14px;">Master Admin (<strong style="color: #D84E55;">wonderlightadventure@gmail.com</strong>) has issued a <strong>₹${card.amount}</strong> wABus Gift Card for you!</p>
 
         ${cardImageHtml}
 
-        <div style="background: #fff5f5; border: 2px dashed #fecdd3; border-radius: 12px; padding: 20px; text-align: center; margin: 20px 0;">
-          <span style="font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: bold; letter-spacing: 1px; display: block;">Gift Card Code</span>
+        <div style="background: #fff5f5; border: 2px dashed #fecdd3; border-radius: 16px; padding: 20px; text-align: center; margin: 20px 0;">
+          <span style="font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: bold; letter-spacing: 1px; display: block;">Gift Card Number</span>
           <div style="font-family: monospace; font-size: 26px; font-weight: 900; color: #0f172a; letter-spacing: 2px; margin: 6px 0;">${card.code}</div>
           <div style="font-size: 14px; font-weight: 700; color: #D84E55;">4-Digit PIN: <span style="font-family: monospace; color: #0f172a;">${card.pin}</span></div>
-          <div style="font-size: 13px; font-weight: 800; color: #16a34a; margin-top: 6px;">Value: ₹${card.amount}</div>
+          <div style="font-size: 13px; font-weight: 800; color: #16a34a; margin-top: 6px;">Gift Value: ₹${card.amount}</div>
         </div>
 
         <h3 style="font-size: 14px; font-weight: 800; color: #0f172a; margin-bottom: 8px;">How to Redeem:</h3>
         <ol style="font-size: 13px; color: #475569; padding-left: 20px; margin: 0 0 20px 0;">
-          <li>Visit <a href="http://localhost:3000" style="color: #D84E55; font-weight: bold;">Busivo Website (http://localhost:3000)</a>.</li>
-          <li>Click Account Menu ➔ Payments ➔ <strong>Redeem gift card</strong>.</li>
-          <li>Enter Code <strong>${card.code}</strong> and PIN <strong>${card.pin}</strong>.</li>
-          <li>₹${card.amount} will be added instantly to your Busivo Wallet balance!</li>
+          <li>Visit the <strong style="color: #D84E55;">wABus Official Platform</strong>.</li>
+          <li>Click Account Profile ➔ <strong>Redeem Gift Card / Offer Code</strong>.</li>
+          <li>Enter Gift Card Number <strong>${card.code}</strong> and PIN <strong>${card.pin}</strong>.</li>
+          <li>₹${card.amount} will be added instantly to your wABus Wallet balance!</li>
         </ol>
 
         <p style="font-size: 12px; color: #94a3b8; border-top: 1px solid #f1f5f9; padding-top: 16px; margin-top: 20px;">
-          Valid until 31-Dec-2030. Issued by Wonderlight Adventure Co. (wonderlightadventure@gmail.com).
+          Valid until 31-Dec-2030. Issued by Wonderlight Adventure Co. (${emailUser}).
         </p>
       </div>
     </div>
   `;
 
   if (emailUser && emailPassword && emailPassword.trim() !== '') {
+    // Attempt 1: Gmail Service (Port 587)
     try {
       const transporter = nodemailer.createTransport({
-        host: 'smtp.gmail.com',
-        port: 587,
-        secure: false,
+        service: 'gmail',
         auth: {
           user: emailUser,
           pass: emailPassword.trim()
@@ -486,54 +605,63 @@ async function sendGiftCardEmail(recipientEmail: string, card: GiftCard): Promis
 
       const info = await transporter.sendMail({
         from: emailFrom,
-        to: recipientEmail,
+        to: cleanEmail,
         cc: emailUser,
         subject: `🎁 You received a ₹${card.amount} wABus Gift Card! (Code: ${card.code})`,
         html: htmlContent
       });
 
-      console.log(`[REAL GMAIL SMTP DISPATCH SUCCESS] Sent from ${emailUser} to ${recipientEmail} & CC ${emailUser} (MsgId: ${info.messageId}, Res: ${info.response})`);
+      sentAdminGiftCardCodes.add(card.code.trim().toUpperCase());
+      console.log(`[REAL GMAIL SMTP GIFT CARD SUCCESS] Sent from ${emailUser} to ${cleanEmail} & CC ${emailUser} (MsgId: ${info.messageId})`);
       return { 
         success: true, 
         sentViaSmtp: true,
         smtpMessageId: info.messageId,
         smtpResponse: info.response
       };
-    } catch (err: any) {
-      console.error(`[REAL GMAIL SMTP DISPATCH ERROR] ${err.message}`);
-      throw new Error(`Gmail SMTP delivery failed: ${err.message}`);
+    } catch (serviceErr: any) {
+      console.warn(`[GIFT CARD EMAIL DISPATCH] ⚠️ Gmail service attempt failed: ${serviceErr.message}. Trying direct SMTP port 465 SSL fallback...`);
+      // Attempt 2: Direct Port 465 SSL
+      try {
+        const fallbackTransporter = nodemailer.createTransport({
+          host: emailHost,
+          port: 465,
+          secure: true,
+          auth: {
+            user: emailUser,
+            pass: emailPassword.trim()
+          },
+          connectionTimeout: 8000,
+          greetingTimeout: 4000,
+          socketTimeout: 8000,
+          tls: {
+            rejectUnauthorized: false
+          }
+        });
+
+        const info2 = await fallbackTransporter.sendMail({
+          from: emailFrom,
+          to: cleanEmail,
+          cc: emailUser,
+          subject: `🎁 You received a ₹${card.amount} wABus Gift Card! (Code: ${card.code})`,
+          html: htmlContent
+        });
+
+        sentAdminGiftCardCodes.add(card.code.trim().toUpperCase());
+        console.log(`[REAL GMAIL SMTP GIFT CARD SUCCESS PORT 465] Sent from ${emailUser} to ${cleanEmail} (MsgId: ${info2.messageId})`);
+        return { 
+          success: true, 
+          sentViaSmtp: true,
+          smtpMessageId: info2.messageId,
+          smtpResponse: info2.response
+        };
+      } catch (smtpErr: any) {
+        console.error(`[REAL GMAIL SMTP GIFT CARD ERROR] Direct SMTP Port 465 failed: ${smtpErr.message}`);
+      }
     }
   }
 
-  // Fallback: Create Ethereal test account for real online webmail inbox viewing!
-  try {
-    const testAccount = await nodemailer.createTestAccount();
-    const testTransporter = nodemailer.createTransport({
-      host: 'smtp.ethereal.email',
-      port: 587,
-      secure: false,
-      auth: {
-        user: testAccount.user,
-        pass: testAccount.pass
-      }
-    });
-
-    const info = await testTransporter.sendMail({
-      from: `"Wonderlight Adventure Co." <wonderlightadventure@gmail.com>`,
-      to: recipientEmail,
-      subject: `🎁 You received a ₹${card.amount} wABus Gift Card! (Code: ${card.code})`,
-      html: htmlContent
-    });
-
-    const previewUrl = nodemailer.getTestMessageUrl(info) || undefined;
-    console.log(`[Ethereal Real Mail Delivered] View online inbox at: ${previewUrl}`);
-    return { success: true, sentViaSmtp: true, previewUrl };
-  } catch (e: any) {
-    console.warn(`[Ethereal Dispatch Notice] ${e.message}`);
-  }
-
-  console.log(`[GIFT CARD EMAIL DISPATCH LOG] 📧 Sent Gift Card ${card.code} (PIN: ${card.pin}, Value: ₹${card.amount}) from ${emailUser} to ${recipientEmail}`);
-  return { success: true, sentViaSmtp: false };
+  return { success: false, sentViaSmtp: false };
 }
 
 function getAuthenticatedUserFromReq(req: express.Request): UserAccount | null {
@@ -2369,19 +2497,30 @@ app.use(express.json());
   app.post('/api/admin/gift-cards/send', async (req, res) => {
     try {
       const { recipientEmail, amount, code, pin, imageUrl, title } = req.body || {};
-      if (!recipientEmail || !amount) {
-        return res.status(400).json({ error: 'Recipient email address and gift card amount are required' });
+      const cleanEmail = String(recipientEmail || '').trim().toLowerCase();
+
+      if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('.')) {
+        return res.status(400).json({ error: 'A valid recipient email address (e.g. user@example.com) is required' });
+      }
+
+      if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
+        return res.status(400).json({ error: 'A valid positive gift card amount in INR is required' });
       }
 
       const cardCode = code ? String(code).trim().toUpperCase() : `WABUS-GIFT-${Math.floor(1000 + Math.random() * 9000)}`;
       const cardPin = pin ? String(pin).trim() : String(Math.floor(1000 + Math.random() * 9000));
+
+      const existingCard = giftCards.find(g => g.code === cardCode);
+      if (existingCard) {
+        return res.status(400).json({ error: `Gift card code ${cardCode} already exists in database.` });
+      }
 
       const newCard: GiftCard = {
         id: `gc-${Date.now()}`,
         code: cardCode,
         pin: cardPin,
         amount: Number(amount),
-        recipientEmail: String(recipientEmail).trim(),
+        recipientEmail: cleanEmail,
         senderEmail: 'wonderlightadventure@gmail.com',
         status: 'ACTIVE',
         validUntil: '2030-12-31',
@@ -2392,11 +2531,11 @@ app.use(express.json());
 
       giftCards.unshift(newCard);
 
-      let emailStatus: { success: boolean; sentViaSmtp: boolean; previewUrl?: string; smtpMessageId?: string; smtpResponse?: string } = { success: true, sentViaSmtp: false };
+      let emailStatus: { success: boolean; sentViaSmtp: boolean; previewUrl?: string; smtpMessageId?: string; smtpResponse?: string; duplicateSkipped?: boolean } = { success: true, sentViaSmtp: false };
       try {
         emailStatus = await sendGiftCardEmail(newCard.recipientEmail, newCard);
       } catch (emailErr: any) {
-        console.warn('[Gift Card Email Non-Fatal Warning]', emailErr);
+        console.warn('[Gift Card Email Non-Fatal Warning]', emailErr?.message || emailErr);
       }
 
       return res.status(200).json({
@@ -2405,7 +2544,7 @@ app.use(express.json());
         previewUrl: emailStatus.previewUrl,
         smtpMessageId: emailStatus.smtpMessageId,
         smtpResponse: emailStatus.smtpResponse,
-        message: `Gift card ${newCard.code} (PIN: ${newCard.pin}) of ₹${newCard.amount} sent from wonderlightadventure@gmail.com to ${newCard.recipientEmail}! ${emailStatus.sentViaSmtp ? '(Google SMTP Delivered)' : '(Email Dispatched)'}`
+        message: `Gift card ${newCard.code} (PIN: ${newCard.pin}) of ₹${newCard.amount} issued and transmitted from wonderlightadventure@gmail.com to ${newCard.recipientEmail}! ${emailStatus.sentViaSmtp ? '(Google SMTP Delivered)' : '(Email Dispatched)'}`
       });
     } catch (err: any) {
       console.error('Error sending gift card email:', err);
