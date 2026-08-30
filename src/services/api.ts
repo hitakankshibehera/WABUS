@@ -320,6 +320,9 @@ export const api = {
         qrToken: booking.qrCodeToken,
         whatsAppDelivered: true
       };
+
+      // Trigger E-Ticket confirmation email to customer
+      api.sendBookingConfirmationEmail(booking).catch(() => {});
     }
 
     // Persist booking into local storage so customer booking history ALWAYS displays
@@ -335,6 +338,20 @@ export const api = {
     }
 
     return bookingResult;
+  },
+
+  async sendBookingConfirmationEmail(booking: Booking, email?: string): Promise<{ success: boolean; message: string }> {
+    try {
+      const res = await fetch('/api/bookings/send-confirmation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ booking, email: email || booking.contactEmail })
+      });
+      return await safeParseJson(res, 'Failed to send E-Ticket confirmation email');
+    } catch (err: any) {
+      console.warn('[EMAIL SERVICE WARN] Failed to send booking confirmation email:', err?.message);
+      return { success: false, message: err?.message || 'Email dispatch failed' };
+    }
   },
 
   async getBookings(): Promise<Booking[]> {

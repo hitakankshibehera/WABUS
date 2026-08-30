@@ -41,9 +41,7 @@ async function sendOtpEmail(email: string, otp: string): Promise<{ success: bool
 
   try {
     const transporter = nodemailer.createTransport({
-      host: 'smtp.gmail.com',
-      port: 465,
-      secure: true,
+      service: 'gmail',
       auth: { user: emailUser, pass: emailPassword },
       connectionTimeout: 8000,
       greetingTimeout: 4000,
@@ -63,8 +61,8 @@ async function sendOtpEmail(email: string, otp: string): Promise<{ success: bool
     try {
       const fallbackTransporter = nodemailer.createTransport({
         host: 'smtp.gmail.com',
-        port: 587,
-        secure: false,
+        port: 465,
+        secure: true,
         auth: { user: emailUser, pass: emailPassword },
         connectionTimeout: 8000,
         greetingTimeout: 4000,
@@ -76,7 +74,7 @@ async function sendOtpEmail(email: string, otp: string): Promise<{ success: bool
         to: email,
         subject: `${otp} is your 6-digit wABus Verification Code`,
         text: `Your 6-digit wABus verification code is: ${otp}`,
-        html: `<div style="font-family: Arial; padding: 20px;"><h2>wABus Login Verification Code</h2><p style="font-size: 32px; font-weight: bold; color: #D84E55;">${otp}</p><p>Valid for 5 minutes.</p></div>`
+        html: htmlBody
       });
       return { success: true, sentViaSmtp: true };
     } catch {

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import QRCode from 'qrcode';
 import { Booking, Trip, FeatureFlags } from '../../types';
+import { api } from '../../services/api';
 import { 
   CheckCircle2, 
   Share2, 
@@ -11,7 +12,9 @@ import {
   Printer, 
   Check, 
   ShieldCheck,
-  UserCheck
+  UserCheck,
+  Mail,
+  Loader2
 } from 'lucide-react';
 import { LiveBusTracker } from './LiveBusTracker';
 
@@ -30,6 +33,8 @@ export const ETicketView: React.FC<ETicketViewProps> = ({
 }) => {
   const [showLiveTracker, setShowLiveTracker] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const [emailSentStatus, setEmailSentStatus] = useState<string | null>(null);
   const [qrCodeUrl, setQrCodeUrl] = useState<string>(
     () => `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(booking.pnr || 'WB123456')}`
   );
@@ -72,11 +77,26 @@ export const ETicketView: React.FC<ETicketViewProps> = ({
     setTimeout(() => setIsCopied(false), 2000);
   };
 
+  const handleResendEmail = async () => {
+    setIsSendingEmail(true);
+    setEmailSentStatus(null);
+    try {
+      const res = await api.sendBookingConfirmationEmail(booking);
+      setEmailSentStatus(res.message || `E-Ticket email sent to ${booking.contactEmail}!`);
+      setTimeout(() => setEmailSentStatus(null), 5000);
+    } catch {
+      setEmailSentStatus('Failed to dispatch email.');
+      setTimeout(() => setEmailSentStatus(null), 5000);
+    } finally {
+      setIsSendingEmail(false);
+    }
+  };
+
   const handleWhatsAppShare = () => {
     const text = encodeURIComponent(
       `🎫 *Wonderlight Advanture E-Ticket & QR Code*\n\n` +
       `*PNR:* ${booking.pnr}\n` +
-      `*Route:* ${trip.originCity} ➔ ${trip.destinationCity}\n` +
+      `*Route:* ${trip?.originCity || booking.trip.originCity} ➔ ${trip?.destinationCity || booking.trip.destinationCity}\n` +
       `*Departure:* ${booking.trip.departureDate} at ${booking.trip.departureTime}\n` +
       `*Coach:* ${booking.trip.operatorName} (${vehicleNumber})\n` +
       `*Seats:* ${booking.passengers.map(p => p.seatNumber).join(', ')}\n` +
@@ -96,21 +116,27 @@ export const ETicketView: React.FC<ETicketViewProps> = ({
   return (
     <div className="max-w-3xl mx-auto space-y-5">
       {/* Top Success Banner */}
-      <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 sm:p-5 text-center space-y-1.5 shadow-xs">
-        <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center mx-auto shadow-sm">
+      <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 sm:p-5 text-center shadow-xs">
+        <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center mx-auto shadow-sm mb-3">
           <CheckCircle2 className="w-6 h-6" />
         </div>
-        <h2 className="text-lg font-bold text-emerald-950">
+        <h2 className="text-lg font-bold text-emerald-950 mb-1">
           {isPaid ? 'Booking Confirmed & Linked to Bus' : 'Seat Reserved (Pay on Boarding)'}
         </h2>
-        <p className="text-xs text-emerald-800 font-medium max-w-md mx-auto">
+        <p className="text-xs text-emerald-800 font-medium max-w-md mx-auto mb-3">
           Your ticket is securely mapped to assigned vehicle <strong className="font-mono bg-emerald-100 px-1.5 py-0.5 rounded text-emerald-900">{vehicleNumber}</strong>. Present this QR code to your conductor for instant digital verification.
         </p>
 
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-900 text-xs font-semibold mt-1">
-          <MessageSquare className="w-3.5 h-3.5 text-emerald-700" />
-          <span>PDF E-Ticket & QR Code sent to +91 {booking.contactPhone} (From Company Gateway +91 94383 18821)</span>
+        <div className="inline-flex flex-wrap items-center justify-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-900 text-xs font-semibold">
+          <Mail className="w-3.5 h-3.5 text-emerald-700" />
+          <span>E-Ticket & QR Code sent to <strong>{booking.contactEmail || 'customer email'}</strong> & WhatsApp +91 {booking.contactPhone}</span>
         </div>
+
+        {emailSentStatus && (
+          <div className="mt-2 text-xs font-bold text-emerald-700 bg-white border border-emerald-300 rounded-lg px-3 py-1.5 inline-block animate-in fade-in">
+            {emailSentStatus}
+          </div>
+        )}
       </div>
 
       {/* wABus Authentic Boarding Pass Card */}
@@ -309,6 +335,16 @@ export const ETicketView: React.FC<ETicketViewProps> = ({
             >
               <Radio className="w-3.5 h-3.5 text-red-200 animate-pulse" />
               <span>🚌 Track My Bus</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleResendEmail}
+              disabled={isSendingEmail}
+              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold text-xs shadow-xs transition cursor-pointer"
+            >
+              {isSendingEmail ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />}
+              <span>{isSendingEmail ? 'Sending Email...' : 'Resend Email'}</span>
             </button>
 
             <button

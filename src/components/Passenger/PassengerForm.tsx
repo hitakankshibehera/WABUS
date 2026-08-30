@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Trip, Seat, BoardingPoint, DroppingPoint, PassengerDetails, FeatureFlags, OfferCoupon } from '../../types';
 import { api } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 import { 
   MapPin, 
   User, 
@@ -43,22 +44,45 @@ export const PassengerForm: React.FC<PassengerFormProps> = ({
   onBack,
   featureFlags,
 }) => {
+  const { currentUser } = useAuth();
   const [boardingPointId, setBoardingPointId] = useState(trip.boardingPoints[0]?.id || '');
   const [droppingPointId, setDroppingPointId] = useState(trip.droppingPoints[0]?.id || '');
-  const [contactEmail, setContactEmail] = useState('ashutosh@wabus.in');
-  const [contactPhone, setContactPhone] = useState('9438318821');
+  const [contactEmail, setContactEmail] = useState(currentUser?.email || '');
+  const [contactPhone, setContactPhone] = useState(currentUser?.phone || '');
   const [optInWhatsApp, setOptInWhatsApp] = useState(featureFlags.enableWhatsAppNotifications);
 
   // Initialize passenger records for each selected seat
   const [passengers, setPassengers] = useState<PassengerDetails[]>(() =>
     selectedSeats.map((seat, idx) => ({
-      name: idx === 0 ? 'Ashutosh Panda' : '',
+      name: idx === 0 ? (currentUser?.name || '') : '',
       age: 26,
       gender: 'MALE',
       seatNumber: seat.number,
       isPrimaryContact: idx === 0,
     }))
   );
+
+  // Synchronize contact info if user logs in after initial form render
+  useEffect(() => {
+    if (currentUser) {
+      if (currentUser.email && (!contactEmail || contactEmail === 'ashutosh@wabus.in')) {
+        setContactEmail(currentUser.email);
+      }
+      if (currentUser.phone && (!contactPhone || contactPhone === '9438318821')) {
+        setContactPhone(currentUser.phone);
+      }
+      if (currentUser.name) {
+        setPassengers(prev => {
+          if (prev.length > 0 && (!prev[0].name || prev[0].name === 'Ashutosh Panda')) {
+            const updated = [...prev];
+            updated[0] = { ...updated[0], name: currentUser.name };
+            return updated;
+          }
+          return prev;
+        });
+      }
+    }
+  }, [currentUser]);
 
   // Offers & Coupon State
   const [availableOffers, setAvailableOffers] = useState<OfferCoupon[]>([]);

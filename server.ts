@@ -134,51 +134,44 @@ async function sendOtpEmail(email: string, otp: string): Promise<{ success: bool
   const emailUser = process.env.EMAIL_USER || 'wonderlightadventure@gmail.com';
   const rawPassword = process.env.EMAIL_PASSWORD || 'yvlf rizi yibe ieny';
   const emailPassword = rawPassword.replace(/\s+/g, '');
-  const emailFrom = process.env.EMAIL_FROM || `" Verification" <${emailUser}>`;
+  const emailFrom = process.env.EMAIL_FROM || `"wABus Verification" <${emailUser}>`;
 
   if (emailUser && emailPassword && emailPassword.trim() !== '') {
-    // Try Primary SMTP Port 465 (SSL)
+    const logoPath = path.join(process.cwd(), 'public', 'logo.png');
+    const hasLogo = fs.existsSync(logoPath);
+
+    const htmlBody = `
+      <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 28px; border: 1px solid #e2e8f0; border-radius: 20px; background-color: #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+        <div style="text-align: center; margin-bottom: 24px;">
+          ${hasLogo ? '<img src="cid:wonderlight_logo" alt="wABus Logo" style="width: 90px; height: 90px; border-radius: 50%; object-fit: cover; margin: 0 auto 12px auto; display: block; border: 3px solid #f1f5f9; box-shadow: 0 4px 10px rgba(0,0,0,0.15);" />' : ''}
+          <h2 style="color: #D84E55; margin: 0; font-size: 22px; font-weight: 800;">wABus Verification Code</h2>
+          <p style="color: #64748b; font-size: 13px; margin: 4px 0 0 0; font-weight: 600;">Wonderlight Adventure Company</p>
+        </div>
+        <div style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); padding: 24px; border-radius: 16px; text-align: center; margin-bottom: 24px; border: 1px solid #e2e8f0;">
+          <p style="margin: 0 0 12px 0; font-size: 14px; color: #475569; font-weight: 600;">Your 6-digit verification code is:</p>
+          <div style="font-size: 38px; font-weight: 900; letter-spacing: 8px; color: #D84E55; margin: 12px 0; font-family: monospace;">${otp}</div>
+          <p style="margin: 12px 0 0 0; font-size: 12px; color: #ef4444; font-weight: 700;">⏰ Code expires in 5 minutes</p>
+        </div>
+        <p style="font-size: 12px; color: #94a3b8; text-align: center; margin: 0; line-height: 1.5;">Sent securely via wABus Identity Transporter (<strong style="color: #475569;">${emailUser}</strong>). Never share this code with anyone.</p>
+      </div>
+    `;
+
+    const attachments = hasLogo ? [{
+      filename: 'logo.png',
+      path: logoPath,
+      cid: 'wonderlight_logo'
+    }] : [];
+
+    // Attempt 1: Gmail service / Port 587 STARTTLS
     try {
       const transporter = nodemailer.createTransport({
-        host: emailHost,
-        port: 465,
-        secure: true,
-        auth: {
-          user: emailUser,
-          pass: emailPassword
-        },
+        service: 'gmail',
+        auth: { user: emailUser, pass: emailPassword },
         connectionTimeout: 8000,
         greetingTimeout: 4000,
         socketTimeout: 8000,
-        tls: {
-          rejectUnauthorized: false
-        }
+        tls: { rejectUnauthorized: false }
       });
-
-      const logoPath = path.join(process.cwd(), 'public', 'logo.png');
-      const hasLogo = fs.existsSync(logoPath);
-
-      const htmlBody = `
-        <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 28px; border: 1px solid #e2e8f0; border-radius: 20px; background-color: #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
-          <div style="text-align: center; margin-bottom: 24px;">
-            ${hasLogo ? '<img src="cid:wonderlight_logo" alt="wABus Logo" style="width: 90px; height: 90px; border-radius: 50%; object-fit: cover; margin: 0 auto 12px auto; display: block; border: 3px solid #f1f5f9; box-shadow: 0 4px 10px rgba(0,0,0,0.15);" />' : ''}
-            <h2 style="color: #D84E55; margin: 0; font-size: 22px; font-weight: 800;">wABus Verification Code</h2>
-            <p style="color: #64748b; font-size: 13px; margin: 4px 0 0 0; font-weight: 600;">Wonderlight Adventure Company</p>
-          </div>
-          <div style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); padding: 24px; border-radius: 16px; text-align: center; margin-bottom: 24px; border: 1px solid #e2e8f0;">
-            <p style="margin: 0 0 12px 0; font-size: 14px; color: #475569; font-weight: 600;">Your 6-digit verification code is:</p>
-            <div style="font-size: 38px; font-weight: 900; letter-spacing: 8px; color: #D84E55; margin: 12px 0; font-family: monospace;">${otp}</div>
-            <p style="margin: 12px 0 0 0; font-size: 12px; color: #ef4444; font-weight: 700;">⏰ Code expires in 5 minutes</p>
-          </div>
-          <p style="font-size: 12px; color: #94a3b8; text-align: center; margin: 0; line-height: 1.5;">Sent securely via wABus Identity Transporter (<strong style="color: #475569;">${emailUser}</strong>). Never share this code with anyone.</p>
-        </div>
-      `;
-
-      const attachments = hasLogo ? [{
-        filename: 'logo.png',
-        path: logoPath,
-        cid: 'wonderlight_logo'
-      }] : [];
 
       await transporter.sendMail({
         from: emailFrom,
@@ -188,44 +181,41 @@ async function sendOtpEmail(email: string, otp: string): Promise<{ success: bool
         html: htmlBody,
         attachments
       });
-      console.log(`[EMAIL SERVICE] ✉️ Real email sent via Port 465 from ${emailUser} to recipient ${email}`);
+      console.log(`[EMAIL SERVICE] ✉️ Real OTP email sent via Gmail service to recipient ${email}`);
       return { success: true, sentViaSmtp: true };
     } catch (err: any) {
-      console.error(`[EMAIL SERVICE] ⚠️ Primary SMTP Port 465 failed for ${emailUser}:`, err?.message || err);
-      // Fallback 1: Retry with direct 587 STARTTLS without attachments if primary 465 fails
+      console.warn(`[EMAIL SERVICE] ⚠️ Primary Gmail service failed for ${emailUser}, trying direct SMTP fallback:`, err?.message || err);
+      // Attempt 2: Direct Port 465 SSL
       try {
         const fallbackTransporter = nodemailer.createTransport({
-          host: 'smtp.gmail.com',
-          port: 587,
-          secure: false,
-          auth: {
-            user: emailUser,
-            pass: emailPassword
-          },
+          host: emailHost,
+          port: 465,
+          secure: true,
+          auth: { user: emailUser, pass: emailPassword },
           connectionTimeout: 8000,
           greetingTimeout: 4000,
           socketTimeout: 8000,
           tls: { rejectUnauthorized: false }
         });
-
         await fallbackTransporter.sendMail({
           from: emailFrom,
           to: email,
           subject: `${otp} is your 6-digit wABus Verification Code`,
           text: `Your 6-digit wABus verification code is: ${otp}\n\nThis code will expire in 5 minutes. Never share this code with anyone.`,
-          html: `<div style="font-family: Arial; padding: 20px;"><h2>wABus Login Verification Code</h2><p style="font-size: 32px; font-weight: bold; color: #D84E55;">${otp}</p><p>Valid for 5 minutes.</p></div>`
+          html: htmlBody,
+          attachments
         });
-        console.log(`[EMAIL SERVICE] ✉️ Real email sent via fallback SMTP (port 587) to recipient ${email}`);
+        console.log(`[EMAIL SERVICE] ✉️ Real OTP email sent via fallback SMTP (port 465) to recipient ${email}`);
         return { success: true, sentViaSmtp: true };
       } catch (fallbackErr: any) {
-        console.error(`[EMAIL SERVICE] ⚠️ Fallback SMTP Port 587 also failed:`, fallbackErr?.message || fallbackErr);
+        console.error(`[EMAIL SERVICE] ⚠️ Direct SMTP Port 465 also failed:`, fallbackErr?.message || fallbackErr);
       }
     }
   } else {
     console.log(`[EMAIL SERVICE] ℹ️ To send real emails to inbox: Add 16-character Gmail App Password to EMAIL_PASSWORD in .env file!`);
   }
 
-  // Development / Local console log fallback
+  // Local log fallback
   console.log(`\n==================================================`);
   console.log(`[AUTH OTP LOCAL LOG] 🔑 Sent OTP code to ${email}: [ ${otp} ]`);
   console.log(`[AUTH OTP LOCAL LOG] ✉️ Sender Email: ${emailUser}`);
@@ -236,138 +226,188 @@ async function sendOtpEmail(email: string, otp: string): Promise<{ success: bool
 
 async function sendBookingConfirmationEmail(booking: Booking): Promise<{ success: boolean; sentViaSmtp: boolean }> {
   const emailHost = process.env.EMAIL_HOST || 'smtp.gmail.com';
-  const emailPort = process.env.EMAIL_PORT ? parseInt(process.env.EMAIL_PORT) : 465;
   const emailUser = process.env.EMAIL_USER || 'wonderlightadventure@gmail.com';
   const rawBookingPass = process.env.EMAIL_PASSWORD || 'yvlf rizi yibe ieny';
   const emailPassword = rawBookingPass.replace(/\s+/g, '');
-  const emailFrom = process.env.EMAIL_FROM || `"Wonderlight Advanture" <${emailUser}>`;
+  const emailFrom = process.env.EMAIL_FROM || `"wABus E-Ticket Confirmation" <${emailUser}>`;
 
   const targetEmail = (booking.contactEmail || '').trim().toLowerCase();
-  if (!targetEmail) return { success: false, sentViaSmtp: false };
+  if (!targetEmail) {
+    console.warn(`[E-TICKET EMAIL WARNING] No contact email address found for PNR ${booking.pnr}`);
+    return { success: false, sentViaSmtp: false };
+  }
 
   try {
-    const qrPayloadStr = JSON.stringify({
+    const qrPayloadStr = booking.qrCodeToken || booking.qrPayloadHash || JSON.stringify({
       pnr: booking.pnr,
-      vehicle: booking.trip.busRegistrationNumber,
-      seats: booking.passengers.map(p => p.seatNumber),
-      hash: booking.qrPayloadHash
+      vehicle: booking.trip?.busRegistrationNumber,
+      seats: booking.passengers ? booking.passengers.map(p => p.seatNumber) : []
     });
     const qrBuffer = await QRCode.toBuffer(qrPayloadStr, { width: 300, margin: 2 });
     const logoPath = path.join(process.cwd(), 'public', 'logo.png');
+    const hasLogo = fs.existsSync(logoPath);
 
-    const seatsText = booking.passengers.map(p => p.seatNumber).join(', ');
-    const passengerNames = booking.passengers.map(p => `${p.name} (${p.gender[0]}, ${p.age}y)`).join(', ');
+    const seatsText = booking.passengers ? booking.passengers.map(p => p.seatNumber).join(', ') : 'N/A';
+    const passengerNames = booking.passengers ? booking.passengers.map(p => `${p.name} (${p.gender ? p.gender[0] : ''}${p.age ? ', ' + p.age + 'y' : ''})`).join(', ') : 'Passenger';
+    const origin = booking.trip?.originCity || 'Boarding Point';
+    const dest = booking.trip?.destinationCity || 'Destination';
+    const depDate = booking.trip?.departureDate || 'Travel Date';
+    const depTime = booking.trip?.departureTime || '';
+    const operator = booking.trip?.operatorName || 'OSRTC Volvo Premier';
+    const busReg = booking.trip?.busRegistrationNumber || 'OD-02-AX-8910';
+
+    const htmlContent = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 28px; border: 1px solid #e2e8f0; border-radius: 20px; background-color: #ffffff; box-shadow: 0 4px 14px rgba(0,0,0,0.06);">
+        
+        <!-- Header -->
+        <div style="text-align: center; margin-bottom: 24px; border-bottom: 2px solid #f1f5f9; padding-bottom: 20px;">
+          ${hasLogo ? '<img src="cid:wonderlight_logo" alt="Wonderlight Adventure Company" style="width: 90px; height: 90px; border-radius: 50%; object-fit: cover; margin: 0 auto 12px auto; display: block; border: 3px solid #f1f5f9;" />' : ''}
+          <h2 style="color: #D84E55; margin: 0; font-size: 24px; font-weight: 900;">CONFIRMED E-TICKET</h2>
+          <p style="color: #64748b; font-size: 13px; margin: 4px 0 0 0; font-weight: 700;">Wonderlight Adventure Company &bull; Official Boarding Pass</p>
+        </div>
+
+        <!-- PNR Ribbon -->
+        <div style="background-color: #D84E55; color: #ffffff; padding: 16px 20px; border-radius: 14px; text-align: center; margin-bottom: 24px;">
+          <span style="font-size: 12px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.9;">Booking Reference PNR</span>
+          <div style="font-size: 32px; font-weight: 900; letter-spacing: 4px; font-family: monospace; margin-top: 4px;">${booking.pnr}</div>
+        </div>
+
+        <!-- Trip Summary -->
+        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 20px; border-radius: 14px; margin-bottom: 24px;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 14px; color: #334155;">
+            <tr>
+              <td style="padding: 6px 0; color: #64748b; font-size: 12px; text-transform: uppercase; font-weight: 700;">Journey Route</td>
+              <td style="padding: 6px 0; font-weight: 800; color: #0f172a; text-align: right;">${origin} ➔ ${dest}</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 0; color: #64748b; font-size: 12px; text-transform: uppercase; font-weight: 700;">Departure Date & Time</td>
+              <td style="padding: 6px 0; font-weight: 800; color: #0f172a; text-align: right;">${depDate} at ${depTime}</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 0; color: #64748b; font-size: 12px; text-transform: uppercase; font-weight: 700;">Coach Operator</td>
+              <td style="padding: 6px 0; font-weight: 700; color: #0f172a; text-align: right;">${operator} (${booking.trip?.busModel || 'Executive Bus'})</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 0; color: #64748b; font-size: 12px; text-transform: uppercase; font-weight: 700;">Bus Registration No.</td>
+              <td style="padding: 6px 0; font-weight: 800; color: #D84E55; text-align: right; font-family: monospace;">${busReg}</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 0; color: #64748b; font-size: 12px; text-transform: uppercase; font-weight: 700;">Confirmed Seats</td>
+              <td style="padding: 6px 0; font-weight: 900; color: #0f172a; text-align: right; font-family: monospace; font-size: 16px;">${seatsText}</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 0; color: #64748b; font-size: 12px; text-transform: uppercase; font-weight: 700;">Passenger(s)</td>
+              <td style="padding: 6px 0; font-weight: 600; color: #0f172a; text-align: right;">${passengerNames}</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 0; color: #64748b; font-size: 12px; text-transform: uppercase; font-weight: 700;">Boarding Point</td>
+              <td style="padding: 6px 0; font-weight: 700; color: #0f172a; text-align: right;">${booking.boardingPoint?.name || origin} (${booking.boardingPoint?.time || depTime})</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 0; color: #64748b; font-size: 12px; text-transform: uppercase; font-weight: 700;">Dropping Point</td>
+              <td style="padding: 6px 0; font-weight: 700; color: #0f172a; text-align: right;">${booking.droppingPoint?.name || dest} (${booking.droppingPoint?.time || ''})</td>
+            </tr>
+            <tr style="border-top: 1px border-slate-200;">
+              <td style="padding: 10px 0 0 0; color: #64748b; font-size: 13px; font-weight: 700;">Total Amount Paid</td>
+              <td style="padding: 10px 0 0 0; font-size: 18px; font-weight: 900; color: #16a34a; text-align: right;">₹${(booking.totalAmount || 0).toLocaleString()} (${booking.paymentMethod || 'ONLINE'})</td>
+            </tr>
+          </table>
+        </div>
+
+        <!-- Dynamic QR Code Card -->
+        <div style="text-align: center; padding: 20px; border: 2px dashed #cbd5e1; border-radius: 16px; margin-bottom: 24px; background-color: #fafafa;">
+          <p style="margin: 0 0 10px 0; font-size: 13px; font-weight: 800; color: #1e293b; text-transform: uppercase;">Conductor Verification QR Code</p>
+          <img src="cid:ticket_qrcode" alt="Boarding Pass QR Code" style="width: 180px; height: 180px; margin: 0 auto; display: block; border-radius: 8px; border: 1px solid #e2e8f0;" />
+          <p style="margin: 10px 0 0 0; font-size: 11px; color: #64748b;">Show this digital QR code to the conductor upon boarding for instant ticket scanning.</p>
+        </div>
+
+        <!-- Footer -->
+        <div style="text-align: center; border-top: 1px solid #f1f5f9; padding-top: 16px;">
+          <p style="margin: 0; font-size: 12px; color: #94a3b8;">
+            Dispatched from <strong>Wonderlight Adventure Official API</strong> (${emailUser}).<br/>
+            WhatsApp Support & Updates: <strong>+91 94383 18821</strong>
+          </p>
+        </div>
+
+      </div>
+    `;
+
+    const attachments: any[] = [
+      {
+        filename: `E-Ticket-${booking.pnr}-QR.png`,
+        content: qrBuffer,
+        cid: 'ticket_qrcode'
+      }
+    ];
+
+    if (hasLogo) {
+      attachments.push({
+        filename: 'logo.png',
+        path: logoPath,
+        cid: 'wonderlight_logo'
+      });
+    }
 
     if (emailUser && emailPassword && emailPassword.trim() !== '') {
-      const transporter = nodemailer.createTransport({
-        host: 'smtp.gmail.com',
-        port: 587,
-        secure: false,
-        auth: {
-          user: emailUser,
-          pass: emailPassword.trim()
-        },
-        tls: {
-          rejectUnauthorized: false
-        }
-      });
-
-      await transporter.sendMail({
-        from: emailFrom,
-        to: targetEmail,
-        subject: `🎫 Confirmed E-Ticket PNR: ${booking.pnr} (${booking.trip.originCity} ➔ ${booking.trip.destinationCity}) - wABus`,
-        text: `Your E-Ticket for PNR ${booking.pnr} is confirmed! Route: ${booking.trip.originCity} to ${booking.trip.destinationCity}, Date: ${booking.trip.departureDate} ${booking.trip.departureTime}, Seats: ${seatsText}. Total Paid: ₹${booking.totalAmount}. Show the attached QR code to the bus conductor.`,
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 28px; border: 1px solid #e2e8f0; border-radius: 20px; background-color: #ffffff; box-shadow: 0 4px 14px rgba(0,0,0,0.06);">
-            
-            <!-- Header -->
-            <div style="text-align: center; margin-bottom: 24px; border-bottom: 2px solid #f1f5f9; padding-bottom: 20px;">
-              <img src="cid:wonderlight_logo" alt="Wonderlight Advanture Company" style="width: 90px; height: 90px; border-radius: 50%; object-fit: cover; margin: 0 auto 12px auto; display: block; border: 3px solid #f1f5f9;" />
-              <h2 style="color: #D84E55; margin: 0; font-size: 24px; font-weight: 900;">CONFIRMED E-TICKET</h2>
-              <p style="color: #64748b; font-size: 13px; margin: 4px 0 0 0; font-weight: 700;">Wonderlight Advanture Company &bull; Official Boarding Pass</p>
-            </div>
-
-            <!-- PNR Ribbon -->
-            <div style="background-color: #D84E55; color: #ffffff; padding: 16px 20px; border-radius: 14px; text-align: center; margin-bottom: 24px;">
-              <span style="font-size: 12px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.9;">Booking Reference PNR</span>
-              <div style="font-size: 32px; font-weight: 900; letter-spacing: 4px; font-family: monospace; margin-top: 4px;">${booking.pnr}</div>
-            </div>
-
-            <!-- Trip Summary -->
-            <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 20px; border-radius: 14px; margin-bottom: 24px;">
-              <table style="width: 100%; border-collapse: collapse; font-size: 14px; color: #334155;">
-                <tr>
-                  <td style="padding: 6px 0; color: #64748b; font-size: 12px; text-transform: uppercase; font-weight: 700;">Journey Route</td>
-                  <td style="padding: 6px 0; font-weight: 800; color: #0f172a; text-align: right;">${booking.trip.originCity} ➔ ${booking.trip.destinationCity}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 6px 0; color: #64748b; font-size: 12px; text-transform: uppercase; font-weight: 700;">Departure Date & Time</td>
-                  <td style="padding: 6px 0; font-weight: 800; color: #0f172a; text-align: right;">${booking.trip.departureDate} at ${booking.trip.departureTime}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 6px 0; color: #64748b; font-size: 12px; text-transform: uppercase; font-weight: 700;">Coach Operator</td>
-                  <td style="padding: 6px 0; font-weight: 700; color: #0f172a; text-align: right;">${booking.trip.operatorName} (${booking.trip.busModel})</td>
-                </tr>
-                <tr>
-                  <td style="padding: 6px 0; color: #64748b; font-size: 12px; text-transform: uppercase; font-weight: 700;">Bus Registration No.</td>
-                  <td style="padding: 6px 0; font-weight: 800; color: #D84E55; text-align: right; font-family: monospace;">${booking.trip.busRegistrationNumber}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 6px 0; color: #64748b; font-size: 12px; text-transform: uppercase; font-weight: 700;">Confirmed Seats</td>
-                  <td style="padding: 6px 0; font-weight: 900; color: #0f172a; text-align: right; font-family: monospace; font-size: 16px;">${seatsText}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 6px 0; color: #64748b; font-size: 12px; text-transform: uppercase; font-weight: 700;">Passenger(s)</td>
-                  <td style="padding: 6px 0; font-weight: 600; color: #0f172a; text-align: right;">${passengerNames}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 6px 0; color: #64748b; font-size: 12px; text-transform: uppercase; font-weight: 700;">Boarding Point</td>
-                  <td style="padding: 6px 0; font-weight: 700; color: #0f172a; text-align: right;">${booking.boardingPoint.name} (${booking.boardingPoint.time})</td>
-                </tr>
-                <tr>
-                  <td style="padding: 6px 0; color: #64748b; font-size: 12px; text-transform: uppercase; font-weight: 700;">Dropping Point</td>
-                  <td style="padding: 6px 0; font-weight: 700; color: #0f172a; text-align: right;">${booking.droppingPoint.name} (${booking.droppingPoint.time})</td>
-                </tr>
-                <tr style="border-top: 1px border-slate-200;">
-                  <td style="padding: 10px 0 0 0; color: #64748b; font-size: 13px; font-weight: 700;">Total Amount Paid</td>
-                  <td style="padding: 10px 0 0 0; font-size: 18px; font-weight: 900; color: #16a34a; text-align: right;">₹${booking.totalAmount.toLocaleString()} (${booking.paymentMethod})</td>
-                </tr>
-              </table>
-            </div>
-
-            <!-- Dynamic QR Code Card -->
-            <div style="text-align: center; padding: 20px; border: 2px dashed #cbd5e1; border-radius: 16px; margin-bottom: 24px; background-color: #fafafa;">
-              <p style="margin: 0 0 10px 0; font-size: 13px; font-weight: 800; color: #1e293b; text-transform: uppercase;">Conductor Verification QR Code</p>
-              <img src="cid:ticket_qrcode" alt="Boarding Pass QR Code" style="width: 180px; height: 180px; margin: 0 auto; display: block; border-radius: 8px; border: 1px solid #e2e8f0;" />
-              <p style="margin: 10px 0 0 0; font-size: 11px; color: #64748b;">Show this digital QR code to the conductor upon boarding for instant ticket scanning.</p>
-            </div>
-
-            <!-- Footer -->
-            <div style="text-align: center; border-top: 1px solid #f1f5f9; padding-top: 16px;">
-              <p style="margin: 0; font-size: 12px; color: #94a3b8;">
-                Dispatched from <strong>Wonderlight Advanture Official API</strong> (${emailUser}).<br/>
-                WhatsApp Support & Updates: <strong>+91 94383 18821</strong>
-              </p>
-            </div>
-
-          </div>
-        `,
-        attachments: [
-          {
-            filename: 'logo.png',
-            path: logoPath,
-            cid: 'wonderlight_logo'
+      // Attempt 1: Gmail Service / Port 587
+      try {
+        const transporter = nodemailer.createTransport({
+          service: 'gmail',
+          auth: {
+            user: emailUser,
+            pass: emailPassword.trim()
           },
-          {
-            filename: `E-Ticket-${booking.pnr}-QR.png`,
-            content: qrBuffer,
-            cid: 'ticket_qrcode'
+          tls: {
+            rejectUnauthorized: false
           }
-        ]
-      });
+        });
 
-      console.log(`[E-TICKET EMAIL DISPATCH] ✉️ Transmitted confirmed E-Ticket PNR: ${booking.pnr} with QR code from ${emailUser} to ${targetEmail}`);
-      return { success: true, sentViaSmtp: true };
+        await transporter.sendMail({
+          from: emailFrom,
+          to: targetEmail,
+          subject: `🎫 Confirmed E-Ticket PNR: ${booking.pnr} (${origin} ➔ ${dest}) - wABus`,
+          text: `Your E-Ticket for PNR ${booking.pnr} is confirmed! Route: ${origin} to ${dest}, Date: ${depDate} ${depTime}, Seats: ${seatsText}. Total Paid: ₹${booking.totalAmount}. Show the attached QR code to the bus conductor.`,
+          html: htmlContent,
+          attachments
+        });
+
+        console.log(`[E-TICKET EMAIL DISPATCH] ✉️ Transmitted confirmed E-Ticket PNR: ${booking.pnr} via Gmail service to ${targetEmail}`);
+        return { success: true, sentViaSmtp: true };
+      } catch (serviceErr: any) {
+        console.warn(`[E-TICKET EMAIL DISPATCH] ⚠️ Gmail service attempt failed: ${serviceErr.message}. Trying direct SMTP port 465 fallback...`);
+        // Attempt 2: Direct Port 465 SSL
+        try {
+          const fallbackTransporter = nodemailer.createTransport({
+            host: emailHost,
+            port: 465,
+            secure: true,
+            auth: {
+              user: emailUser,
+              pass: emailPassword.trim()
+            },
+            connectionTimeout: 8000,
+            greetingTimeout: 4000,
+            socketTimeout: 8000,
+            tls: {
+              rejectUnauthorized: false
+            }
+          });
+
+          await fallbackTransporter.sendMail({
+            from: emailFrom,
+            to: targetEmail,
+            subject: `🎫 Confirmed E-Ticket PNR: ${booking.pnr} (${origin} ➔ ${dest}) - wABus`,
+            text: `Your E-Ticket for PNR ${booking.pnr} is confirmed! Route: ${origin} to ${dest}, Date: ${depDate} ${depTime}, Seats: ${seatsText}. Total Paid: ₹${booking.totalAmount}. Show the attached QR code to the bus conductor.`,
+            html: htmlContent,
+            attachments
+          });
+
+          console.log(`[E-TICKET EMAIL DISPATCH] ✉️ Transmitted confirmed E-Ticket PNR: ${booking.pnr} via Port 465 to ${targetEmail}`);
+          return { success: true, sentViaSmtp: true };
+        } catch (smtpErr: any) {
+          console.error(`[E-TICKET EMAIL DISPATCH ERROR] ⚠️ Direct SMTP Port 465 failed: ${smtpErr.message}`);
+        }
+      }
     }
   } catch (err: any) {
     console.error(`[E-TICKET EMAIL DISPATCH ERROR] ⚠️ Failed to transmit E-Ticket for PNR ${booking.pnr}:`, err?.message || err);
@@ -1267,6 +1307,33 @@ app.use(express.json());
       whatsAppDelivered: true,
       emailDelivered: true,
       message: `E-Ticket PNR ${pnr} with QR Code dispatched to ${cleanContactEmail} & WhatsApp +91-${contactPhone}`
+    });
+  });
+
+  // Standalone endpoint to dispatch or resend E-Ticket Confirmation Email to Customer
+  app.post('/api/bookings/send-confirmation', async (req, res) => {
+    const { booking, pnr, email } = req.body || {};
+    let targetBooking = booking as Booking | undefined;
+
+    if (!targetBooking && pnr) {
+      targetBooking = bookings.find(b => b.pnr.toUpperCase() === String(pnr).toUpperCase());
+    }
+
+    if (!targetBooking) {
+      return res.status(400).json({ error: 'Valid booking object or PNR is required.' });
+    }
+
+    if (email && typeof email === 'string' && email.includes('@')) {
+      targetBooking = { ...targetBooking, contactEmail: email.trim().toLowerCase() };
+    }
+
+    const mailResult = await sendBookingConfirmationEmail(targetBooking);
+    return res.json({
+      success: mailResult.success,
+      sentViaSmtp: mailResult.sentViaSmtp,
+      message: mailResult.sentViaSmtp
+        ? `E-Ticket confirmation email sent successfully to ${targetBooking.contactEmail}`
+        : `Email queued for ${targetBooking.contactEmail}`
     });
   });
 
