@@ -231,9 +231,16 @@ async function sendBookingConfirmationEmail(booking: Booking): Promise<{ success
   const emailPassword = rawBookingPass.replace(/\s+/g, '');
   const emailFrom = process.env.EMAIL_FROM || `"wABus E-Ticket Confirmation" <${emailUser}>`;
 
-  const targetEmail = (booking.contactEmail || '').trim().toLowerCase();
-  if (!targetEmail) {
-    console.warn(`[E-TICKET EMAIL WARNING] No contact email address found for PNR ${booking.pnr}`);
+  let targetEmail = (booking.contactEmail || '').trim().toLowerCase();
+  if (!targetEmail || !targetEmail.includes('@')) {
+    if (booking.passengers && Array.isArray(booking.passengers)) {
+      const pEmail = (booking.passengers as any[]).find(p => p && p.email && typeof p.email === 'string' && p.email.includes('@'));
+      if (pEmail) targetEmail = pEmail.email.trim().toLowerCase();
+    }
+  }
+
+  if (!targetEmail || !targetEmail.includes('@')) {
+    console.warn(`[E-TICKET EMAIL WARNING] No valid contact email address found for PNR ${booking.pnr}`);
     return { success: false, sentViaSmtp: false };
   }
 

@@ -194,6 +194,13 @@ export default function App() {
       setSelectedSeats([]);
       setLockExpiresAt(null);
       loadData(); // Refresh seat matrix & bookings
+
+      // Direct E-Ticket confirmation email dispatch to customer's email address
+      if (res && res.booking) {
+        api.sendBookingConfirmationEmail(res.booking, checkoutPayload.contactEmail).catch(e => {
+          console.warn('[E-TICKET EMAIL DISPATCH GUARANTEE WARN]', e);
+        });
+      }
     } catch (err: any) {
       console.error('Checkout error:', err);
       setStatusNotification('Checkout failed: ' + err.message);
