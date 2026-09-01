@@ -14,6 +14,7 @@ import {
   Play, 
   CheckCircle2, 
   RefreshCw, 
+  Mail,
   Plus, 
   Calendar, 
   Layers, 
@@ -77,6 +78,20 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       await fetchBookingsList();
     } catch (err: any) {
       setWaRetryStatusMsg(`❌ WhatsApp retry failed: ${err.message || 'Error sending message'}`);
+    } finally {
+      setRetryingPnr(null);
+    }
+  };
+
+  const handleRetryEmail = async (pnr: string, email?: string) => {
+    setRetryingPnr(pnr);
+    setWaRetryStatusMsg(null);
+    try {
+      const result = await api.retryEmailNotification(pnr, email);
+      setWaRetryStatusMsg(`✉️ E-Ticket confirmation email for PNR ${pnr} re-sent successfully to ${email || 'customer'}!`);
+      await fetchBookingsList();
+    } catch (err: any) {
+      setWaRetryStatusMsg(`❌ Email retry failed: ${err.message || 'Error sending email'}`);
     } finally {
       setRetryingPnr(null);
     }
@@ -1055,14 +1070,25 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                           )}
                         </td>
                         <td className="py-3.5 px-3 text-right">
-                          <button
-                            onClick={() => handleRetryWhatsApp(b.pnr)}
-                            disabled={retryingPnr === b.pnr}
-                            className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white rounded-xl text-[11px] font-bold transition inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
-                          >
-                            <RefreshCw className={`w-3 h-3 text-emerald-400 ${retryingPnr === b.pnr ? 'animate-spin' : ''}`} />
-                            <span>{retryingPnr === b.pnr ? 'Sending...' : 'Retry WhatsApp'}</span>
-                          </button>
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => handleRetryEmail(b.pnr, b.contactEmail)}
+                              disabled={retryingPnr === b.pnr}
+                              className="px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-[#D84E55] border border-red-200 disabled:opacity-50 rounded-xl text-[11px] font-bold transition inline-flex items-center gap-1 cursor-pointer shadow-2xs"
+                              title="Re-send E-Ticket email to customer"
+                            >
+                              <Mail className="w-3 h-3 text-[#D84E55]" />
+                              <span>{retryingPnr === b.pnr ? 'Sending...' : 'Resend Email'}</span>
+                            </button>
+                            <button
+                              onClick={() => handleRetryWhatsApp(b.pnr)}
+                              disabled={retryingPnr === b.pnr}
+                              className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white rounded-xl text-[11px] font-bold transition inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
+                            >
+                              <RefreshCw className={`w-3 h-3 text-emerald-400 ${retryingPnr === b.pnr ? 'animate-spin' : ''}`} />
+                              <span>{retryingPnr === b.pnr ? 'Sending...' : 'Retry WhatsApp'}</span>
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );

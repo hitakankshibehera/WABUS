@@ -140,46 +140,51 @@ async function sendMailWithFallback(mailOptions: nodemailer.SendMailOptions): Pr
   const rawPass = process.env.EMAIL_PASSWORD || 'yvlf rizi yibe ieny';
   const emailPassword = rawPass.replace(/['"\s]+/g, '').trim();
 
-  // Transporter 1: Direct Port 587 STARTTLS (Explicit host)
+  // Transporter 1: Direct Port 465 SSL (Forced IPv4 & Connection Pool for ultra-fast dispatch)
   try {
-    const transporter587 = nodemailer.createTransport({
+    const transporter465 = nodemailer.createTransport({
       host: 'smtp.gmail.com',
-      port: 587,
-      secure: false, // STARTTLS
+      port: 465,
+      secure: true,
+      pool: true,
+      maxConnections: 3,
+      maxMessages: 50,
+      family: 4, // Force IPv4 to eliminate 10s IPv6 DNS timeouts on cloud hosts
       auth: { user: emailUser, pass: emailPassword },
-      connectionTimeout: 6000,
-      greetingTimeout: 4000,
-      socketTimeout: 6000,
+      connectionTimeout: 4000,
+      greetingTimeout: 3000,
+      socketTimeout: 4000,
       tls: { rejectUnauthorized: false }
-    });
+    } as any);
 
-    const info = await transporter587.sendMail({
+    const info = await transporter465.sendMail({
       from: mailOptions.from || `"MargPath Official" <${emailUser}>`,
       ...mailOptions
     });
-    console.log(`[SMTP SUCCESS - Port 587] Email sent to ${mailOptions.to}. Message ID: ${info.messageId}`);
+    console.log(`[SMTP SUCCESS - Port 465 SSL] Email sent to ${mailOptions.to}. Message ID: ${info.messageId}`);
     return { success: true, messageId: info.messageId };
   } catch (err1: any) {
-    console.warn(`[SMTP WARN - Port 587 Failed] ${err1?.message || err1}. Attempting Port 465 SSL fallback...`);
+    console.warn(`[SMTP WARN - Port 465 SSL Failed] ${err1?.message || err1}. Attempting Port 587 STARTTLS fallback...`);
 
-    // Transporter 2: Direct Port 465 SSL/TLS
+    // Transporter 2: Direct Port 587 STARTTLS
     try {
-      const transporter465 = nodemailer.createTransport({
+      const transporter587 = nodemailer.createTransport({
         host: 'smtp.gmail.com',
-        port: 465,
-        secure: true, // SSL
+        port: 587,
+        secure: false,
+        family: 4,
         auth: { user: emailUser, pass: emailPassword },
-        connectionTimeout: 6000,
-        greetingTimeout: 4000,
-        socketTimeout: 6000,
+        connectionTimeout: 4000,
+        greetingTimeout: 3000,
+        socketTimeout: 4000,
         tls: { rejectUnauthorized: false }
-      });
+      } as any);
 
-      const info2 = await transporter465.sendMail({
+      const info2 = await transporter587.sendMail({
         from: mailOptions.from || `"MargPath Official" <${emailUser}>`,
         ...mailOptions
       });
-      console.log(`[SMTP SUCCESS - Port 465 SSL] Email sent to ${mailOptions.to}. Message ID: ${info2.messageId}`);
+      console.log(`[SMTP SUCCESS - Port 587 STARTTLS] Email sent to ${mailOptions.to}. Message ID: ${info2.messageId}`);
       return { success: true, messageId: info2.messageId };
     } catch (err2: any) {
       console.error(`[SMTP ERROR - Both Transporters Failed] ${err2?.message || err2}`);
