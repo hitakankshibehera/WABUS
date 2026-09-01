@@ -239,16 +239,44 @@ async function sendMailWithFallback(mailOptions: nodemailer.SendMailOptions): Pr
   const rawPass = process.env.EMAIL_PASSWORD || 'yvlf rizi yibe ieny';
   const emailPassword = rawPass.replace(/['"\s]+/g, '').trim();
 
-  // Transporter 1: Direct Port 465 SSL
+  // Try HTTP Resend API if key available for zero-latency 24/7 delivery
+  const resendApiKey = process.env.RESEND_API_KEY;
+  if (resendApiKey) {
+    try {
+      const res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${resendApiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          from: 'MargPath Official <onboarding@resend.dev>',
+          to: [mailOptions.to],
+          subject: mailOptions.subject,
+          html: mailOptions.html || mailOptions.text
+        })
+      });
+      if (res.ok) {
+        const data: any = await res.json();
+        console.log(`[RESEND API SUCCESS] Email sent to ${mailOptions.to}. ID: ${data.id}`);
+        return { success: true, messageId: data.id };
+      }
+    } catch (rErr) {
+      console.warn('[RESEND API WARN] Resend API failed, falling back to Gmail SMTP...', rErr);
+    }
+  }
+
+  // Transporter 1: Direct Port 465 SSL (Unpooled for 100% fresh sockets on Vercel)
   try {
     const transporter465 = nodemailer.createTransport({
       host: 'smtp.gmail.com',
       port: 465,
       secure: true,
+      pool: false,
       auth: { user: emailUser, pass: emailPassword },
-      connectionTimeout: 8000,
-      greetingTimeout: 4000,
-      socketTimeout: 8000,
+      connectionTimeout: 5000,
+      greetingTimeout: 3000,
+      socketTimeout: 5000,
       tls: { rejectUnauthorized: false }
     } as any);
 
@@ -265,10 +293,11 @@ async function sendMailWithFallback(mailOptions: nodemailer.SendMailOptions): Pr
     try {
       const transporterService = nodemailer.createTransport({
         service: 'gmail',
+        pool: false,
         auth: { user: emailUser, pass: emailPassword },
-        connectionTimeout: 8000,
-        greetingTimeout: 4000,
-        socketTimeout: 8000,
+        connectionTimeout: 5000,
+        greetingTimeout: 3000,
+        socketTimeout: 5000,
         tls: { rejectUnauthorized: false }
       } as any);
 
@@ -288,10 +317,11 @@ async function sendMailWithFallback(mailOptions: nodemailer.SendMailOptions): Pr
           port: 587,
           secure: false,
           requireTLS: true,
+          pool: false,
           auth: { user: emailUser, pass: emailPassword },
-          connectionTimeout: 8000,
-          greetingTimeout: 4000,
-          socketTimeout: 8000,
+          connectionTimeout: 5000,
+          greetingTimeout: 3000,
+          socketTimeout: 5000,
           tls: { rejectUnauthorized: false }
         } as any);
 
