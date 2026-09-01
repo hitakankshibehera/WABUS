@@ -3,10 +3,32 @@ import crypto from 'crypto';
 import nodemailer from 'nodemailer';
 import QRCode from 'qrcode';
 import PDFDocument from 'pdfkit';
-import { INITIAL_TRIPS } from '../src/data/mockDatabase';
-
 const app = express();
 app.use(express.json());
+
+const INITIAL_TRIPS: any[] = [
+  {
+    id: 'trip-101',
+    originCity: 'Bhubaneswar',
+    destinationCity: 'Puri',
+    departureDate: new Date().toISOString().split('T')[0],
+    departureTime: '08:00 AM',
+    arrivalTime: '10:00 AM',
+    duration: '2h 0m',
+    category: 'EXPRESS',
+    fare: 250,
+    operatorName: 'OSRTC Volvo Premier',
+    busRegistrationNumber: 'OD-02-AX-8910',
+    availableSeatsCount: 36,
+    seats: Array.from({ length: 36 }, (_, i) => ({
+      id: `seat-${i + 1}`,
+      number: `L${i + 1}`,
+      status: 'AVAILABLE',
+      fare: 250,
+      type: i % 2 === 0 ? 'WINDOW' : 'AISLE'
+    }))
+  }
+];
 
 // In-Memory stores for Vercel Serverless Function instances
 const serverTrips = JSON.parse(JSON.stringify(INITIAL_TRIPS));
