@@ -271,6 +271,20 @@ export const QRScanner: React.FC<QRScannerProps> = ({
     }
   };
 
+  const announcePhonePeVoice = (text: string) => {
+    try {
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = 1.0;
+        utterance.pitch = 1.05;
+        utterance.volume = 1.0;
+        utterance.lang = 'en-IN';
+        window.speechSynthesis.speak(utterance);
+      }
+    } catch (e) {}
+  };
+
   const handleScan = async (codeToVerify: string, autoCollectCash = false) => {
     if (!codeToVerify.trim()) return;
     setIsScanning(true);
@@ -294,6 +308,15 @@ export const QRScanner: React.FC<QRScannerProps> = ({
         if (typeof navigator !== 'undefined' && navigator.vibrate) {
           try { navigator.vibrate([100, 50, 100]); } catch (e) {}
         }
+
+        const seatInfo = res.booking?.passengers?.map((p: any) => p.seatNumber).join(', ') || 'Seat';
+        const fare = res.booking?.totalAmount || 450;
+        const isPaid = res.booking?.paymentStatus === 'PAID';
+
+        announcePhonePeVoice(isPaid
+          ? `Ticket Verified! Seat ${seatInfo} Boarding Approved. ${fare} Rupees Paid Online.`
+          : `Ticket Verified! Cash Collected ${fare} Rupees. Boarding Approved.`);
+
         setScanResult(res);
         onScanComplete();
       } else if (res.status === 'PENDING_CASH_COLLECTION') {
@@ -301,13 +324,25 @@ export const QRScanner: React.FC<QRScannerProps> = ({
         if (typeof navigator !== 'undefined' && navigator.vibrate) {
           try { navigator.vibrate([80, 40, 80]); } catch (e) {}
         }
+        const fare = res.booking?.totalAmount || 450;
+        announcePhonePeVoice(`Payment Pending! Please collect ${fare} Rupees from passenger.`);
+        setScanResult(res);
+      } else if (res.status === 'INVALID_WRONG_BUS') {
+        soundEngine.playError();
+        announcePhonePeVoice(`Warning! Wrong Bus. Ticket assigned to vehicle ${res.ticketBusNumber || ''}.`);
+        setScanResult(res);
+      } else if (res.status === 'INVALID_ALREADY_BOARDED') {
+        soundEngine.playError();
+        announcePhonePeVoice('Warning! Ticket already scanned and boarded.');
         setScanResult(res);
       } else {
         soundEngine.playError();
+        announcePhonePeVoice('Invalid Ticket. Verification Failed.');
         setScanResult(res);
       }
     } catch (err: any) {
       soundEngine.playError();
+      announcePhonePeVoice('Verification error. Ticket not found.');
       setScanResult({
         valid: false,
         status: 'INVALID_NOT_FOUND',
