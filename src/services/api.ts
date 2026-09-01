@@ -1,4 +1,4 @@
-import { Trip, Booking, FeatureFlags, PayoutRecord, Route, ConductorProfile, OfferCoupon, UserAccount, OtpSessionResponse, VerifyOtpResponse, GiftCard, Bus, Seat } from '../types';
+import { Trip, Booking, FeatureFlags, PayoutRecord, Route, ConductorProfile, OfferCoupon, UserAccount, OtpSessionResponse, VerifyOtpResponse, GiftCard, Bus, Seat, SeatLayoutTemplate, InventoryAuditLog } from '../types';
 import { INITIAL_TRIPS, MOCK_BUSES, MOCK_ROUTES, INITIAL_CONDUCTORS, INITIAL_BOOKINGS, MOCK_PAYOUTS, DEFAULT_FEATURE_FLAGS, generateSleeperSeats, generateSeaterSeats } from '../data/mockDatabase';
 
 async function safeParseJson(res: Response, defaultError: string): Promise<any> {
@@ -1007,6 +1007,79 @@ export const api = {
         sentViaSmtp: true,
         message: `E-Ticket confirmation email retry dispatched for PNR ${pnrOrId}`
       };
+    }
+  },
+
+  async getSeatLayoutTemplates(): Promise<SeatLayoutTemplate[]> {
+    try {
+      const res = await fetch('/api/admin/layouts');
+      if (!res.ok) return [];
+      return await res.json();
+    } catch {
+      return [];
+    }
+  },
+
+  async saveSeatLayoutTemplate(layout: Partial<SeatLayoutTemplate>): Promise<{ success: boolean; layout: SeatLayoutTemplate; message: string }> {
+    const res = await fetch('/api/admin/layouts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(layout)
+    });
+    return await safeParseJson(res, 'Failed to save seat layout template');
+  },
+
+  async getBuses(): Promise<Bus[]> {
+    try {
+      const res = await fetch('/api/admin/buses');
+      if (!res.ok) return MOCK_BUSES;
+      return await res.json();
+    } catch {
+      return MOCK_BUSES;
+    }
+  },
+
+  async saveBus(bus: Partial<Bus>): Promise<{ success: boolean; bus: Bus; message: string }> {
+    const res = await fetch('/api/admin/buses', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(bus)
+    });
+    return await safeParseJson(res, 'Failed to save bus record');
+  },
+
+  async getLiveSeatInventory(tripId: string): Promise<{ tripId: string; busRegistrationNumber: string; route: string; departureDate: string; departureTime: string; seats: any[] }> {
+    const res = await fetch(`/api/admin/trips/${tripId}/live-inventory`);
+    return await safeParseJson(res, 'Failed to load live seat inventory');
+  },
+
+  async operatorBlockSeat(tripId: string, seatId: string, seatNumber: string, reason?: string): Promise<{ success: boolean; message: string }> {
+    const res = await fetch('/api/admin/inventory/block', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tripId, seatId, seatNumber, reason })
+    });
+    window.dispatchEvent(new Event('wabus_booking_updated'));
+    return await safeParseJson(res, 'Failed to block seat');
+  },
+
+  async operatorReleaseSeat(tripId: string, seatId: string, seatNumber: string): Promise<{ success: boolean; message: string }> {
+    const res = await fetch('/api/admin/inventory/release', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tripId, seatId, seatNumber })
+    });
+    window.dispatchEvent(new Event('wabus_booking_updated'));
+    return await safeParseJson(res, 'Failed to release seat');
+  },
+
+  async getInventoryAuditLogs(): Promise<InventoryAuditLog[]> {
+    try {
+      const res = await fetch('/api/admin/audit-logs');
+      if (!res.ok) return [];
+      return await res.json();
+    } catch {
+      return [];
     }
   },
 

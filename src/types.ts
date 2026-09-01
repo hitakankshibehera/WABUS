@@ -2,10 +2,50 @@ export type CoachType = 'AC_SLEEPER_2_1' | 'VOLVO_MULTI_AXLE_2_2' | 'SCANIA_LUXU
 export type TripCategory = 'DAY_COACH' | 'NIGHT_COACH';
 export type SeatTier = 'LOWER_BERTH' | 'UPPER_BERTH' | 'SEATER_WINDOW' | 'SEATER_AISLE';
 export type SeatGenderRestriction = 'ANY' | 'FEMALE_ONLY' | 'MALE_ONLY';
-export type SeatStatus = 'AVAILABLE' | 'LOCKED' | 'BOOKED' | 'CONDUCTOR_RESERVED';
+export type SeatStatus = 'AVAILABLE' | 'SELECTED' | 'HELD' | 'BOOKED' | 'BLOCKED' | 'CANCELLED' | 'LOCKED' | 'CONDUCTOR_RESERVED';
 export type PaymentStatus = 'PAID_ONLINE' | 'PAY_ON_BOARDING_PENDING' | 'REFUNDED' | 'FAILED' | 'PENDING' | 'COMPLETED' | 'PAID';
 export type CheckInStatus = 'CONFIRMED' | 'BOARDED' | 'NO_SHOW' | 'CANCELLED';
 export type PaymentMethod = 'UPI' | 'UPI_QR' | 'CARD' | 'CREDIT_DEBIT_CARD' | 'NET_BANKING' | 'GIFT_CARD' | 'PAY_ON_BOARDING_COD';
+
+export interface SeatLayoutSeat {
+  id: string;
+  layoutId?: string;
+  number: string;
+  deck: 'LOWER' | 'UPPER';
+  row: number;
+  col: number;
+  isSleeper: boolean;
+  isWindow?: boolean;
+  isAisle?: boolean;
+  isLadies?: boolean;
+  isOperatorBlocked?: boolean;
+  xPos?: number;
+  yPos?: number;
+  basePrice?: number;
+}
+
+export interface SeatLayoutElement {
+  id: string;
+  type: 'DRIVER_CABIN' | 'DOOR' | 'STAIRS' | 'RESTROOM' | 'AISLE';
+  deck: 'LOWER' | 'UPPER';
+  row: number;
+  col: number;
+  label?: string;
+}
+
+export interface SeatLayoutTemplate {
+  id: string;
+  name: string; // e.g. "2+2 Luxury Seater (40 Seats)", "2+1 AC Sleeper (30 Berths)"
+  layoutCode: string; // e.g. "LAYOUT-2X2-SEATER"
+  description?: string;
+  totalRows: number;
+  totalCols: number;
+  hasLowerDeck: boolean;
+  hasUpperDeck: boolean;
+  seats: SeatLayoutSeat[];
+  elements?: SeatLayoutElement[];
+  createdAt?: string;
+}
 
 export interface Seat {
   id: string;
@@ -20,6 +60,40 @@ export interface Seat {
   bookedGender?: 'MALE' | 'FEMALE' | 'OTHER';
   lockedBySessionId?: string;
   lockExpiresAt?: number; // timestamp in ms
+  segmentFromId?: string;
+  segmentToId?: string;
+  passengerName?: string;
+  bookingPnr?: string;
+}
+
+export interface TripSeatInventory {
+  id: string;
+  tripId: string;
+  seatId: string;
+  seatNumber: string;
+  deck: 'LOWER' | 'UPPER';
+  status: SeatStatus;
+  heldBySessionId?: string;
+  holdExpiresAt?: number;
+  bookingId?: string;
+  bookingPnr?: string;
+  passengerName?: string;
+  passengerGender?: string;
+  segmentFromStopIndex?: number;
+  segmentToStopIndex?: number;
+  updatedAt: string;
+}
+
+export interface InventoryAuditLog {
+  id: string;
+  tripId: string;
+  seatId: string;
+  seatNumber: string;
+  previousStatus: string;
+  newStatus: string;
+  triggeredBy: string;
+  details?: string;
+  timestamp: string;
 }
 
 export interface BoardingDroppingPoint {
@@ -28,6 +102,7 @@ export interface BoardingDroppingPoint {
   landmark: string;
   time: string; // e.g. "21:30"
   contactPhone: string;
+  stopIndex?: number;
 }
 
 // Aliases for compatibility
@@ -45,6 +120,8 @@ export interface Bus {
   totalSeats: number;
   hasLowerDeck: boolean;
   hasUpperDeck: boolean;
+  layoutId?: string; // Link to SeatLayoutTemplate
+  layoutCode?: string; // e.g. LAYOUT-2X2-SEATER
   amenities: string[];
   driverName: string;
   driverPhone: string;
@@ -52,6 +129,8 @@ export interface Bus {
   conductorName: string;
   conductorPhone: string;
   assignedRoute?: string;
+  status?: 'ACTIVE' | 'INACTIVE' | 'MAINTENANCE';
+  images?: string[];
   liveGps?: {
     latitude: number;
     longitude: number;

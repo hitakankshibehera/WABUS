@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FeatureFlags, PayoutRecord, Trip, Route, Bus, OfferCoupon, CoachType, Booking } from '../../types';
+import { FeatureFlags, PayoutRecord, Trip, Route, Bus, OfferCoupon, CoachType, Booking, SeatLayoutTemplate, InventoryAuditLog } from '../../types';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { 
@@ -49,7 +49,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   onRefreshTrips,
 }) => {
   const { currentUser, loginAdmin, signupAdmin, switchDemoRole, logout } = useAuth();
-  const [activeAdminTab, setActiveAdminTab] = useState<'FEATURE_FLAGS' | 'BOOKINGS' | 'SCHEDULES' | 'OFFERS' | 'PAYOUTS' | 'ANALYTICS' | 'CUSTOMERS' | 'SEAT_LAYOUT'>('FEATURE_FLAGS');
+  const [activeAdminTab, setActiveAdminTab] = useState<'FEATURE_FLAGS' | 'BOOKINGS' | 'SCHEDULES' | 'OFFERS' | 'PAYOUTS' | 'ANALYTICS' | 'CUSTOMERS' | 'SEAT_LAYOUT' | 'BUS_MANAGEMENT' | 'LIVE_INVENTORY' | 'AUDIT_LOGS'>('FEATURE_FLAGS');
   const [payouts, setPayouts] = useState<PayoutRecord[]>([]);
   const [isCronRunning, setIsCronRunning] = useState(false);
   const [cronMessage, setCronMessage] = useState<string | null>(null);
@@ -110,10 +110,53 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [newSeatType, setNewSeatType] = useState<'SLEEPER' | 'SEATER'>('SLEEPER');
   const [newSeatStatus, setNewSeatStatus] = useState<string>('AVAILABLE');
 
+  // Bus Master & Layout Templates State
+  const [busesList, setBusesList] = useState<Bus[]>([]);
+  const [layoutTemplatesList, setLayoutTemplatesList] = useState<SeatLayoutTemplate[]>([]);
+  const [auditLogsList, setAuditLogsList] = useState<InventoryAuditLog[]>([]);
+  const [liveInventoryTripId, setLiveInventoryTripId] = useState<string>('');
+  const [liveInventoryData, setLiveInventoryData] = useState<any>(null);
+  const [liveInvStatusMsg, setLiveInvStatusMsg] = useState<string | null>(null);
+
+  // Bus Master Form State
+  const [masterRegNum, setMasterRegNum] = useState('OD-02-AX-8910');
+  const [masterOperatorName, setMasterOperatorName] = useState('OSRTC Volvo Premier');
+  const [masterModel, setMasterModel] = useState('BharatBenz 2+1 AC Sleeper Executive');
+  const [masterBusType, setMasterBusType] = useState<CoachType>('AC_SLEEPER_2_1');
+  const [masterTotalSeats, setMasterTotalSeats] = useState('30');
+  const [masterLayoutId, setMasterLayoutId] = useState('layout-2x1-sleeper');
+  const [masterDriverName, setMasterDriverName] = useState('Rameshwar Mahapatra');
+  const [masterDriverPhone, setMasterDriverPhone] = useState('+91 98610 24819');
+  const [masterConductorName, setMasterConductorName] = useState('Bijay Nayak');
+  const [masterConductorPhone, setMasterConductorPhone] = useState('+91 94371 00001');
+  const [busFormMsg, setBusFormMsg] = useState<string | null>(null);
+
+  const fetchMasterData = async () => {
+    try {
+      const [buses, templates, logs] = await Promise.all([
+        api.getBuses(),
+        api.getSeatLayoutTemplates(),
+        api.getInventoryAuditLogs()
+      ]);
+      setBusesList(buses);
+      setLayoutTemplatesList(templates);
+      setAuditLogsList(logs);
+    } catch (err) {
+      console.warn('Failed to load master data:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchMasterData();
+  }, []);
+
   useEffect(() => {
     if (trips && trips.length > 0 && !selectedSeatStudioTripId) {
       setSelectedSeatStudioTripId(trips[0].id);
       setEditingSeats(JSON.parse(JSON.stringify(trips[0].seats)));
+    }
+    if (trips && trips.length > 0 && !liveInventoryTripId) {
+      setLiveInventoryTripId(trips[0].id);
     }
   }, [trips]);
 
@@ -125,6 +168,14 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       }
     }
   }, [selectedSeatStudioTripId, trips]);
+
+  useEffect(() => {
+    if (liveInventoryTripId) {
+      api.getLiveSeatInventory(liveInventoryTripId)
+        .then(setLiveInventoryData)
+        .catch(() => {});
+    }
+  }, [liveInventoryTripId]);
 
   // Offers State
   const [offers, setOffers] = useState<OfferCoupon[]>([]);
@@ -746,13 +797,40 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
               Fleet & Schedules
             </button>
             <button
+              onClick={() => setActiveAdminTab('BUS_MANAGEMENT')}
+              className={`px-3.5 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1.5 ${
+                activeAdminTab === 'BUS_MANAGEMENT' ? 'bg-[#D84E55] text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <BusIcon className="w-3.5 h-3.5" />
+              <span>Bus Master</span>
+            </button>
+            <button
               onClick={() => setActiveAdminTab('SEAT_LAYOUT')}
               className={`px-3.5 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1.5 ${
                 activeAdminTab === 'SEAT_LAYOUT' ? 'bg-[#D84E55] text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'
               }`}
             >
-              <BusIcon className="w-3.5 h-3.5" />
+              <Layers className="w-3.5 h-3.5" />
               <span>Seat Layout Studio</span>
+            </button>
+            <button
+              onClick={() => setActiveAdminTab('LIVE_INVENTORY')}
+              className={`px-3.5 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1.5 ${
+                activeAdminTab === 'LIVE_INVENTORY' ? 'bg-[#D84E55] text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <BarChart3 className="w-3.5 h-3.5" />
+              <span>Live Seat Inventory</span>
+            </button>
+            <button
+              onClick={() => setActiveAdminTab('AUDIT_LOGS')}
+              className={`px-3.5 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1.5 ${
+                activeAdminTab === 'AUDIT_LOGS' ? 'bg-[#D84E55] text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <Clock className="w-3.5 h-3.5" />
+              <span>Audit Logs</span>
             </button>
             <button
               onClick={() => setActiveAdminTab('OFFERS')}
@@ -1926,6 +2004,373 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
           </div>
         );
       })()}
+
+      {/* TAB: BUS MANAGEMENT & FLEET MASTER */}
+      {activeAdminTab === 'BUS_MANAGEMENT' && (() => {
+        const handleCreateBus = async (e: React.FormEvent) => {
+          e.preventDefault();
+          setBusFormMsg(null);
+          try {
+            const res = await api.saveBus({
+              registrationNumber: masterRegNum,
+              operatorName: masterOperatorName,
+              model: masterModel,
+              busType: masterBusType,
+              totalSeats: Number(masterTotalSeats),
+              layoutId: masterLayoutId,
+              driverName: masterDriverName,
+              driverPhone: masterDriverPhone,
+              conductorName: masterConductorName,
+              conductorPhone: masterConductorPhone,
+              status: 'ACTIVE'
+            });
+            setBusFormMsg(`✨ Bus ${res.bus.registrationNumber} (${res.bus.operatorName}) successfully registered and linked to Layout Template!`);
+            fetchMasterData();
+          } catch (err: any) {
+            setBusFormMsg(`❌ Failed to register bus: ${err?.message || 'Error saving bus'}`);
+          }
+        };
+
+        return (
+          <div className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-7 shadow-xs space-y-6">
+            <div className="border-b border-gray-100 pb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h3 className="text-base font-extrabold text-gray-900 flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#D84E55] to-[#b83238] flex items-center justify-center text-white shadow-sm">
+                    <BusIcon className="w-4.5 h-4.5" />
+                  </div>
+                  <span>Bus Master &amp; Fleet Management</span>
+                </h3>
+                <p className="text-xs text-gray-500 mt-1 ml-10">
+                  Register physical vehicles, assign operator credentials, select layout templates, and manage bus status.
+                </p>
+              </div>
+            </div>
+
+            {busFormMsg && (
+              <div className={`p-3 rounded-2xl text-xs font-bold text-center ${
+                busFormMsg.includes('✨') ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-red-800 border border-red-200'
+              }`}>
+                {busFormMsg}
+              </div>
+            )}
+
+            {/* Add Bus Form */}
+            <form onSubmit={handleCreateBus} className="bg-gray-50 p-5 rounded-2xl border border-gray-200 space-y-4">
+              <h4 className="text-xs font-extrabold text-gray-900 uppercase tracking-wider flex items-center gap-2">
+                <Plus className="w-4 h-4 text-[#D84E55]" /> Add New Vehicle to Fleet
+              </h4>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="text-[10px] font-bold text-gray-600 uppercase block mb-1">Registration Number</label>
+                  <input
+                    type="text"
+                    value={masterRegNum}
+                    onChange={e => setMasterRegNum(e.target.value)}
+                    placeholder="OD-02-AX-8910"
+                    className="w-full px-3.5 py-2 bg-white border border-gray-300 rounded-xl text-xs font-bold text-gray-900 focus:outline-none focus:border-[#D84E55]"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-gray-600 uppercase block mb-1">Operator Name</label>
+                  <input
+                    type="text"
+                    value={masterOperatorName}
+                    onChange={e => setMasterOperatorName(e.target.value)}
+                    placeholder="OSRTC Volvo Premier"
+                    className="w-full px-3.5 py-2 bg-white border border-gray-300 rounded-xl text-xs font-bold text-gray-900 focus:outline-none focus:border-[#D84E55]"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-gray-600 uppercase block mb-1">Coach Model</label>
+                  <input
+                    type="text"
+                    value={masterModel}
+                    onChange={e => setMasterModel(e.target.value)}
+                    placeholder="BharatBenz 2+1 AC Sleeper"
+                    className="w-full px-3.5 py-2 bg-white border border-gray-300 rounded-xl text-xs font-bold text-gray-900 focus:outline-none focus:border-[#D84E55]"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-gray-600 uppercase block mb-1">Coach Type</label>
+                  <select
+                    value={masterBusType}
+                    onChange={e => setMasterBusType(e.target.value as any)}
+                    className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl text-xs font-bold text-gray-900 focus:outline-none"
+                  >
+                    <option value="AC_SLEEPER_2_1">2+1 AC Sleeper</option>
+                    <option value="VOLVO_MULTI_AXLE_2_2">2+2 Volvo Multi-Axle Seater</option>
+                    <option value="SCANIA_LUXURY_SLEEPER">Scania Luxury Sleeper</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-gray-600 uppercase block mb-1">Total Capacity</label>
+                  <input
+                    type="number"
+                    value={masterTotalSeats}
+                    onChange={e => setMasterTotalSeats(e.target.value)}
+                    placeholder="30"
+                    className="w-full px-3.5 py-2 bg-white border border-gray-300 rounded-xl text-xs font-bold text-gray-900 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-gray-600 uppercase block mb-1">Linked Seat Layout Template</label>
+                  <select
+                    value={masterLayoutId}
+                    onChange={e => setMasterLayoutId(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl text-xs font-bold text-gray-900 focus:outline-none"
+                  >
+                    {layoutTemplatesList.map(t => (
+                      <option key={t.id} value={t.id}>{t.name} ({t.layoutCode})</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-2">
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 bg-[#D84E55] hover:bg-[#c44349] text-white font-extrabold text-xs rounded-xl transition shadow-sm cursor-pointer flex items-center gap-1.5"
+                >
+                  <Plus className="w-4 h-4" /> Save Bus to Fleet
+                </button>
+              </div>
+            </form>
+
+            {/* Active Buses List */}
+            <div className="space-y-3">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500">Registered Fleet Vehicles ({busesList.length})</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {busesList.map(b => (
+                  <div key={b.id} className="bg-gray-50 p-4 rounded-2xl border border-gray-200 text-xs space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-extrabold text-gray-900 text-sm font-mono">{b.registrationNumber}</span>
+                      <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold border border-emerald-200">
+                        {b.status || 'ACTIVE'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-gray-600">
+                      <span>Operator: <strong>{b.operatorName}</strong></span>
+                      <span>Model: <strong>{b.model}</strong></span>
+                    </div>
+                    <div className="flex items-center justify-between text-gray-500 text-[11px] pt-1 border-t border-gray-200">
+                      <span>Layout: <strong className="text-purple-700 font-mono">{b.layoutCode || 'LAYOUT-2X1-SLEEPER'}</strong></span>
+                      <span>Capacity: <strong className="text-[#D84E55]">{b.totalSeats} Seats</strong></span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* TAB: LIVE TRIP SEAT INVENTORY MANAGER */}
+      {activeAdminTab === 'LIVE_INVENTORY' && (() => {
+        const handleBlockSeat = async (seatId: string, seatNumber: string) => {
+          setLiveInvStatusMsg(null);
+          try {
+            const res = await api.operatorBlockSeat(liveInventoryTripId, seatId, seatNumber, 'Operator maintenance block');
+            setLiveInvStatusMsg(`✨ ${res.message}`);
+            const updated = await api.getLiveSeatInventory(liveInventoryTripId);
+            setLiveInventoryData(updated);
+            onRefreshTrips();
+          } catch (err: any) {
+            setLiveInvStatusMsg(`❌ ${err?.message || 'Failed to block seat'}`);
+          }
+        };
+
+        const handleReleaseSeat = async (seatId: string, seatNumber: string) => {
+          setLiveInvStatusMsg(null);
+          try {
+            const res = await api.operatorReleaseSeat(liveInventoryTripId, seatId, seatNumber);
+            setLiveInvStatusMsg(`✨ ${res.message}`);
+            const updated = await api.getLiveSeatInventory(liveInventoryTripId);
+            setLiveInventoryData(updated);
+            onRefreshTrips();
+          } catch (err: any) {
+            setLiveInvStatusMsg(`❌ ${err?.message || 'Failed to release seat'}`);
+          }
+        };
+
+        return (
+          <div className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-7 shadow-xs space-y-6">
+            <div className="border-b border-gray-100 pb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h3 className="text-base font-extrabold text-gray-900 flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#D84E55] to-[#b83238] flex items-center justify-center text-white shadow-sm">
+                    <BarChart3 className="w-4.5 h-4.5" />
+                  </div>
+                  <span>Trip-Specific Live Seat Inventory Manager</span>
+                </h3>
+                <p className="text-xs text-gray-500 mt-1 ml-10">
+                  Inspect real-time seat states (AVAILABLE, HELD, BOOKED, BLOCKED), view passenger details, or perform manual operator block/unblock.
+                </p>
+              </div>
+            </div>
+
+            {liveInvStatusMsg && (
+              <div className={`p-3 rounded-2xl text-xs font-bold text-center ${
+                liveInvStatusMsg.includes('✨') ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-red-800 border border-red-200'
+              }`}>
+                {liveInvStatusMsg}
+              </div>
+            )}
+
+            {/* Trip Selector Bar */}
+            <div className="bg-gray-50 p-4 rounded-2xl border border-gray-200 space-y-1">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500 block">
+                Select Active Trip &amp; Travel Date
+              </label>
+              <select
+                value={liveInventoryTripId}
+                onChange={e => setLiveInventoryTripId(e.target.value)}
+                className="w-full px-3.5 py-2.5 bg-white border border-gray-300 rounded-xl text-xs font-bold text-gray-900 focus:outline-none focus:border-[#D84E55] cursor-pointer"
+              >
+                {trips.map(t => (
+                  <option key={t.id} value={t.id}>
+                    {t.originCity} ➔ {t.destinationCity} | Bus: {t.bus?.registrationNumber || 'Vehicle'} ({t.departureDate || 'Today'} at {t.departureTime})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Live Inventory Grid */}
+            {liveInventoryData && liveInventoryData.seats && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
+                    Live Inventory Status for {liveInventoryData.route} ({liveInventoryData.busRegistrationNumber})
+                  </h4>
+                  <span className="text-xs font-mono font-extrabold text-[#D84E55]">
+                    {liveInventoryData.seats.filter((s: any) => s.status === 'AVAILABLE').length} Available / {liveInventoryData.seats.length} Total
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                  {liveInventoryData.seats.map((seat: any) => {
+                    const isAvailable = seat.status === 'AVAILABLE';
+                    const isHeld = seat.status === 'HELD' || seat.status === 'LOCKED';
+                    const isBooked = seat.status === 'BOOKED';
+                    const isBlocked = seat.status === 'BLOCKED';
+
+                    let cardClass = 'bg-emerald-50 border-emerald-300 text-emerald-950';
+                    if (isHeld) cardClass = 'bg-amber-50 border-amber-300 text-amber-950 ring-2 ring-amber-400';
+                    else if (isBooked) cardClass = 'bg-slate-100 border-slate-300 text-slate-700';
+                    else if (isBlocked) cardClass = 'bg-red-50 border-red-300 text-red-950';
+
+                    return (
+                      <div key={seat.seatId} className={`p-3 rounded-2xl border space-y-2 text-xs font-semibold ${cardClass}`}>
+                        <div className="flex items-center justify-between font-mono font-black text-sm">
+                          <span>Seat {seat.seatNumber}</span>
+                          <span className="text-[10px] px-1.5 py-0.2 rounded font-sans uppercase font-bold bg-white/70">
+                            {seat.deck}
+                          </span>
+                        </div>
+
+                        <div className="text-[11px] font-bold">
+                          Status: <span className="uppercase">{seat.status}</span>
+                        </div>
+
+                        {seat.passengerName && (
+                          <div className="text-[10px] text-gray-600 truncate">
+                            Pax: <strong>{seat.passengerName}</strong>
+                          </div>
+                        )}
+                        {seat.bookingPnr && (
+                          <div className="text-[10px] font-mono text-purple-700 font-bold">
+                            PNR: {seat.bookingPnr}
+                          </div>
+                        )}
+
+                        <div className="pt-1 flex gap-1">
+                          {isBlocked ? (
+                            <button
+                              onClick={() => handleReleaseSeat(seat.seatId, seat.seatNumber)}
+                              className="w-full py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-bold transition cursor-pointer"
+                            >
+                              Release Seat
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleBlockSeat(seat.seatId, seat.seatNumber)}
+                              className="w-full py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg text-[10px] font-bold transition cursor-pointer"
+                            >
+                              Block Seat
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* TAB: AUDIT LOGS TRAIL */}
+      {activeAdminTab === 'AUDIT_LOGS' && (
+        <div className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-7 shadow-xs space-y-6">
+          <div className="border-b border-gray-100 pb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h3 className="text-base font-extrabold text-gray-900 flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#D84E55] to-[#b83238] flex items-center justify-center text-white shadow-sm">
+                  <Clock className="w-4.5 h-4.5" />
+                </div>
+                <span>Inventory Audit Trail Logs</span>
+              </h3>
+              <p className="text-xs text-gray-500 mt-1 ml-10">
+                Complete historical record of every seat status transition (AVAILABLE ➔ HELD ➔ BOOKED ➔ CANCELLED).
+              </p>
+            </div>
+            <button
+              onClick={fetchMasterData}
+              className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-xl text-xs font-bold text-gray-700 transition flex items-center gap-1 cursor-pointer self-start sm:self-auto"
+            >
+              <RefreshCw className="w-3.5 h-3.5" /> Refresh Audit Logs
+            </button>
+          </div>
+
+          <div className="overflow-x-auto border border-gray-200 rounded-2xl">
+            <table className="w-full text-left text-xs font-semibold">
+              <thead className="bg-gray-100 text-gray-600 uppercase text-[10px] tracking-wider border-b border-gray-200">
+                <tr>
+                  <th className="p-3">Timestamp</th>
+                  <th className="p-3">Seat Number</th>
+                  <th className="p-3">Transition</th>
+                  <th className="p-3">Triggered By</th>
+                  <th className="p-3">Details</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {auditLogsList.map((log: any) => (
+                  <tr key={log.id} className="hover:bg-gray-50">
+                    <td className="p-3 text-gray-500 font-mono text-[11px]">
+                      {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                    </td>
+                    <td className="p-3 font-mono font-bold text-gray-900">{log.seatNumber}</td>
+                    <td className="p-3 font-mono font-bold text-purple-700">
+                      {log.previousStatus} ➔ {log.newStatus}
+                    </td>
+                    <td className="p-3 text-gray-700">{log.triggeredBy}</td>
+                    <td className="p-3 text-gray-500">{log.details || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* TAB: OFFERS & COUPONS MANAGER */}
       {activeAdminTab === 'OFFERS' && (

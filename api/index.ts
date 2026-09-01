@@ -33,6 +33,108 @@ const INITIAL_TRIPS: any[] = [
 // In-Memory stores for Vercel Serverless Function instances
 const serverTrips = JSON.parse(JSON.stringify(INITIAL_TRIPS));
 const serverBookings: any[] = [];
+const serverLayoutTemplates: any[] = [
+  {
+    id: 'layout-2x1-sleeper',
+    name: '2+1 Luxury AC Sleeper (30 Berths)',
+    layoutCode: 'LAYOUT-2X1-SLEEPER',
+    description: 'Standard 2+1 sleeper coach with 15 Lower Berths and 15 Upper Berths',
+    totalRows: 10,
+    totalCols: 3,
+    hasLowerDeck: true,
+    hasUpperDeck: true,
+    seats: [
+      ...Array.from({ length: 15 }, (_, i) => ({
+        id: `layout-l-${i + 1}`,
+        number: `L${i + 1}`,
+        deck: 'LOWER',
+        row: Math.floor(i / 3) + 1,
+        col: (i % 3) + 1,
+        isSleeper: true,
+        isWindow: i % 3 === 0 || i % 3 === 2,
+        isAisle: i % 3 === 1,
+        basePrice: 550
+      })),
+      ...Array.from({ length: 15 }, (_, i) => ({
+        id: `layout-u-${i + 1}`,
+        number: `U${i + 1}`,
+        deck: 'UPPER',
+        row: Math.floor(i / 3) + 1,
+        col: (i % 3) + 1,
+        isSleeper: true,
+        isWindow: i % 3 === 0 || i % 3 === 2,
+        isAisle: i % 3 === 1,
+        basePrice: 450
+      }))
+    ],
+    elements: [
+      { id: 'elem-1', type: 'DRIVER_CABIN', deck: 'LOWER', row: 0, col: 3, label: 'Driver Steering' },
+      { id: 'elem-2', type: 'DOOR', deck: 'LOWER', row: 0, col: 1, label: 'Passenger Entrance' }
+    ]
+  },
+  {
+    id: 'layout-2x2-seater',
+    name: '2+2 Volvo Multi-Axle Seater (40 Seats)',
+    layoutCode: 'LAYOUT-2X2-SEATER',
+    description: '40 Recliner Seats in 2+2 layout',
+    totalRows: 10,
+    totalCols: 4,
+    hasLowerDeck: true,
+    hasUpperDeck: false,
+    seats: Array.from({ length: 40 }, (_, i) => ({
+      id: `layout-s-${i + 1}`,
+      number: `${i + 1}`,
+      deck: 'LOWER',
+      row: Math.floor(i / 4) + 1,
+      col: (i % 4) + 1,
+      isSleeper: false,
+      isWindow: i % 4 === 0 || i % 4 === 3,
+      isAisle: i % 4 === 1 || i % 4 === 2,
+      basePrice: 350
+    })),
+    elements: [
+      { id: 'elem-10', type: 'DRIVER_CABIN', deck: 'LOWER', row: 0, col: 4, label: 'Driver Cabin' }
+    ]
+  }
+];
+
+const serverBuses: any[] = [
+  {
+    id: 'bus-1',
+    registrationNumber: 'OD-02-AX-8910',
+    operatorId: 'op-1',
+    operatorName: 'OSRTC Volvo Premier',
+    model: 'BharatBenz 2+1 AC Sleeper Executive',
+    busType: 'AC_SLEEPER_2_1',
+    totalSeats: 30,
+    hasLowerDeck: true,
+    hasUpperDeck: true,
+    layoutId: 'layout-2x1-sleeper',
+    layoutCode: 'LAYOUT-2X1-SLEEPER',
+    amenities: ['AC', 'WiFi 5G', 'USB Fast Charger', 'Personal LED Screen', 'Plush Pillow & Blanket'],
+    driverName: 'Rameshwar Mahapatra',
+    driverPhone: '+91 98610 24819',
+    conductorName: 'Bijay Nayak',
+    conductorPhone: '+91 94371 00001',
+    status: 'ACTIVE'
+  }
+];
+
+const serverTripInventory = new Map<string, any>(); // key: `${tripId}:${seatId}`
+const serverAuditLogs: any[] = [
+  {
+    id: 'log-init-1',
+    tripId: 'trip-1',
+    seatId: 'seat-1-L1',
+    seatNumber: 'L1',
+    previousStatus: 'AVAILABLE',
+    newStatus: 'HELD',
+    triggeredBy: 'Customer (Session-1029)',
+    details: '10-minute seat hold lock initialized',
+    timestamp: new Date().toISOString()
+  }
+];
+
 const redisLocks = new Map<string, { sessionId: string; expiresAt: number }>();
 const otpStore = new Map<string, { hash: string; salt: string; expiresAt: number; resendAllowedAt: number }>();
 const sentBookingConfirmationPnrs = new Set<string>();
@@ -890,6 +992,218 @@ app.post(['/api/admin/trips/update-seats', '/admin/trips/update-seats'], (req, r
     console.error('[Vercel Admin Update Seats Error]', err);
     return res.status(500).json({ error: err?.message || 'Failed to update seat arrangement' });
   }
+});
+
+// 6d. Layout Templates Endpoint
+app.get(['/api/admin/layouts', '/admin/layouts'], (req, res) => {
+  return res.json(serverLayoutTemplates);
+});
+
+app.post(['/api/admin/layouts', '/admin/layouts'], (req, res) => {
+  const { name, layoutCode, totalRows, totalCols, hasLowerDeck, hasUpperDeck, seats, elements } = req.body || {};
+  if (!name || !Array.isArray(seats)) {
+    return res.status(400).json({ error: 'Layout name and seats array are required.' });
+  }
+
+  const newLayout = {
+    id: `layout-${Date.now()}`,
+    name,
+    layoutCode: layoutCode || `LAYOUT-${Date.now()}`,
+    totalRows: totalRows || 10,
+    totalCols: totalCols || 4,
+    hasLowerDeck: hasLowerDeck !== false,
+    hasUpperDeck: Boolean(hasUpperDeck),
+    seats,
+    elements: elements || [],
+    createdAt: new Date().toISOString()
+  };
+
+  serverLayoutTemplates.unshift(newLayout);
+  return res.json({ success: true, layout: newLayout, message: `Seat layout template '${name}' saved successfully!` });
+});
+
+// 6e. Bus Master API
+app.get(['/api/admin/buses', '/admin/buses'], (req, res) => {
+  return res.json(serverBuses);
+});
+
+app.post(['/api/admin/buses', '/admin/buses'], (req, res) => {
+  const { registrationNumber, operatorName, model, busType, totalSeats, hasLowerDeck, hasUpperDeck, layoutId, amenities, driverName, driverPhone, conductorName, conductorPhone } = req.body || {};
+  if (!registrationNumber || !operatorName) {
+    return res.status(400).json({ error: 'Registration number and operator name are required.' });
+  }
+
+  const existingIndex = serverBuses.findIndex(b => b.registrationNumber.toUpperCase() === registrationNumber.trim().toUpperCase());
+  const busRecord = {
+    id: existingIndex >= 0 ? serverBuses[existingIndex].id : `bus-${Date.now()}`,
+    registrationNumber: registrationNumber.trim().toUpperCase(),
+    operatorId: 'op-1',
+    operatorName: operatorName.trim(),
+    model: model || 'Standard Luxury Coach',
+    busType: busType || 'AC_SLEEPER_2_1',
+    totalSeats: Number(totalSeats) || 30,
+    hasLowerDeck: hasLowerDeck !== false,
+    hasUpperDeck: Boolean(hasUpperDeck),
+    layoutId: layoutId || 'layout-2x1-sleeper',
+    layoutCode: layoutId ? (serverLayoutTemplates.find(l => l.id === layoutId)?.layoutCode || 'LAYOUT-CUSTOM') : 'LAYOUT-2X1-SLEEPER',
+    amenities: Array.isArray(amenities) ? amenities : ['AC', 'WiFi 5G', 'USB Charger'],
+    driverName: driverName || 'Rameshwar Mahapatra',
+    driverPhone: driverPhone || '+91 98610 24819',
+    conductorName: conductorName || 'Bijay Nayak',
+    conductorPhone: conductorPhone || '+91 94371 00001',
+    status: 'ACTIVE'
+  };
+
+  if (existingIndex >= 0) {
+    serverBuses[existingIndex] = busRecord;
+  } else {
+    serverBuses.unshift(busRecord);
+  }
+
+  return res.json({ success: true, bus: busRecord, message: `Bus ${registrationNumber} saved successfully!` });
+});
+
+// 6f. Live Inventory Manager & Manual Block/Release
+app.get(['/api/admin/trips/:tripId/live-inventory', '/admin/trips/:tripId/live-inventory'], (req, res) => {
+  const { tripId } = req.params;
+  const trip = serverTrips.find((t: any) => t.id === tripId) || serverTrips[0];
+  if (!trip) return res.status(404).json({ error: 'Trip not found' });
+
+  const inventoryList = trip.seats.map((seat: any) => {
+    const invKey = `${trip.id}:${seat.id}`;
+    const stored = serverTripInventory.get(invKey);
+    return {
+      seatId: seat.id,
+      seatNumber: seat.number,
+      deck: seat.deck,
+      status: stored?.status || seat.status || 'AVAILABLE',
+      heldBySessionId: stored?.heldBySessionId || seat.lockedBySessionId,
+      holdExpiresAt: stored?.holdExpiresAt || seat.lockExpiresAt,
+      bookingPnr: stored?.bookingPnr || seat.bookingPnr,
+      passengerName: stored?.passengerName || seat.passengerName,
+      bookedGender: seat.bookedGender,
+      basePrice: seat.basePrice || trip.baseFare
+    };
+  });
+
+  return res.json({
+    tripId: trip.id,
+    busRegistrationNumber: trip.bus?.registrationNumber || trip.busRegistrationNumber,
+    route: `${trip.originCity} ➔ ${trip.destinationCity}`,
+    departureDate: trip.departureDate,
+    departureTime: trip.departureTime,
+    seats: inventoryList
+  });
+});
+
+app.post(['/api/admin/inventory/block', '/admin/inventory/block'], (req, res) => {
+  const { tripId, seatId, seatNumber, reason } = req.body || {};
+  const trip = serverTrips.find((t: any) => t.id === tripId);
+  if (!trip) return res.status(404).json({ error: 'Trip not found' });
+
+  const seat = trip.seats.find((s: any) => s.id === seatId || String(s.number).toUpperCase() === String(seatNumber).toUpperCase());
+  if (seat) {
+    const prevStatus = seat.status;
+    seat.status = 'BLOCKED';
+    serverTripInventory.set(`${tripId}:${seat.id}`, { status: 'BLOCKED', updatedAt: new Date().toISOString() });
+    
+    serverAuditLogs.unshift({
+      id: `log-${Date.now()}`,
+      tripId,
+      seatId: seat.id,
+      seatNumber: seat.number,
+      previousStatus: prevStatus,
+      newStatus: 'BLOCKED',
+      triggeredBy: 'Operator / Admin Manual Action',
+      details: reason || 'Operator maintenance block',
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  return res.json({ success: true, message: `Seat ${seatNumber || seatId} BLOCKED by Operator.` });
+});
+
+app.post(['/api/admin/inventory/release', '/admin/inventory/release'], (req, res) => {
+  const { tripId, seatId, seatNumber } = req.body || {};
+  const trip = serverTrips.find((t: any) => t.id === tripId);
+  if (!trip) return res.status(404).json({ error: 'Trip not found' });
+
+  const seat = trip.seats.find((s: any) => s.id === seatId || String(s.number).toUpperCase() === String(seatNumber).toUpperCase());
+  if (seat) {
+    const prevStatus = seat.status;
+    seat.status = 'AVAILABLE';
+    delete seat.lockedBySessionId;
+    delete seat.lockExpiresAt;
+    serverTripInventory.set(`${tripId}:${seat.id}`, { status: 'AVAILABLE', updatedAt: new Date().toISOString() });
+
+    serverAuditLogs.unshift({
+      id: `log-${Date.now()}`,
+      tripId,
+      seatId: seat.id,
+      seatNumber: seat.number,
+      previousStatus: prevStatus,
+      newStatus: 'AVAILABLE',
+      triggeredBy: 'Operator / Admin Manual Action',
+      details: 'Operator released seat lock',
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  return res.json({ success: true, message: `Seat ${seatNumber || seatId} is now AVAILABLE.` });
+});
+
+// 6g. Cancellation & Inventory Restoration Endpoint
+app.post(['/api/bookings/cancel', '/bookings/cancel'], (req, res) => {
+  const { pnr, reason } = req.body || {};
+  if (!pnr) return res.status(400).json({ error: 'Booking PNR is required for cancellation.' });
+
+  const bookingIndex = serverBookings.findIndex((b: any) => b.pnr.toUpperCase() === String(pnr).trim().toUpperCase());
+  if (bookingIndex < 0) {
+    return res.status(404).json({ error: `Booking PNR ${pnr} not found.` });
+  }
+
+  const booking = serverBookings[bookingIndex];
+  booking.checkInStatus = 'CANCELLED';
+  booking.paymentStatus = 'REFUNDED';
+
+  const trip = serverTrips.find((t: any) => t.id === booking.tripId);
+  if (trip && Array.isArray(booking.passengers)) {
+    for (const p of booking.passengers) {
+      const seat = trip.seats.find((s: any) => s.id === p.seatId || String(s.number).toUpperCase() === String(p.seatNumber).toUpperCase());
+      if (seat) {
+        const prevStatus = seat.status;
+        seat.status = 'AVAILABLE';
+        delete seat.bookedGender;
+        delete seat.passengerName;
+        delete seat.bookingPnr;
+
+        serverAuditLogs.unshift({
+          id: `log-${Date.now()}`,
+          tripId: trip.id,
+          seatId: seat.id,
+          seatNumber: seat.number,
+          previousStatus: prevStatus,
+          newStatus: 'AVAILABLE',
+          triggeredBy: `Customer Cancel (PNR: ${pnr})`,
+          details: reason || 'Booking cancellation refund processed',
+          timestamp: new Date().toISOString()
+        });
+      }
+    }
+    trip.availableSeatsCount = trip.seats.filter((s: any) => s.status === 'AVAILABLE').length;
+  }
+
+  return res.json({
+    success: true,
+    message: `Booking PNR ${pnr} cancelled successfully! Seat inventory restored to AVAILABLE.`,
+    refundAmount: booking.totalAmount * 0.9, // 90% refund policy
+    cancellationFee: booking.totalAmount * 0.1
+  });
+});
+
+// 6h. Audit Logs API Endpoint
+app.get(['/api/admin/audit-logs', '/admin/audit-logs'], (req, res) => {
+  return res.json(serverAuditLogs);
 });
 
 // 7. Dynamic Trips Search & Details Endpoint for Vercel

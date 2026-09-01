@@ -1,4 +1,96 @@
-import { Bus, Route, Trip, Seat, FeatureFlags, Booking, PayoutRecord, ConductorProfile } from '../types';
+import { Bus, Route, Trip, Seat, FeatureFlags, Booking, PayoutRecord, ConductorProfile, SeatLayoutTemplate, InventoryAuditLog } from '../types';
+
+export const INITIAL_SEAT_LAYOUT_TEMPLATES: SeatLayoutTemplate[] = [
+  {
+    id: 'layout-2x1-sleeper',
+    name: '2+1 Luxury AC Sleeper (30 Berths)',
+    layoutCode: 'LAYOUT-2X1-SLEEPER',
+    description: 'Standard 2+1 sleeper coach with 15 Lower Berths and 15 Upper Berths',
+    totalRows: 10,
+    totalCols: 3,
+    hasLowerDeck: true,
+    hasUpperDeck: true,
+    seats: [
+      ...Array.from({ length: 15 }, (_, i) => ({
+        id: `layout-l-${i + 1}`,
+        number: `L${i + 1}`,
+        deck: 'LOWER' as const,
+        row: Math.floor(i / 3) + 1,
+        col: (i % 3) + 1,
+        isSleeper: true,
+        isWindow: i % 3 === 0 || i % 3 === 2,
+        isAisle: i % 3 === 1,
+        basePrice: 550
+      })),
+      ...Array.from({ length: 15 }, (_, i) => ({
+        id: `layout-u-${i + 1}`,
+        number: `U${i + 1}`,
+        deck: 'UPPER' as const,
+        row: Math.floor(i / 3) + 1,
+        col: (i % 3) + 1,
+        isSleeper: true,
+        isWindow: i % 3 === 0 || i % 3 === 2,
+        isAisle: i % 3 === 1,
+        basePrice: 450
+      }))
+    ],
+    elements: [
+      { id: 'elem-1', type: 'DRIVER_CABIN', deck: 'LOWER', row: 0, col: 3, label: 'Driver Steering' },
+      { id: 'elem-2', type: 'DOOR', deck: 'LOWER', row: 0, col: 1, label: 'Passenger Entrance' },
+      { id: 'elem-3', type: 'STAIRS', deck: 'LOWER', row: 1, col: 2, label: 'Upper Deck Stairs' }
+    ]
+  },
+  {
+    id: 'layout-2x2-seater',
+    name: '2+2 Volvo Multi-Axle Seater (40 Seats)',
+    layoutCode: 'LAYOUT-2X2-SEATER',
+    description: '40 Recliner Seats in 2+2 layout',
+    totalRows: 10,
+    totalCols: 4,
+    hasLowerDeck: true,
+    hasUpperDeck: false,
+    seats: Array.from({ length: 40 }, (_, i) => ({
+      id: `layout-s-${i + 1}`,
+      number: `${i + 1}`,
+      deck: 'LOWER' as const,
+      row: Math.floor(i / 4) + 1,
+      col: (i % 4) + 1,
+      isSleeper: false,
+      isWindow: i % 4 === 0 || i % 4 === 3,
+      isAisle: i % 4 === 1 || i % 4 === 2,
+      basePrice: 350
+    })),
+    elements: [
+      { id: 'elem-10', type: 'DRIVER_CABIN', deck: 'LOWER', row: 0, col: 4, label: 'Driver Cabin' },
+      { id: 'elem-11', type: 'DOOR', deck: 'LOWER', row: 0, col: 1, label: 'Main Door' }
+    ]
+  }
+];
+
+export const INITIAL_INVENTORY_AUDIT_LOGS: InventoryAuditLog[] = [
+  {
+    id: 'log-1',
+    tripId: 'trip-1',
+    seatId: 'seat-1-L1',
+    seatNumber: 'L1',
+    previousStatus: 'AVAILABLE',
+    newStatus: 'HELD',
+    triggeredBy: 'Customer (Session-1029)',
+    details: '10-minute seat hold lock initialized',
+    timestamp: new Date(Date.now() - 1000 * 60 * 15).toISOString()
+  },
+  {
+    id: 'log-2',
+    tripId: 'trip-1',
+    seatId: 'seat-1-L1',
+    seatNumber: 'L1',
+    previousStatus: 'HELD',
+    newStatus: 'BOOKED',
+    triggeredBy: 'Payment Gateway (PNR: WB892341)',
+    details: 'Payment confirmed via UPI',
+    timestamp: new Date(Date.now() - 1000 * 60 * 10).toISOString()
+  }
+];
 
 export const DEFAULT_FEATURE_FLAGS: FeatureFlags = {
   enableSurgePricing: true,
@@ -79,6 +171,8 @@ export const MOCK_BUSES: Bus[] = [
     totalSeats: 30,
     hasLowerDeck: true,
     hasUpperDeck: true,
+    layoutId: 'layout-2x1-sleeper',
+    layoutCode: 'LAYOUT-2X1-SLEEPER',
     amenities: ['AC', 'WiFi 5G', 'USB Fast Charger', 'Personal LED Screen', 'Plush Pillow & Blanket', 'Mineral Water', 'GPS Live Tracking'],
     driverName: 'Rameshwar Mahapatra',
     driverPhone: '+91 98610 24819',
