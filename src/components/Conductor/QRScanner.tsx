@@ -42,6 +42,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({
   const [isScanning, setIsScanning] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [isPhonePeModalOpen, setIsPhonePeModalOpen] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -348,7 +349,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({
       {/* Header with Assigned Bus Indicator */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
         <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-2xl bg-red-50 text-[#D84E55] flex items-center justify-center shadow-2xs">
+          <div className="w-11 h-11 rounded-2xl bg-purple-50 text-[#673ab7] flex items-center justify-center shadow-2xs">
             <Camera className="w-5 h-5" />
           </div>
           <div>
@@ -359,7 +360,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({
               </span>
             </div>
             <p className="text-xs text-slate-500">
-              Validates ticket cryptography & checks passenger into assigned bus
+              PhonePe &amp; Paytm style live scanner for passenger ticket verification
             </p>
           </div>
         </div>
@@ -375,97 +376,130 @@ export const QRScanner: React.FC<QRScannerProps> = ({
             <span>Upload QR Photo</span>
             <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
           </label>
-
-          <button
-            type="button"
-            onClick={switchMobileCamera}
-            title="Switch Rear/Front Camera"
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-100 text-slate-700 border border-slate-200 hover:bg-slate-200 text-xs font-bold transition cursor-pointer"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">{facingMode === 'environment' ? 'Rear Cam' : 'Front Cam'}</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={toggleTorch}
-            title="Toggle Flashlight / Torch"
-            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-xs font-bold transition cursor-pointer ${
-              torchActive ? 'bg-amber-100 text-amber-800 border-amber-300' : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
-            }`}
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">{torchActive ? 'Torch On' : 'Torch Off'}</span>
-          </button>
-
-          <button
-            onClick={toggleCamera}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer border ${
-              cameraActive 
-                ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' 
-                : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
-            }`}
-          >
-            {cameraActive ? <Video className="w-3.5 h-3.5 text-emerald-600" /> : <VideoOff className="w-3.5 h-3.5" />}
-            <span>{cameraActive ? 'Camera Active' : 'Start Camera'}</span>
-          </button>
         </div>
       </div>
 
-      {/* Viewfinder scanner box */}
-      <div className="relative bg-slate-950 border-2 border-dashed border-red-500/50 rounded-3xl p-6 sm:p-8 flex flex-col items-center justify-center text-center overflow-hidden text-white shadow-inner">
-        {/* Animated laser scan line */}
-        <div className="absolute inset-x-0 h-1 bg-gradient-to-r from-transparent via-[#D84E55] to-transparent animate-bounce opacity-90 pointer-events-none"></div>
-
-        {/* Live Camera or Simulated Lens */}
-        {cameraActive ? (
-          <div className="relative w-full max-w-sm aspect-video rounded-2xl overflow-hidden bg-black border border-white/20 mb-3">
-            <video 
-              ref={videoRef} 
-              autoPlay 
-              playsInline 
-              muted 
-              className="w-full h-full object-cover"
-            />
-            <div className="absolute inset-0 border-2 border-red-500/60 rounded-2xl pointer-events-none flex items-center justify-center">
-              <div className="w-40 h-40 border-2 border-dashed border-white/80 rounded-xl animate-pulse"></div>
-            </div>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center gap-3 my-2">
-            <button
-              onClick={() => startCamera(facingMode)}
-              className="px-6 py-3 rounded-2xl bg-[#D84E55] hover:bg-[#C33E44] text-white font-extrabold text-sm flex items-center gap-2 shadow-lg shadow-red-500/30 transition cursor-pointer"
-            >
-              <Camera className="w-5 h-5 animate-pulse" />
-              <span>Tap to Open Mobile Camera</span>
-            </button>
-            <span className="text-[11px] text-slate-400">Allows mobile phone camera access for scanning passenger tickets</span>
-          </div>
-        )}
-
-        {cameraError && (
-          <div className="mb-3 px-3 py-2 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-200 text-xs max-w-md space-y-1">
-            <div className="font-bold flex items-center justify-center gap-1">
-              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
-              <span>Camera Status Notice</span>
-            </div>
-            <p className="text-[11px] text-amber-100">{cameraError}</p>
-            <button
-              onClick={() => startCamera(facingMode)}
-              className="mt-1 px-3 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-[11px] inline-block transition cursor-pointer"
-            >
-              Retry Camera Permission
-            </button>
-          </div>
-        )}
-
-        <span className="text-sm font-bold text-white">Point Camera at Passenger&apos;s Mobile QR Code</span>
-        <p className="text-xs text-slate-300 max-w-md mt-1">
-          Scans wABus digital passes, WhatsApp PDF QR tickets, and printed boarding vouchers.
-        </p>
-
+      {/* STEP 1: PHONEPE STYLE PURPLE CIRCULAR SCAN BUTTON (Image 1 Style) */}
+      <div className="py-8 flex flex-col items-center justify-center text-center space-y-4 bg-slate-50 border-2 border-dashed border-purple-200 rounded-3xl">
+        <button
+          type="button"
+          onClick={() => {
+            setIsPhonePeModalOpen(true);
+            startCamera(facingMode);
+          }}
+          className="w-24 h-24 rounded-full bg-[#673ab7] hover:bg-[#5e35b1] text-white flex flex-col items-center justify-center shadow-2xl shadow-purple-500/40 hover:scale-105 active:scale-95 transition cursor-pointer border-4 border-purple-300/50 group"
+          title="Tap to Open PhonePe Style Camera Scanner"
+        >
+          <QrCode className="w-10 h-10 group-hover:scale-110 transition-transform" />
+        </button>
+        <div>
+          <h4 className="text-sm font-black text-slate-900 uppercase tracking-wider">Tap Purple Button to Scan Ticket QR</h4>
+          <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+            Opens native PhonePe/Paytm style fullscreen QR camera scanner to verify customer ticket &amp; payment status.
+          </p>
+        </div>
       </div>
+
+      {/* STEP 2: FULLSCREEN NATIVE PHONEPE MOBILE SCANNER MODAL (Image 2 Style) */}
+      {isPhonePeModalOpen && (
+        <div className="fixed inset-0 z-50 bg-[#0b0c10] text-white flex flex-col justify-between p-4 sm:p-6 overflow-hidden animate-in fade-in">
+          {/* PhonePe Header Bar */}
+          <div className="flex items-center justify-between border-b border-white/10 pb-4">
+            <button
+              onClick={() => {
+                setIsPhonePeModalOpen(false);
+                stopCamera();
+              }}
+              className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition cursor-pointer"
+            >
+              ✕
+            </button>
+            <div className="text-center">
+              <h3 className="text-base font-extrabold tracking-wide text-white">Scan Ticket QR</h3>
+              <p className="text-[11px] text-purple-300 font-medium">MargPath Digital Pass • WhatsApp Ticket QR</p>
+            </div>
+            <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-purple-300 font-bold text-sm">
+              ?
+            </div>
+          </div>
+
+          {/* PhonePe Viewfinder Frame */}
+          <div className="flex-1 flex flex-col items-center justify-center my-4 relative">
+            <div className="relative w-72 h-72 rounded-3xl border-2 border-purple-500 overflow-hidden shadow-2xl shadow-purple-500/30 flex items-center justify-center bg-black">
+              {/* PhonePe Purple Corner Brackets */}
+              <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-purple-500 rounded-tl-xl pointer-events-none z-10"></div>
+              <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-purple-500 rounded-tr-xl pointer-events-none z-10"></div>
+              <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-purple-500 rounded-bl-xl pointer-events-none z-10"></div>
+              <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-purple-500 rounded-br-xl pointer-events-none z-10"></div>
+
+              {/* Pulsing Laser Scan Line */}
+              <div className="absolute inset-x-0 h-1 bg-gradient-to-r from-transparent via-purple-400 to-transparent animate-bounce opacity-90 pointer-events-none z-10"></div>
+
+              {/* Live Video Camera */}
+              {cameraActive ? (
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="flex flex-col items-center gap-2 text-center p-4">
+                  <Camera className="w-8 h-8 text-purple-400 animate-pulse" />
+                  <span className="text-xs font-bold text-white">Opening Camera...</span>
+                  <button
+                    onClick={() => startCamera(facingMode)}
+                    className="mt-2 px-4 py-1.5 rounded-xl bg-purple-600 text-white font-bold text-xs shadow-md"
+                  >
+                    Allow Camera
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Action Buttons Under Viewfinder */}
+            <div className="flex items-center gap-8 mt-6">
+              <label className="flex flex-col items-center gap-1.5 cursor-pointer group">
+                <div className="w-12 h-12 rounded-full bg-white/10 group-hover:bg-white/20 border border-white/20 flex items-center justify-center transition">
+                  <QrCode className="w-5 h-5 text-purple-300" />
+                </div>
+                <span className="text-[11px] font-bold text-slate-300">Upload QR</span>
+                <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
+              </label>
+
+              <button
+                type="button"
+                onClick={toggleTorch}
+                className="flex flex-col items-center gap-1.5 group cursor-pointer"
+              >
+                <div className={`w-12 h-12 rounded-full border flex items-center justify-center transition ${
+                  torchActive ? 'bg-amber-500 border-amber-300 text-black' : 'bg-white/10 group-hover:bg-white/20 border-white/20 text-purple-300'
+                }`}>
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <span className="text-[11px] font-bold text-slate-300">{torchActive ? 'Torch On' : 'Torch'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={switchMobileCamera}
+                className="flex flex-col items-center gap-1.5 group cursor-pointer"
+              >
+                <div className="w-12 h-12 rounded-full bg-white/10 group-hover:bg-white/20 border border-white/20 flex items-center justify-center transition">
+                  <RefreshCw className="w-5 h-5 text-purple-300" />
+                </div>
+                <span className="text-[11px] font-bold text-slate-300">Flip Cam</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Bottom Branding Footer */}
+          <div className="text-center border-t border-white/10 pt-3 text-xs text-slate-400 font-mono font-bold tracking-widest uppercase">
+            BHIM UPI &bull; MARGPATH VERIFICATION SCANNER
+          </div>
+        </div>
+      )}
 
       {/* Manual Input Search Fallback */}
       <div className="flex gap-2">
@@ -480,7 +514,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({
         <button
           onClick={() => handleScan(inputCode)}
           disabled={isScanning}
-          className="px-5 py-2.5 rounded-xl bg-[#D84E55] hover:bg-[#C33E44] text-white font-bold text-xs flex items-center gap-1.5 shadow-xs disabled:opacity-50 transition cursor-pointer"
+          className="px-5 py-2.5 rounded-xl bg-[#673ab7] hover:bg-[#5e35b1] text-white font-bold text-xs flex items-center gap-1.5 shadow-xs disabled:opacity-50 transition cursor-pointer"
         >
           {isScanning ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserCheck className="w-4 h-4" />}
           <span>Verify Ticket</span>
