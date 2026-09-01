@@ -103,6 +103,13 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [editingDeck, setEditingDeck] = useState<'LOWER' | 'UPPER'>('LOWER');
   const [seatStudioStatusMsg, setSeatStudioStatusMsg] = useState<string | null>(null);
 
+  // Add Seat Form State
+  const [newSeatNum, setNewSeatNum] = useState('L16');
+  const [newSeatDeck, setNewSeatDeck] = useState<'LOWER' | 'UPPER'>('LOWER');
+  const [newSeatPrice, setNewSeatPrice] = useState('450');
+  const [newSeatType, setNewSeatType] = useState<'SLEEPER' | 'SEATER'>('SLEEPER');
+  const [newSeatStatus, setNewSeatStatus] = useState<string>('AVAILABLE');
+
   useEffect(() => {
     if (trips && trips.length > 0 && !selectedSeatStudioTripId) {
       setSelectedSeatStudioTripId(trips[0].id);
@@ -1577,12 +1584,47 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
           }));
         };
 
+        const handleAddSingleSeat = (e: React.FormEvent) => {
+          e.preventDefault();
+          const cleanNum = newSeatNum.trim().toUpperCase();
+          if (!cleanNum) {
+            alert('Please enter a valid seat number (e.g. L16, U16, 11A).');
+            return;
+          }
+
+          const exists = currentSeats.some((s: any) => String(s.number).toUpperCase() === cleanNum);
+          if (exists) {
+            alert(`Seat ${cleanNum} already exists in this bus layout.`);
+            return;
+          }
+
+          const newSeat = {
+            id: `seat-custom-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+            number: cleanNum,
+            deck: newSeatDeck,
+            row: Math.max(...currentSeats.map((s: any) => s.row || 1), 1) + 1,
+            col: 1,
+            isSleeper: newSeatType === 'SLEEPER',
+            basePrice: Number(newSeatPrice) || 450,
+            status: newSeatStatus,
+            genderRestriction: newSeatStatus === 'FEMALE_ONLY' ? 'FEMALE_ONLY' : 'ANY'
+          };
+
+          setEditingSeats([...currentSeats, newSeat]);
+          setSeatStudioStatusMsg(`✨ Added seat ${cleanNum} (${newSeatDeck} Deck) to layout! Click "Save & Deploy" to activate live.`);
+          setNewSeatNum('');
+        };
+
+        const handleRemoveSingleSeat = (seatId: string) => {
+          setEditingSeats(prev => prev.filter((s: any) => s.id !== seatId && String(s.number).toUpperCase() !== String(seatId).toUpperCase()));
+        };
+
         const handleSaveSeats = async () => {
           setSeatStudioStatusMsg(null);
           if (!selectedSeatStudioTripId) return;
           try {
             const res = await api.updateTripSeats(selectedSeatStudioTripId, currentSeats);
-            setSeatStudioStatusMsg(`✨ Success! Seat arrangement updated and LIVE for bus ${selectedTripObj?.bus?.registrationNumber || 'vehicle'}!`);
+            setSeatStudioStatusMsg(`✨ Success! Seat arrangement updated and LIVE for bus ${selectedTripObj?.bus?.registrationNumber || 'vehicle'}! (${currentSeats.length} Total Seats)`);
             onRefreshTrips();
           } catch (err: any) {
             setSeatStudioStatusMsg(`❌ Failed to update seat layout: ${err?.message || 'Error saving seats'}`);
@@ -1692,9 +1734,79 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
               </div>
             </div>
 
+            {/* ADD NEW SEAT FORM PANEL FOR MASTER ADMIN */}
+            <form onSubmit={handleAddSingleSeat} className="bg-purple-50 border border-purple-200 p-4 rounded-2xl space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-extrabold text-purple-950 flex items-center gap-1.5">
+                  <Plus className="w-4 h-4 text-purple-700" /> ➕ Add New Seat / Berth to Layout
+                </h4>
+                <span className="text-[10px] font-bold text-purple-700 bg-purple-100 px-2 py-0.5 rounded">
+                  Current Layout Seats: {currentSeats.length}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 items-end">
+                <div>
+                  <label className="text-[10px] font-bold text-purple-900 uppercase block mb-1">Seat Number</label>
+                  <input
+                    type="text"
+                    value={newSeatNum}
+                    onChange={(e) => setNewSeatNum(e.target.value)}
+                    placeholder="e.g. L16, U16"
+                    className="w-full px-3 py-1.5 bg-white border border-purple-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-purple-600"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-purple-900 uppercase block mb-1">Deck</label>
+                  <select
+                    value={newSeatDeck}
+                    onChange={(e) => setNewSeatDeck(e.target.value as any)}
+                    className="w-full px-3 py-1.5 bg-white border border-purple-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none"
+                  >
+                    <option value="LOWER">Lower Deck</option>
+                    <option value="UPPER">Upper Deck</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-purple-900 uppercase block mb-1">Seat Type</label>
+                  <select
+                    value={newSeatType}
+                    onChange={(e) => setNewSeatType(e.target.value as any)}
+                    className="w-full px-3 py-1.5 bg-white border border-purple-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none"
+                  >
+                    <option value="SLEEPER">Sleeper Berth</option>
+                    <option value="SEATER">Recliner Seater</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-purple-900 uppercase block mb-1">Base Price (₹)</label>
+                  <input
+                    type="number"
+                    value={newSeatPrice}
+                    onChange={(e) => setNewSeatPrice(e.target.value)}
+                    placeholder="450"
+                    className="w-full px-3 py-1.5 bg-white border border-purple-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <button
+                    type="submit"
+                    className="w-full py-1.5 bg-purple-700 hover:bg-purple-800 text-white font-extrabold text-xs rounded-xl transition shadow-xs cursor-pointer flex items-center justify-center gap-1"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Add Seat
+                  </button>
+                </div>
+              </div>
+            </form>
+
             {/* Seat Legend Bar */}
             <div className="flex flex-wrap items-center gap-3 bg-gray-50 p-3 rounded-2xl text-[11px] font-semibold border border-gray-200">
-              <span className="text-gray-400 font-bold uppercase tracking-wider text-[10px]">Seat Status Legend (Click any seat to change status):</span>
+              <span className="text-gray-400 font-bold uppercase tracking-wider text-[10px]">Seat Status Legend (Click any seat to change status, or 🗑️ to delete):</span>
               <span className="flex items-center gap-1 text-slate-700 bg-white border border-slate-300 px-2 py-0.5 rounded font-bold">
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Available
               </span>
@@ -1738,23 +1850,40 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                   return (
                     <div
                       key={seat.id}
-                      onClick={() => handleSeatStatusCycle(seat.id)}
-                      className={`p-3 rounded-2xl border-2 transition cursor-pointer flex flex-col items-center justify-between text-center space-y-1 shadow-xs hover:scale-105 ${statusBg}`}
+                      className={`p-2.5 rounded-2xl border-2 transition relative flex flex-col items-center justify-between text-center space-y-1 shadow-xs hover:scale-105 ${statusBg}`}
                     >
-                      <div className="text-[10px] font-extrabold tracking-wider uppercase text-slate-400">
-                        {seat.deck === 'UPPER' ? 'Upper' : 'Lower'}
-                      </div>
+                      {/* Delete Seat Button */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRemoveSingleSeat(seat.id);
+                        }}
+                        className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-100 hover:bg-red-200 text-red-600 border border-red-300 flex items-center justify-center text-[10px] transition cursor-pointer"
+                        title="Remove Seat from Layout"
+                      >
+                        <X className="w-3 h-3 text-[#D84E55]" />
+                      </button>
 
-                      <div className="font-mono text-sm font-black tracking-tight">
-                        {seat.number}
-                      </div>
+                      <div
+                        onClick={() => handleSeatStatusCycle(seat.id)}
+                        className="w-full flex flex-col items-center justify-between cursor-pointer space-y-1 pt-1"
+                      >
+                        <div className="text-[10px] font-extrabold tracking-wider uppercase text-slate-400">
+                          {seat.deck === 'UPPER' ? 'Upper' : 'Lower'}
+                        </div>
 
-                      <div className="text-[10px] font-bold">
-                        {isConductor ? '👮 Cond' : isFemale ? '🌸 Female' : isBooked ? '🔴 Booked' : '🟢 Avail'}
-                      </div>
+                        <div className="font-mono text-sm font-black tracking-tight">
+                          {seat.number}
+                        </div>
 
-                      <div className="text-[10px] font-extrabold text-[#D84E55]">
-                        ₹{seat.basePrice || selectedTripObj?.baseFare || 450}
+                        <div className="text-[10px] font-bold">
+                          {isConductor ? '👮 Cond' : isFemale ? '🌸 Female' : isBooked ? '🔴 Booked' : '🟢 Avail'}
+                        </div>
+
+                        <div className="text-[10px] font-extrabold text-[#D84E55]">
+                          ₹{seat.basePrice || selectedTripObj?.baseFare || 450}
+                        </div>
                       </div>
                     </div>
                   );
