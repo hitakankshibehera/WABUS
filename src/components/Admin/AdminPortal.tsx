@@ -1584,7 +1584,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
           }));
         };
 
-        const handleAddSingleSeat = (e: React.FormEvent) => {
+        const handleAddSingleSeat = async (e: React.FormEvent) => {
           e.preventDefault();
           const cleanNum = newSeatNum.trim().toUpperCase();
           if (!cleanNum) {
@@ -1592,7 +1592,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
             return;
           }
 
-          const exists = currentSeats.some((s: any) => String(s.number).toUpperCase() === cleanNum);
+          const baseSeats = currentSeats;
+          const exists = baseSeats.some((s: any) => String(s.number).toUpperCase() === cleanNum);
           if (exists) {
             alert(`Seat ${cleanNum} already exists in this bus layout.`);
             return;
@@ -1602,21 +1603,34 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
             id: `seat-custom-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
             number: cleanNum,
             deck: newSeatDeck,
-            row: Math.max(...currentSeats.map((s: any) => s.row || 1), 1) + 1,
+            row: Math.max(...baseSeats.map((s: any) => s.row || 1), 1) + 1,
             col: 1,
             isSleeper: newSeatType === 'SLEEPER',
-            basePrice: Number(newSeatPrice) || 450,
+            basePrice: Number(newSeatPrice) || selectedTripObj?.baseFare || 450,
             status: newSeatStatus,
             genderRestriction: newSeatStatus === 'FEMALE_ONLY' ? 'FEMALE_ONLY' : 'ANY'
           };
 
-          setEditingSeats([...currentSeats, newSeat]);
-          setSeatStudioStatusMsg(`✨ Added seat ${cleanNum} (${newSeatDeck} Deck) to layout! Click "Save & Deploy" to activate live.`);
+          const updatedList = [...baseSeats, newSeat];
+          setEditingSeats(updatedList);
+
+          if (selectedSeatStudioTripId) {
+            await api.updateTripSeats(selectedSeatStudioTripId, updatedList);
+            onRefreshTrips();
+          }
+
+          setSeatStudioStatusMsg(`✨ Added seat ${cleanNum} (${newSeatDeck} Deck) to bus layout and deployed live!`);
           setNewSeatNum('');
         };
 
-        const handleRemoveSingleSeat = (seatId: string) => {
-          setEditingSeats(prev => prev.filter((s: any) => s.id !== seatId && String(s.number).toUpperCase() !== String(seatId).toUpperCase()));
+        const handleRemoveSingleSeat = async (seatId: string) => {
+          const updatedList = currentSeats.filter((s: any) => s.id !== seatId && String(s.number).toUpperCase() !== String(seatId).toUpperCase());
+          setEditingSeats(updatedList);
+          if (selectedSeatStudioTripId) {
+            await api.updateTripSeats(selectedSeatStudioTripId, updatedList);
+            onRefreshTrips();
+          }
+          setSeatStudioStatusMsg(`🗑️ Removed seat from bus layout and deployed live!`);
         };
 
         const handleSaveSeats = async () => {
