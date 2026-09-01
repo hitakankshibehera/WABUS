@@ -1,9 +1,12 @@
 {
   "version": 2,
   "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "/api"
-    }
+    { "source": "/api/(.*)", "destination": "/api" },
+    { "source": "/api", "destination": "/api" },
+    { "source": "/auth/(.*)", "destination": "/api" },
+    { "source": "/trips/(.*)", "destination": "/api" },
+    { "source": "/bookings/(.*)", "destination": "/api" },
+    { "source": "/admin/(.*)", "destination": "/api" },
+    { "source": "/((?!assets/|.*\\..*).*)", "destination": "/index.html" }
   ]
 }
