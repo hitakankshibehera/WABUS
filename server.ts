@@ -131,8 +131,9 @@ function generate6DigitOtp(): string {
 }
 
 /**
- * Ultra-resilient Gmail Transporter with automatic failover between
- * Port 587 (STARTTLS) and Port 465 (SSL/TLS).
+ * Ultra-resilient Gmail Transporter with dual-transporter failover:
+ * Primary: Port 465 SSL Direct (smtp.gmail.com)
+ * Fallback: Gmail Service Transporter
  */
 async function sendMailWithFallback(mailOptions: nodemailer.SendMailOptions): Promise<{ success: boolean; messageId?: string; error?: string }> {
   const rawUser = process.env.EMAIL_USER || 'wonderlightadventure@gmail.com';
@@ -140,20 +141,16 @@ async function sendMailWithFallback(mailOptions: nodemailer.SendMailOptions): Pr
   const rawPass = process.env.EMAIL_PASSWORD || 'yvlf rizi yibe ieny';
   const emailPassword = rawPass.replace(/['"\s]+/g, '').trim();
 
-  // Transporter 1: Direct Port 465 SSL (Forced IPv4 & Connection Pool for ultra-fast dispatch)
+  // Transporter 1: Direct Port 465 SSL
   try {
     const transporter465 = nodemailer.createTransport({
       host: 'smtp.gmail.com',
       port: 465,
       secure: true,
-      pool: true,
-      maxConnections: 3,
-      maxMessages: 50,
-      family: 4, // Force IPv4 to eliminate 10s IPv6 DNS timeouts on cloud hosts
       auth: { user: emailUser, pass: emailPassword },
-      connectionTimeout: 4000,
-      greetingTimeout: 3000,
-      socketTimeout: 4000,
+      connectionTimeout: 8000,
+      greetingTimeout: 4000,
+      socketTimeout: 8000,
       tls: { rejectUnauthorized: false }
     } as any);
 
@@ -164,27 +161,24 @@ async function sendMailWithFallback(mailOptions: nodemailer.SendMailOptions): Pr
     console.log(`[SMTP SUCCESS - Port 465 SSL] Email sent to ${mailOptions.to}. Message ID: ${info.messageId}`);
     return { success: true, messageId: info.messageId };
   } catch (err1: any) {
-    console.warn(`[SMTP WARN - Port 465 SSL Failed] ${err1?.message || err1}. Attempting Port 587 STARTTLS fallback...`);
+    console.warn(`[SMTP WARN - Port 465 SSL Failed] ${err1?.message || err1}. Trying Gmail service fallback...`);
 
-    // Transporter 2: Direct Port 587 STARTTLS
+    // Transporter 2: Service Gmail
     try {
-      const transporter587 = nodemailer.createTransport({
-        host: 'smtp.gmail.com',
-        port: 587,
-        secure: false,
-        family: 4,
+      const transporterService = nodemailer.createTransport({
+        service: 'gmail',
         auth: { user: emailUser, pass: emailPassword },
-        connectionTimeout: 4000,
-        greetingTimeout: 3000,
-        socketTimeout: 4000,
+        connectionTimeout: 8000,
+        greetingTimeout: 4000,
+        socketTimeout: 8000,
         tls: { rejectUnauthorized: false }
       } as any);
 
-      const info2 = await transporter587.sendMail({
+      const info2 = await transporterService.sendMail({
         from: mailOptions.from || `"MargPath Official" <${emailUser}>`,
         ...mailOptions
       });
-      console.log(`[SMTP SUCCESS - Port 587 STARTTLS] Email sent to ${mailOptions.to}. Message ID: ${info2.messageId}`);
+      console.log(`[SMTP SUCCESS - Gmail Service] Email sent to ${mailOptions.to}. Message ID: ${info2.messageId}`);
       return { success: true, messageId: info2.messageId };
     } catch (err2: any) {
       console.error(`[SMTP ERROR - Both Transporters Failed] ${err2?.message || err2}`);
