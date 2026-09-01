@@ -334,14 +334,14 @@ async function sendBookingConfirmationEmail(booking: any): Promise<{ success: bo
         </div>
 
         <div style="text-align: center; margin: 24px 0 12px 0;">
-          <a href="https://busivo.vercel.app/" target="_blank" style="display: inline-block; background-color: #D84E55; color: #ffffff; padding: 14px 28px; border-radius: 14px; font-weight: 900; font-size: 14px; text-decoration: none; box-shadow: 0 4px 14px rgba(216,78,85,0.3);">
-            🚌 View My Journey & Live GPS on busivo.vercel.app
+          <a href="https://margpath.vercel.app/" target="_blank" style="display: inline-block; background-color: #D84E55; color: #ffffff; padding: 14px 28px; border-radius: 14px; font-weight: 900; font-size: 14px; text-decoration: none; box-shadow: 0 4px 14px rgba(216,78,85,0.3);">
+            🚌 View My Journey & Live GPS on margpath.vercel.app
           </a>
         </div>
 
         <p style="font-size: 12px; color: #94a3b8; text-align: center; border-top: 1px solid #f1f5f9; padding-top: 16px; margin-top: 24px;">
           PDF E-Ticket is attached. Show QR code to bus conductor during boarding.<br/>
-          MargPath Ecosystem &bull; <a href="https://busivo.vercel.app/" target="_blank" style="color: #D84E55; font-weight: bold; text-decoration: underline;">https://busivo.vercel.app/</a>
+          MargPath Ecosystem &bull; <a href="https://margpath.vercel.app/" target="_blank" style="color: #D84E55; font-weight: bold; text-decoration: underline;">https://margpath.vercel.app/</a>
         </p>
       </div>
     `;
@@ -411,7 +411,7 @@ async function sendGiftCardEmail(recipientEmail: string, card: any): Promise<{ s
 
         <h3 style="font-size: 14px; font-weight: 800; color: #0f172a; margin-bottom: 8px;">How to Redeem:</h3>
         <ol style="font-size: 13px; color: #475569; padding-left: 20px; margin: 0 0 20px 0; line-height: 1.6;">
-          <li>Click the button below or visit <a href="https://busivo.vercel.app/" target="_blank" style="color: #D84E55; font-weight: bold; text-decoration: underline;">https://busivo.vercel.app/</a>.</li>
+          <li>Click the button below or visit <a href="https://margpath.vercel.app/" target="_blank" style="color: #D84E55; font-weight: bold; text-decoration: underline;">https://margpath.vercel.app/</a>.</li>
           <li>Click Account Profile ➔ <strong>Redeem Gift Card / Offer Code</strong>.</li>
           <li>Enter Gift Card Number <strong style="font-family: monospace;">${card.code}</strong> and PIN <strong style="font-family: monospace;">${card.pin}</strong>.</li>
           <li>₹${card.amount} will be credited instantly to your MargPath Wallet balance!</li>
@@ -419,14 +419,14 @@ async function sendGiftCardEmail(recipientEmail: string, card: any): Promise<{ s
 
         <!-- Direct Link Button -->
         <div style="text-align: center; margin: 24px 0 12px 0;">
-          <a href="https://busivo.vercel.app/" target="_blank" style="display: inline-block; background-color: #D84E55; color: #ffffff; padding: 14px 28px; border-radius: 14px; font-weight: 900; font-size: 14px; text-decoration: none; box-shadow: 0 4px 14px rgba(216,78,85,0.3);">
-            🎁 Visit Website & Redeem Gift Card (busivo.vercel.app)
+          <a href="https://margpath.vercel.app/" target="_blank" style="display: inline-block; background-color: #D84E55; color: #ffffff; padding: 14px 28px; border-radius: 14px; font-weight: 900; font-size: 14px; text-decoration: none; box-shadow: 0 4px 14px rgba(216,78,85,0.3);">
+            🎁 Visit Website & Redeem Gift Card (margpath.vercel.app)
           </a>
         </div>
 
         <p style="font-size: 12px; color: #94a3b8; border-top: 1px solid #f1f5f9; padding-top: 16px; margin-top: 20px;">
           Valid until 31-Dec-2030. Issued by MargPath (${emailUser}).<br/>
-          Official Website: <a href="https://busivo.vercel.app/" target="_blank" style="color: #D84E55; font-weight: bold; text-decoration: underline;">https://busivo.vercel.app/</a>
+          Official Website: <a href="https://margpath.vercel.app/" target="_blank" style="color: #D84E55; font-weight: bold; text-decoration: underline;">https://margpath.vercel.app/</a>
         </p>
       </div>
     </div>
