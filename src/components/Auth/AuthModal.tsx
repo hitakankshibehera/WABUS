@@ -57,6 +57,7 @@ export const AuthModal: React.FC = () => {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [displayedOtp, setDisplayedOtp] = useState<string | null>(null);
 
   useEffect(() => {
     if (isAuthModalOpen) {
@@ -123,6 +124,9 @@ export const AuthModal: React.FC = () => {
       const res = await sendEmailOtp(cleanEmail);
       setOtpStep('OTP');
       setOtp('');
+      if (res.code || res.otp) {
+        setDisplayedOtp(res.code || res.otp);
+      }
       startResendTimer(res.resendAllowedInSeconds || 45);
       setSuccessMsg(`We sent a 6-digit verification code to ${res.email || cleanEmail}. Please check your email inbox!`);
     } catch (err: any) {
@@ -172,6 +176,9 @@ export const AuthModal: React.FC = () => {
     try {
       const res = await resendEmailOtp(email.trim());
       setOtp('');
+      if (res.code || res.otp) {
+        setDisplayedOtp(res.code || res.otp);
+      }
       startResendTimer(res.resendAllowedInSeconds || 45);
       setSuccessMsg(`A new 6-digit verification code was sent to ${email.trim()}`);
     } catch (err: any) {
@@ -433,7 +440,20 @@ export const AuthModal: React.FC = () => {
                 </button>
               </div>
 
-
+              {displayedOtp && (
+                <div className="bg-amber-50 border border-amber-200 p-3 rounded-2xl text-center space-y-1 shadow-2xs">
+                  <div className="text-[10px] font-extrabold text-amber-800 uppercase tracking-wider flex items-center justify-center gap-1">
+                    <ShieldCheck className="w-3.5 h-3.5 text-amber-600" />
+                    <span>Your 6-Digit Verification Code</span>
+                  </div>
+                  <div className="font-mono text-2xl font-black text-[#D84E55] tracking-widest my-0.5">
+                    {displayedOtp}
+                  </div>
+                  <div className="text-[10px] text-amber-700 font-medium">
+                    Code sent to {email}. You can also enter this code directly!
+                  </div>
+                </div>
+              )}
 
               <div>
                 <label className="block text-center text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
