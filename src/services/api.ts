@@ -1,4 +1,4 @@
-import { Trip, Booking, FeatureFlags, PayoutRecord, Route, ConductorProfile, OfferCoupon, UserAccount, OtpSessionResponse, VerifyOtpResponse, GiftCard, Bus } from '../types';
+import { Trip, Booking, FeatureFlags, PayoutRecord, Route, ConductorProfile, OfferCoupon, UserAccount, OtpSessionResponse, VerifyOtpResponse, GiftCard, Bus, Seat } from '../types';
 import { INITIAL_TRIPS, MOCK_BUSES, MOCK_ROUTES, INITIAL_CONDUCTORS, INITIAL_BOOKINGS, MOCK_PAYOUTS, DEFAULT_FEATURE_FLAGS, generateSleeperSeats, generateSeaterSeats } from '../data/mockDatabase';
 
 async function safeParseJson(res: Response, defaultError: string): Promise<any> {
@@ -886,6 +886,36 @@ export const api = {
       },
       message: `🎉 Gift card ${cleanCode} redeemed! ₹${amt} added to your wABus Wallet.`
     };
+  },
+
+  async updateTripSeats(tripId: string, seats: Seat[]): Promise<{ success: boolean; trip: Trip }> {
+    try {
+      const res = await fetch('/api/admin/trips/update-seats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tripId, seats })
+      });
+      const data = await safeParseJson(res, 'Failed to update trip seats on server');
+      if (data && data.success) {
+        const target = INITIAL_TRIPS.find(t => t.id === tripId);
+        if (target) {
+          target.seats = seats;
+          target.availableSeatsCount = seats.filter(s => s.status === 'AVAILABLE').length;
+        }
+        window.dispatchEvent(new Event('wabus_booking_updated'));
+        return data;
+      }
+    } catch (err) {
+      console.warn('[UPDATE SEATS NOTICE]', err);
+    }
+
+    const target = INITIAL_TRIPS.find(t => t.id === tripId);
+    if (target) {
+      target.seats = seats;
+      target.availableSeatsCount = seats.filter(s => s.status === 'AVAILABLE').length;
+    }
+    window.dispatchEvent(new Event('wabus_booking_updated'));
+    return { success: true, trip: target || INITIAL_TRIPS[0] };
   },
 
   async getAdminGiftCards(): Promise<GiftCard[]> {

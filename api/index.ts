@@ -867,6 +867,31 @@ app.post(['/api/admin/bookings/retry-email', '/admin/bookings/retry-email'], asy
   }
 });
 
+// 6c. Admin Seat Layout Update Endpoint for Vercel
+app.post(['/api/admin/trips/update-seats', '/admin/trips/update-seats'], (req, res) => {
+  try {
+    const { tripId, seats } = req.body || {};
+    if (!tripId || !Array.isArray(seats)) {
+      return res.status(400).json({ error: 'tripId and seats array are required.' });
+    }
+
+    const trip = serverTrips.find((t: any) => t.id === tripId);
+    if (trip) {
+      trip.seats = seats;
+      trip.availableSeatsCount = seats.filter((s: any) => s.status === 'AVAILABLE').length;
+    }
+
+    return res.json({
+      success: true,
+      message: `Bus seat arrangement updated live for trip ${tripId}!`,
+      trip
+    });
+  } catch (err: any) {
+    console.error('[Vercel Admin Update Seats Error]', err);
+    return res.status(500).json({ error: err?.message || 'Failed to update seat arrangement' });
+  }
+});
+
 // 7. Dynamic Trips Search & Details Endpoint for Vercel
 app.get(['/api/trips', '/trips'], (req, res) => {
   const { origin, destination, category, busType } = req.query || {};

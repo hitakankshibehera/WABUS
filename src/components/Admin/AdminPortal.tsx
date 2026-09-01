@@ -49,7 +49,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   onRefreshTrips,
 }) => {
   const { currentUser, loginAdmin, signupAdmin, switchDemoRole, logout } = useAuth();
-  const [activeAdminTab, setActiveAdminTab] = useState<'FEATURE_FLAGS' | 'BOOKINGS' | 'SCHEDULES' | 'OFFERS' | 'PAYOUTS' | 'ANALYTICS' | 'CUSTOMERS'>('FEATURE_FLAGS');
+  const [activeAdminTab, setActiveAdminTab] = useState<'FEATURE_FLAGS' | 'BOOKINGS' | 'SCHEDULES' | 'OFFERS' | 'PAYOUTS' | 'ANALYTICS' | 'CUSTOMERS' | 'SEAT_LAYOUT'>('FEATURE_FLAGS');
   const [payouts, setPayouts] = useState<PayoutRecord[]>([]);
   const [isCronRunning, setIsCronRunning] = useState(false);
   const [cronMessage, setCronMessage] = useState<string | null>(null);
@@ -96,6 +96,28 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       setRetryingPnr(null);
     }
   };
+
+  // Interactive Seat Layout Studio State
+  const [selectedSeatStudioTripId, setSelectedSeatStudioTripId] = useState<string>('');
+  const [editingSeats, setEditingSeats] = useState<any[]>([]);
+  const [editingDeck, setEditingDeck] = useState<'LOWER' | 'UPPER'>('LOWER');
+  const [seatStudioStatusMsg, setSeatStudioStatusMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (trips && trips.length > 0 && !selectedSeatStudioTripId) {
+      setSelectedSeatStudioTripId(trips[0].id);
+      setEditingSeats(JSON.parse(JSON.stringify(trips[0].seats)));
+    }
+  }, [trips]);
+
+  useEffect(() => {
+    if (selectedSeatStudioTripId) {
+      const match = trips.find(t => t.id === selectedSeatStudioTripId);
+      if (match) {
+        setEditingSeats(JSON.parse(JSON.stringify(match.seats)));
+      }
+    }
+  }, [selectedSeatStudioTripId, trips]);
 
   // Offers State
   const [offers, setOffers] = useState<OfferCoupon[]>([]);
@@ -715,6 +737,15 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
               }`}
             >
               Fleet & Schedules
+            </button>
+            <button
+              onClick={() => setActiveAdminTab('SEAT_LAYOUT')}
+              className={`px-3.5 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1.5 ${
+                activeAdminTab === 'SEAT_LAYOUT' ? 'bg-[#D84E55] text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <BusIcon className="w-3.5 h-3.5" />
+              <span>Seat Layout Studio</span>
             </button>
             <button
               onClick={() => setActiveAdminTab('OFFERS')}
@@ -1504,6 +1535,254 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
           </div>
         </div>
       )}
+
+      {/* TAB: INTERACTIVE BUS SEAT LAYOUT & ARRANGEMENT STUDIO */}
+      {activeAdminTab === 'SEAT_LAYOUT' && (() => {
+        const selectedTripObj = trips.find(t => t.id === selectedSeatStudioTripId) || trips[0];
+        const currentSeats = editingSeats.length > 0 ? editingSeats : (selectedTripObj?.seats || []);
+        const lowerSeats = currentSeats.filter((s: any) => s.deck === 'LOWER');
+        const upperSeats = currentSeats.filter((s: any) => s.deck === 'UPPER');
+        const activeSeats = editingDeck === 'LOWER' ? lowerSeats : upperSeats;
+
+        const handleSeatStatusCycle = (seatId: string) => {
+          setEditingSeats(prev => prev.map((s: any) => {
+            if (s.id === seatId || String(s.number).toUpperCase() === String(seatId).toUpperCase()) {
+              let nextStatus = 'AVAILABLE';
+              let nextGender = s.bookedGender;
+              let nextRestriction = s.genderRestriction;
+
+              if (s.status === 'AVAILABLE') {
+                nextStatus = 'CONDUCTOR_RESERVED';
+              } else if (s.status === 'CONDUCTOR_RESERVED') {
+                nextStatus = 'AVAILABLE';
+                nextRestriction = 'FEMALE_ONLY';
+              } else if (s.status === 'AVAILABLE' && nextRestriction === 'FEMALE_ONLY') {
+                nextStatus = 'BOOKED';
+                nextGender = 'MALE';
+                nextRestriction = 'ANY';
+              } else if (s.status === 'BOOKED') {
+                nextStatus = 'AVAILABLE';
+                nextGender = undefined;
+                nextRestriction = 'ANY';
+              }
+
+              return {
+                ...s,
+                status: nextStatus,
+                bookedGender: nextGender,
+                genderRestriction: nextRestriction
+              };
+            }
+            return s;
+          }));
+        };
+
+        const handleSaveSeats = async () => {
+          setSeatStudioStatusMsg(null);
+          if (!selectedSeatStudioTripId) return;
+          try {
+            const res = await api.updateTripSeats(selectedSeatStudioTripId, currentSeats);
+            setSeatStudioStatusMsg(`✨ Success! Seat arrangement updated and LIVE for bus ${selectedTripObj?.bus?.registrationNumber || 'vehicle'}!`);
+            onRefreshTrips();
+          } catch (err: any) {
+            setSeatStudioStatusMsg(`❌ Failed to update seat layout: ${err?.message || 'Error saving seats'}`);
+          }
+        };
+
+        return (
+          <div className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-7 shadow-xs space-y-6">
+            {/* Studio Header */}
+            <div className="border-b border-gray-100 pb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h3 className="text-base font-extrabold text-gray-900 flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#D84E55] to-[#b83238] flex items-center justify-center shadow-sm text-white">
+                    <BusIcon className="w-4.5 h-4.5" />
+                  </div>
+                  <span>Master Bus Seat Layout &amp; Arrangement Studio</span>
+                </h3>
+                <p className="text-xs text-gray-500 mt-1 ml-10">
+                  Arrange Upper &amp; Lower deck berths, conductor seat, driver cabin, and custom seat prices.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleSaveSeats}
+                className="px-5 py-2.5 rounded-xl bg-[#D84E55] hover:bg-[#c44349] text-white font-extrabold text-xs transition shadow-md cursor-pointer flex items-center gap-2 shrink-0 self-start sm:self-auto"
+              >
+                <Sparkles className="w-4 h-4" />
+                <span>Save &amp; Deploy Seat Arrangement Live</span>
+              </button>
+            </div>
+
+            {seatStudioStatusMsg && (
+              <div className={`p-3 rounded-2xl text-xs font-bold text-center ${
+                seatStudioStatusMsg.includes('✨') ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-red-800 border border-red-200'
+              }`}>
+                {seatStudioStatusMsg}
+              </div>
+            )}
+
+            {/* Trip Selector Bar */}
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center bg-gray-50 p-4 rounded-2xl border border-gray-200">
+              <div className="md:col-span-6 space-y-1">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500 block">
+                  Select Bus Schedule to Customize Layout
+                </label>
+                <select
+                  value={selectedSeatStudioTripId}
+                  onChange={(e) => setSelectedSeatStudioTripId(e.target.value)}
+                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl text-xs font-bold text-gray-900 focus:outline-none focus:border-[#D84E55] cursor-pointer"
+                >
+                  {trips.map(t => (
+                    <option key={t.id} value={t.id}>
+                      {t.originCity} ➔ {t.destinationCity} | Bus: {t.bus?.registrationNumber || 'Vehicle'} ({t.departureTime})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="md:col-span-6 flex flex-wrap items-center gap-3 text-xs text-gray-600 font-semibold border-t md:border-t-0 md:border-l border-gray-200 pt-3 md:pt-0 md:pl-4">
+                <div>
+                  <span className="text-gray-400 text-[10px] uppercase block">Assigned Conductor</span>
+                  <span className="font-bold text-purple-700">👮 {selectedTripObj?.bus?.conductorName || 'Bijay Nayak'}</span>
+                </div>
+                <div>
+                  <span className="text-gray-400 text-[10px] uppercase block">Bus Model &amp; Type</span>
+                  <span className="font-bold text-gray-900">{selectedTripObj?.bus?.model || 'Executive Sleeper'}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Deck & Cabin Controls Header */}
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-4">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Deck View:</span>
+                <div className="flex bg-gray-100 p-1 rounded-xl border border-gray-200 text-xs font-bold">
+                  <button
+                    type="button"
+                    onClick={() => setEditingDeck('LOWER')}
+                    className={`px-3 py-1 rounded-lg transition cursor-pointer ${
+                      editingDeck === 'LOWER' ? 'bg-[#D84E55] text-white shadow-xs' : 'text-gray-600'
+                    }`}
+                  >
+                    Lower Deck ({lowerSeats.length} Seats)
+                  </button>
+                  {upperSeats.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setEditingDeck('UPPER')}
+                      className={`px-3 py-1 rounded-lg transition cursor-pointer ${
+                        editingDeck === 'UPPER' ? 'bg-[#D84E55] text-white shadow-xs' : 'text-gray-600'
+                      }`}
+                    >
+                      Upper Deck ({upperSeats.length} Berths)
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-4 text-xs">
+                <span className="flex items-center gap-1 font-bold text-slate-800 bg-slate-100 px-2.5 py-1 rounded-lg">
+                  🛞 Driver Cabin: Front Right
+                </span>
+                <span className="flex items-center gap-1 font-bold text-purple-900 bg-purple-50 border border-purple-200 px-2.5 py-1 rounded-lg">
+                  👮 Conductor Reserved Seat
+                </span>
+              </div>
+            </div>
+
+            {/* Seat Legend Bar */}
+            <div className="flex flex-wrap items-center gap-3 bg-gray-50 p-3 rounded-2xl text-[11px] font-semibold border border-gray-200">
+              <span className="text-gray-400 font-bold uppercase tracking-wider text-[10px]">Seat Status Legend (Click any seat to change status):</span>
+              <span className="flex items-center gap-1 text-slate-700 bg-white border border-slate-300 px-2 py-0.5 rounded font-bold">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Available
+              </span>
+              <span className="flex items-center gap-1 text-purple-800 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded font-bold">
+                <span className="w-2.5 h-2.5 rounded-full bg-purple-600"></span> Conductor Reserved
+              </span>
+              <span className="flex items-center gap-1 text-pink-700 bg-pink-50 border border-pink-200 px-2 py-0.5 rounded font-bold">
+                <span className="w-2.5 h-2.5 rounded-full bg-pink-500"></span> Female Only
+              </span>
+              <span className="flex items-center gap-1 text-slate-500 bg-slate-200 border border-slate-300 px-2 py-0.5 rounded font-bold">
+                <span className="w-2.5 h-2.5 rounded-full bg-slate-400"></span> Booked / Unavailable
+              </span>
+            </div>
+
+            {/* Visual Bus Interior Canvas */}
+            <div className="border-2 border-dashed border-gray-300 rounded-3xl p-6 bg-slate-50 relative space-y-6">
+              
+              {/* Front Bus Cabin Header */}
+              <div className="flex items-center justify-between border-b-2 border-slate-200 pb-4">
+                <div className="flex items-center gap-2 bg-slate-900 text-white px-3 py-1.5 rounded-xl font-mono text-xs font-bold">
+                  <span>FRONT OF BUS</span>
+                </div>
+                {/* Steering Wheel Badge */}
+                <div className="flex items-center gap-2 bg-amber-100 text-amber-900 border border-amber-300 px-3 py-1.5 rounded-xl text-xs font-black shadow-xs">
+                  <span className="text-base">🛞</span> Driver Steering Wheel &amp; Dashboard
+                </div>
+              </div>
+
+              {/* Seats Grid Canvas */}
+              <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-3">
+                {activeSeats.map((seat: any) => {
+                  const isConductor = seat.status === 'CONDUCTOR_RESERVED';
+                  const isFemale = seat.genderRestriction === 'FEMALE_ONLY';
+                  const isBooked = seat.status === 'BOOKED';
+
+                  let statusBg = 'bg-white border-slate-300 text-slate-900 hover:border-[#D84E55]';
+                  if (isConductor) statusBg = 'bg-purple-100 border-purple-300 text-purple-900 font-black ring-2 ring-purple-400';
+                  else if (isFemale) statusBg = 'bg-pink-100 border-pink-300 text-pink-900 font-bold';
+                  else if (isBooked) statusBg = 'bg-slate-200 border-slate-400 text-slate-500 font-bold opacity-75';
+
+                  return (
+                    <div
+                      key={seat.id}
+                      onClick={() => handleSeatStatusCycle(seat.id)}
+                      className={`p-3 rounded-2xl border-2 transition cursor-pointer flex flex-col items-center justify-between text-center space-y-1 shadow-xs hover:scale-105 ${statusBg}`}
+                    >
+                      <div className="text-[10px] font-extrabold tracking-wider uppercase text-slate-400">
+                        {seat.deck === 'UPPER' ? 'Upper' : 'Lower'}
+                      </div>
+
+                      <div className="font-mono text-sm font-black tracking-tight">
+                        {seat.number}
+                      </div>
+
+                      <div className="text-[10px] font-bold">
+                        {isConductor ? '👮 Cond' : isFemale ? '🌸 Female' : isBooked ? '🔴 Booked' : '🟢 Avail'}
+                      </div>
+
+                      <div className="text-[10px] font-extrabold text-[#D84E55]">
+                        ₹{seat.basePrice || selectedTripObj?.baseFare || 450}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Rear Bus Footer */}
+              <div className="text-center border-t-2 border-slate-200 pt-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                REAR ENGINE &amp; EMERGENCY EXIT DOOR
+              </div>
+
+            </div>
+
+            {/* Deploy Action Bar */}
+            <div className="flex justify-end pt-3">
+              <button
+                type="button"
+                onClick={handleSaveSeats}
+                className="px-6 py-3 bg-[#D84E55] hover:bg-[#c44349] text-white font-black text-xs rounded-2xl transition shadow-lg shadow-red-500/20 cursor-pointer flex items-center gap-2"
+              >
+                <Sparkles className="w-4 h-4 text-amber-300" />
+                <span>Save &amp; Deploy Seat Arrangement Live</span>
+              </button>
+            </div>
+
+          </div>
+        );
+      })()}
 
       {/* TAB: OFFERS & COUPONS MANAGER */}
       {activeAdminTab === 'OFFERS' && (
