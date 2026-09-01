@@ -421,6 +421,7 @@ export const api = {
           });
           matchTrip.availableSeatsCount = matchTrip.seats.filter(s => s.status === 'AVAILABLE').length;
         }
+        window.dispatchEvent(new Event('wabus_booking_updated'));
       }
     } catch (e) {
       console.warn('[STORAGE SEAT UPDATE WARN]', e);

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Seat, Trip, FeatureFlags } from '../../types';
+import { api } from '../../services/api';
 import { soundEngine } from '../../utils/audio';
 import { Layers, Clock, Shield, User, AlertCircle, Info, Lock, ChevronRight } from 'lucide-react';
 
@@ -23,6 +24,30 @@ export const SeatMatrix: React.FC<SeatMatrixProps> = ({
 }) => {
   const [activeDeck, setActiveDeck] = useState<'LOWER' | 'UPPER'>('LOWER');
   const [timeRemainingSeconds, setTimeRemainingSeconds] = useState<number | null>(null);
+  const [liveSeats, setLiveSeats] = useState<Seat[]>(trip.seats);
+
+  useEffect(() => {
+    setLiveSeats(trip.seats);
+  }, [trip]);
+
+  // Real-time seat updates polling & cross-tab event listener
+  useEffect(() => {
+    const fetchLatestSeats = async () => {
+      try {
+        const updatedTrip = await api.getTripById(trip.id);
+        if (updatedTrip && updatedTrip.seats) {
+          setLiveSeats(updatedTrip.seats);
+        }
+      } catch {}
+    };
+
+    const interval = setInterval(fetchLatestSeats, 3000);
+    window.addEventListener('wabus_booking_updated', fetchLatestSeats);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('wabus_booking_updated', fetchLatestSeats);
+    };
+  }, [trip.id]);
 
   // Active Countdown Timer for Redis TTL Lock
   useEffect(() => {
@@ -41,8 +66,8 @@ export const SeatMatrix: React.FC<SeatMatrixProps> = ({
     return () => clearInterval(interval);
   }, [lockExpiresAt, selectedSeats]);
 
-  const lowerDeckSeats = trip.seats.filter(s => s.deck === 'LOWER');
-  const upperDeckSeats = trip.seats.filter(s => s.deck === 'UPPER');
+  const lowerDeckSeats = liveSeats.filter(s => s.deck === 'LOWER');
+  const upperDeckSeats = liveSeats.filter(s => s.deck === 'UPPER');
   const hasUpperDeck = upperDeckSeats.length > 0;
 
   const currentDeckSeats = activeDeck === 'LOWER' ? lowerDeckSeats : upperDeckSeats;
