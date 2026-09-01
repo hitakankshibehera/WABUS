@@ -610,9 +610,7 @@ app.post(['/api/auth/send-otp', '/auth/send-otp'], async (req, res) => {
     expiresInSeconds: 300,
     resendAllowedInSeconds: 45,
     email: cleanEmail,
-    sentViaSmtp: mailResult.sentViaSmtp,
-    code: otp,
-    otp
+    sentViaSmtp: mailResult.sentViaSmtp
   });
 });
 

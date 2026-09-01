@@ -440,20 +440,15 @@ export const AuthModal: React.FC = () => {
                 </button>
               </div>
 
-              {displayedOtp && (
-                <div className="bg-amber-50 border border-amber-200 p-3 rounded-2xl text-center space-y-1 shadow-2xs">
-                  <div className="text-[10px] font-extrabold text-amber-800 uppercase tracking-wider flex items-center justify-center gap-1">
-                    <ShieldCheck className="w-3.5 h-3.5 text-amber-600" />
-                    <span>Your 6-Digit Verification Code</span>
-                  </div>
-                  <div className="font-mono text-2xl font-black text-[#D84E55] tracking-widest my-0.5">
-                    {displayedOtp}
-                  </div>
-                  <div className="text-[10px] text-amber-700 font-medium">
-                    Code sent to {email}. You can also enter this code directly!
-                  </div>
+              <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-2xl text-center space-y-1 shadow-2xs">
+                <div className="text-[11px] font-extrabold text-emerald-800 flex items-center justify-center gap-1">
+                  <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                  <span>Verification Code Dispatched!</span>
                 </div>
-              )}
+                <div className="text-[11px] text-emerald-700 font-medium">
+                  We sent a 6-digit verification code to <strong className="text-slate-900 font-bold">{email}</strong>. Check your email inbox!
+                </div>
+              </div>
 
               <div>
                 <label className="block text-center text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
