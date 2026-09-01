@@ -500,11 +500,14 @@ export const QRScanner: React.FC<QRScannerProps> = ({
                 type="button"
                 onClick={switchMobileCamera}
                 className="flex flex-col items-center gap-1.5 group cursor-pointer"
+                title="Switch between Rear (Back) and Front (Selfie) Camera"
               >
                 <div className="w-12 h-12 rounded-full bg-white/10 group-hover:bg-white/20 border border-white/20 flex items-center justify-center transition">
                   <RefreshCw className="w-5 h-5 text-purple-300" />
                 </div>
-                <span className="text-[11px] font-bold text-slate-300">Flip Cam</span>
+                <span className="text-[11px] font-bold text-slate-300">
+                  {facingMode === 'environment' ? 'Rear Cam' : 'Front Cam'}
+                </span>
               </button>
             </div>
           </div>
