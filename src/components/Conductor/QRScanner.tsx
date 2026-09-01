@@ -305,6 +305,9 @@ export const QRScanner: React.FC<QRScannerProps> = ({
         autoCollectCash
       });
 
+      // Suddenly OFF/Close the QR code scanner modal to reveal the customer status to conductor
+      setIsPhonePeModalOpen(false);
+
       if (res.valid && res.passengerAllowed) {
         soundEngine.playSuccess();
         if (typeof navigator !== 'undefined' && navigator.vibrate) {
@@ -342,15 +345,8 @@ export const QRScanner: React.FC<QRScannerProps> = ({
         announcePhonePeVoice('Invalid Ticket. Verification Failed.');
         setScanResult(res);
       }
-
-      // Auto-reset after 2.5 seconds to proceed straight to next scan
-      if (autoResetTimerRef.current) clearTimeout(autoResetTimerRef.current);
-      autoResetTimerRef.current = setTimeout(() => {
-        setScanResult(null);
-        setInputCode('');
-        setIsScanning(false);
-      }, 2500);
     } catch (err: any) {
+      setIsPhonePeModalOpen(false);
       soundEngine.playError();
       announcePhonePeVoice('Verification error. Ticket not found.');
       setScanResult({
