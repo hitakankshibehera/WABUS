@@ -4,6 +4,26 @@
     {
       "source": "/api/(.*)",
       "destination": "/api"
+    },
+    {
+      "source": "/auth/(.*)",
+      "destination": "/api"
+    },
+    {
+      "source": "/bookings/(.*)",
+      "destination": "/api"
+    },
+    {
+      "source": "/admin/(.*)",
+      "destination": "/api"
+    },
+    {
+      "source": "/trips/(.*)",
+      "destination": "/api"
+    },
+    {
+      "source": "/((?!api|auth|bookings|admin|trips|assets|.*\\..*).*)",
+      "destination": "/index.html"
     }
   ]
 }
