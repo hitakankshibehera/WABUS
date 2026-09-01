@@ -977,35 +977,31 @@ app.post(['/api/admin/trips/update-seats', '/admin/trips/update-seats'], (req, r
       return res.status(400).json({ error: 'tripId and seats array are required.' });
     }
 
-    const targetTrip = serverTrips.find((t: any) => t.id === tripId) || serverTrips[0];
-    const targetReg = targetTrip?.bus?.registrationNumber || targetTrip?.busRegistrationNumber;
+    const trip = serverTrips.find((t: any) => t.id === tripId);
+    if (trip) {
+      trip.seats = seats;
+      trip.availableSeatsCount = seats.filter((s: any) => s.status === 'AVAILABLE').length;
 
-    // Update ALL trips sharing this tripId or bus registration
-    for (const t of serverTrips) {
-      if (t.id === tripId || (targetReg && (t.bus?.registrationNumber === targetReg || t.busRegistrationNumber === targetReg))) {
-        t.seats = seats;
-        t.availableSeatsCount = seats.filter((s: any) => s.status === 'AVAILABLE').length;
-
-        // Sync every seat into serverTripInventory map
-        for (const s of seats) {
-          const invKey = `${t.id}:${s.id}`;
-          const existing = serverTripInventory.get(invKey);
-          serverTripInventory.set(invKey, {
-            ...existing,
-            seatId: s.id,
-            seatNumber: s.number,
-            deck: s.deck,
-            status: s.status || 'AVAILABLE',
-            updatedAt: new Date().toISOString()
-          });
-        }
+      // Sync into serverTripInventory map
+      for (const seat of seats) {
+        const invKey = `${trip.id}:${seat.id}`;
+        const existing = serverTripInventory.get(invKey) || {};
+        serverTripInventory.set(invKey, {
+          ...existing,
+          tripId: trip.id,
+          seatId: seat.id,
+          seatNumber: seat.number,
+          deck: seat.deck,
+          status: seat.status || 'AVAILABLE',
+          updatedAt: new Date().toISOString()
+        });
       }
     }
 
     return res.json({
       success: true,
-      message: `Bus seat layout updated live and connected to Live Inventory & Customer Search for trip ${tripId}!`,
-      trip: targetTrip
+      message: `Bus seat arrangement updated live for trip ${tripId}!`,
+      trip
     });
   } catch (err: any) {
     console.error('[Vercel Admin Update Seats Error]', err);
