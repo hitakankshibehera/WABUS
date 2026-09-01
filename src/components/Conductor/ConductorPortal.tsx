@@ -67,8 +67,8 @@ export const ConductorPortal: React.FC<ConductorPortalProps> = ({
 
   // Find trip belonging to this conductor's assigned bus
   const matchingTrip = trips.find(t => 
-    t.bus.registrationNumber.toUpperCase() === assignedBusNumber.toUpperCase() ||
-    t.bus.conductorId === currentUser?.employeeId
+    (t.bus?.registrationNumber || '').toUpperCase() === assignedBusNumber.toUpperCase() ||
+    (t.bus?.conductorId === currentUser?.employeeId)
   ) || trips[0];
 
   const [selectedTripId, setSelectedTripId] = useState<string>(matchingTrip?.id || trips[0]?.id || '');

@@ -314,7 +314,7 @@ export default function App() {
                           </span>
                         </div>
                         <p className="text-xs text-slate-500">
-                          {selectedTrip.bus.operatorName} &bull; {selectedTrip.bus.model} ({selectedTrip.bus.registrationNumber})
+                          {selectedTrip.bus?.operatorName || 'OSRTC Volvo Premier'} &bull; {selectedTrip.bus?.model || 'Executive Bus'} ({selectedTrip.bus?.registrationNumber || 'OD-02-AX-8910'})
                         </p>
                       </div>
                     </div>

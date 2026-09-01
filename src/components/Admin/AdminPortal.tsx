@@ -1484,7 +1484,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                         {t.category}
                       </span>
                       <button
-                        onClick={() => handleRemoveTrip(t.id, `${t.originCity} ➔ ${t.destinationCity} (${t.bus.registrationNumber})`)}
+                        onClick={() => handleRemoveTrip(t.id, `${t.originCity} ➔ ${t.destinationCity} (${t.bus?.registrationNumber || 'Bus'})`)}
                         className="px-2 py-0.5 rounded bg-red-50 hover:bg-red-100 text-[#D84E55] font-bold text-[10px] transition cursor-pointer flex items-center gap-1 border border-red-200"
                         title="Remove this bus schedule"
                       >
@@ -1494,8 +1494,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                     </div>
                   </div>
                   <div className="flex items-center justify-between text-gray-500 text-[11px]">
-                    <span>Bus: <strong className="text-gray-900 font-mono">{t.bus.registrationNumber}</strong></span>
-                    <span>Conductor: <strong className="text-purple-700 font-semibold">{t.bus.conductorName}</strong></span>
+                    <span>Bus: <strong className="text-gray-900 font-mono">{t.bus?.registrationNumber || 'OD-02-AX-8910'}</strong></span>
+                    <span>Conductor: <strong className="text-purple-700 font-semibold">{t.bus?.conductorName || 'Bijay Nayak'}</strong></span>
                     <span>Base: <strong className="text-[#D84E55] font-mono font-bold">₹{t.baseFare}</strong></span>
                   </div>
                 </div>

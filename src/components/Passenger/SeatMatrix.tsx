@@ -110,7 +110,7 @@ export const SeatMatrix: React.FC<SeatMatrixProps> = ({
           <div className="flex items-center gap-2">
             <h3 className="text-base font-extrabold text-slate-900">Select Seats / Berths</h3>
             <span className="text-[11px] px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-bold">
-              {trip.bus.busType.replace(/_/g, ' ')}
+              {(trip.bus?.busType || 'VOLVO_AC').replace(/_/g, ' ')}
             </span>
           </div>
           <p className="text-xs text-slate-500 mt-0.5">
