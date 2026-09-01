@@ -130,99 +130,93 @@ function generate6DigitOtp(): string {
   return crypto.randomInt(100000, 1000000).toString();
 }
 
-async function sendOtpEmail(email: string, otp: string): Promise<{ success: boolean; sentViaSmtp: boolean }> {
-  const emailHost = process.env.EMAIL_HOST || 'smtp.gmail.com';
-  const emailUser = process.env.EMAIL_USER || 'wonderlightadventure@gmail.com';
-  const rawPassword = process.env.EMAIL_PASSWORD || 'yvlf rizi yibe ieny';
-  const emailPassword = rawPassword.replace(/\s+/g, '');
-  const emailFrom = process.env.EMAIL_FROM || `"wABus Verification" <${emailUser}>`;
+/**
+ * Ultra-resilient Gmail Transporter with automatic failover between
+ * Port 587 (STARTTLS) and Port 465 (SSL/TLS).
+ */
+async function sendMailWithFallback(mailOptions: nodemailer.SendMailOptions): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  const rawUser = process.env.EMAIL_USER || 'wonderlightadventure@gmail.com';
+  const emailUser = rawUser.replace(/['"\s]+/g, '').trim();
+  const rawPass = process.env.EMAIL_PASSWORD || 'yvlf rizi yibe ieny';
+  const emailPassword = rawPass.replace(/['"\s]+/g, '').trim();
 
-  if (emailUser && emailPassword && emailPassword.trim() !== '') {
-    const logoPath = path.join(process.cwd(), 'public', 'logo.png');
-    const hasLogo = fs.existsSync(logoPath);
+  // Transporter 1: Direct Port 587 STARTTLS (Explicit host)
+  try {
+    const transporter587 = nodemailer.createTransport({
+      host: 'smtp.gmail.com',
+      port: 587,
+      secure: false, // STARTTLS
+      auth: { user: emailUser, pass: emailPassword },
+      connectionTimeout: 6000,
+      greetingTimeout: 4000,
+      socketTimeout: 6000,
+      tls: { rejectUnauthorized: false }
+    });
 
-    const htmlBody = `
-      <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 28px; border: 1px solid #e2e8f0; border-radius: 20px; background-color: #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
-        <div style="text-align: center; margin-bottom: 24px;">
-          ${hasLogo ? '<img src="cid:wonderlight_logo" alt="wABus Logo" style="width: 90px; height: 90px; border-radius: 50%; object-fit: cover; margin: 0 auto 12px auto; display: block; border: 3px solid #f1f5f9; box-shadow: 0 4px 10px rgba(0,0,0,0.15);" />' : ''}
-          <h2 style="color: #D84E55; margin: 0; font-size: 22px; font-weight: 800;">wABus Verification Code</h2>
-          <p style="color: #64748b; font-size: 13px; margin: 4px 0 0 0; font-weight: 600;">Wonderlight Adventure Company</p>
-        </div>
-        <div style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); padding: 24px; border-radius: 16px; text-align: center; margin-bottom: 24px; border: 1px solid #e2e8f0;">
-          <p style="margin: 0 0 12px 0; font-size: 14px; color: #475569; font-weight: 600;">Your 6-digit verification code is:</p>
-          <div style="font-size: 38px; font-weight: 900; letter-spacing: 8px; color: #D84E55; margin: 12px 0; font-family: monospace;">${otp}</div>
-          <p style="margin: 12px 0 0 0; font-size: 12px; color: #ef4444; font-weight: 700;">⏰ Code expires in 5 minutes</p>
-        </div>
-        <p style="font-size: 12px; color: #94a3b8; text-align: center; margin: 0; line-height: 1.5;">Sent securely via wABus Identity Transporter (<strong style="color: #475569;">${emailUser}</strong>). Never share this code with anyone.</p>
-      </div>
-    `;
+    const info = await transporter587.sendMail({
+      from: mailOptions.from || `"MargPath Official" <${emailUser}>`,
+      ...mailOptions
+    });
+    console.log(`[SMTP SUCCESS - Port 587] Email sent to ${mailOptions.to}. Message ID: ${info.messageId}`);
+    return { success: true, messageId: info.messageId };
+  } catch (err1: any) {
+    console.warn(`[SMTP WARN - Port 587 Failed] ${err1?.message || err1}. Attempting Port 465 SSL fallback...`);
 
-    const attachments = hasLogo ? [{
-      filename: 'logo.png',
-      path: logoPath,
-      cid: 'wonderlight_logo'
-    }] : [];
-
-    // Attempt 1: Gmail service / Port 587 STARTTLS
+    // Transporter 2: Direct Port 465 SSL/TLS
     try {
-      const transporter = nodemailer.createTransport({
-        service: 'gmail',
+      const transporter465 = nodemailer.createTransport({
+        host: 'smtp.gmail.com',
+        port: 465,
+        secure: true, // SSL
         auth: { user: emailUser, pass: emailPassword },
-        connectionTimeout: 8000,
+        connectionTimeout: 6000,
         greetingTimeout: 4000,
-        socketTimeout: 8000,
+        socketTimeout: 6000,
         tls: { rejectUnauthorized: false }
       });
 
-      await transporter.sendMail({
-        from: emailFrom,
-        to: email,
-        subject: `${otp} is your 6-digit wABus Verification Code`,
-        text: `Your 6-digit wABus verification code is: ${otp}\n\nThis code will expire in 5 minutes. Never share this code with anyone.`,
-        html: htmlBody,
-        attachments
+      const info2 = await transporter465.sendMail({
+        from: mailOptions.from || `"MargPath Official" <${emailUser}>`,
+        ...mailOptions
       });
-      console.log(`[EMAIL SERVICE] ✉️ Real OTP email sent via Gmail service to recipient ${email}`);
-      return { success: true, sentViaSmtp: true };
-    } catch (err: any) {
-      console.warn(`[EMAIL SERVICE] ⚠️ Primary Gmail service failed for ${emailUser}, trying direct SMTP fallback:`, err?.message || err);
-      // Attempt 2: Direct Port 465 SSL
-      try {
-        const fallbackTransporter = nodemailer.createTransport({
-          host: emailHost,
-          port: 465,
-          secure: true,
-          auth: { user: emailUser, pass: emailPassword },
-          connectionTimeout: 8000,
-          greetingTimeout: 4000,
-          socketTimeout: 8000,
-          tls: { rejectUnauthorized: false }
-        });
-        await fallbackTransporter.sendMail({
-          from: emailFrom,
-          to: email,
-          subject: `${otp} is your 6-digit wABus Verification Code`,
-          text: `Your 6-digit wABus verification code is: ${otp}\n\nThis code will expire in 5 minutes. Never share this code with anyone.`,
-          html: htmlBody,
-          attachments
-        });
-        console.log(`[EMAIL SERVICE] ✉️ Real OTP email sent via fallback SMTP (port 465) to recipient ${email}`);
-        return { success: true, sentViaSmtp: true };
-      } catch (fallbackErr: any) {
-        console.error(`[EMAIL SERVICE] ⚠️ Direct SMTP Port 465 also failed:`, fallbackErr?.message || fallbackErr);
-      }
+      console.log(`[SMTP SUCCESS - Port 465 SSL] Email sent to ${mailOptions.to}. Message ID: ${info2.messageId}`);
+      return { success: true, messageId: info2.messageId };
+    } catch (err2: any) {
+      console.error(`[SMTP ERROR - Both Transporters Failed] ${err2?.message || err2}`);
+      return { success: false, error: err2?.message || String(err2) };
     }
-  } else {
-    console.log(`[EMAIL SERVICE] ℹ️ To send real emails to inbox: Add 16-character Gmail App Password to EMAIL_PASSWORD in .env file!`);
   }
+}
 
-  // Local log fallback
-  console.log(`\n==================================================`);
-  console.log(`[AUTH OTP LOCAL LOG] 🔑 Sent OTP code to ${email}: [ ${otp} ]`);
-  console.log(`[AUTH OTP LOCAL LOG] ✉️ Sender Email: ${emailUser}`);
-  console.log(`[AUTH OTP LOCAL LOG] ⏰ Valid for 5 minutes (Expires: ${new Date(Date.now() + 5 * 60 * 1000).toLocaleTimeString()})`);
-  console.log(`==================================================\n`);
-  return { success: true, sentViaSmtp: false };
+async function sendOtpEmail(email: string, otp: string): Promise<{ success: boolean; sentViaSmtp: boolean }> {
+  const rawUser = process.env.EMAIL_USER || 'wonderlightadventure@gmail.com';
+  const emailUser = rawUser.replace(/['"\s]+/g, '').trim();
+  const emailFrom = process.env.EMAIL_FROM || `"MargPath Verification" <${emailUser}>`;
+
+  const htmlBody = `
+    <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 28px; border: 1px solid #e2e8f0; border-radius: 20px; background-color: #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+      <div style="text-align: center; margin-bottom: 24px;">
+        <h2 style="color: #D84E55; margin: 0; font-size: 22px; font-weight: 800;">MargPath Verification Code</h2>
+        <p style="color: #64748b; font-size: 13px; margin: 4px 0 0 0; font-weight: 600;">Explore. Connect. Experience.</p>
+      </div>
+      <div style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); padding: 24px; border-radius: 16px; text-align: center; margin-bottom: 24px; border: 1px solid #e2e8f0;">
+        <p style="margin: 0 0 12px 0; font-size: 14px; color: #475569; font-weight: 600;">Your 6-digit verification code is:</p>
+        <div style="font-size: 38px; font-weight: 900; letter-spacing: 8px; color: #D84E55; margin: 12px 0; font-family: monospace;">${otp}</div>
+        <p style="margin: 12px 0 0 0; font-size: 12px; color: #ef4444; font-weight: 700;">⏰ Code expires in 5 minutes</p>
+      </div>
+      <p style="font-size: 12px; color: #94a3b8; text-align: center; margin: 0; line-height: 1.5;">Sent securely via MargPath Identity Transporter (<strong style="color: #475569;">${emailUser}</strong>). Never share this code with anyone.</p>
+    </div>
+  `;
+
+  const result = await sendMailWithFallback({
+    from: emailFrom,
+    to: email,
+    subject: `${otp} is your 6-digit MargPath Verification Code`,
+    text: `Your 6-digit MargPath verification code is: ${otp}\n\nThis code will expire in 5 minutes.`,
+    html: htmlBody
+  });
+
+  return { success: result.success, sentViaSmtp: result.success };
 }
 
 // Idempotency tracking sets to prevent duplicate email dispatches
@@ -468,82 +462,29 @@ async function sendBookingConfirmationEmail(booking: Booking): Promise<{ success
       });
     }
 
-    if (emailUser && emailPassword && emailPassword.trim() !== '') {
-      // Attempt 1: Gmail Service / Port 587
-      try {
-        const transporter = nodemailer.createTransport({
-          service: 'gmail',
-          auth: {
-            user: emailUser,
-            pass: emailPassword.trim()
-          },
-          tls: {
-            rejectUnauthorized: false
-          }
-        });
+    const result = await sendMailWithFallback({
+      from: process.env.EMAIL_FROM || `"MargPath E-Ticket Confirmation" <wonderlightadventure@gmail.com>`,
+      to: targetEmail,
+      subject: `🎫 Confirmed E-Ticket PNR: ${booking.pnr} (${origin} ➔ ${dest}) - MargPath`,
+      text: `Your E-Ticket for PNR ${booking.pnr} is confirmed! Route: ${origin} to ${dest}, Date: ${depDate} ${depTime}, Seats: ${seatsText}. Total Paid: ₹${booking.totalAmount}. Show the attached QR code to the bus conductor.`,
+      html: htmlContent,
+      attachments
+    });
 
-        await transporter.sendMail({
-          from: emailFrom,
-          to: targetEmail,
-          subject: `🎫 Confirmed E-Ticket PNR: ${booking.pnr} (${origin} ➔ ${dest}) - wABus`,
-          text: `Your E-Ticket for PNR ${booking.pnr} is confirmed! Route: ${origin} to ${dest}, Date: ${depDate} ${depTime}, Seats: ${seatsText}. Total Paid: ₹${booking.totalAmount}. Show the attached QR code to the bus conductor.`,
-          html: htmlContent,
-          attachments
-        });
-
-        sentBookingConfirmationPnrs.add(booking.pnr);
-        console.log(`[E-TICKET EMAIL DISPATCH] ✉️ Transmitted confirmed E-Ticket PNR: ${booking.pnr} (with PDF attachment) via Gmail service to ${targetEmail}`);
-        return { success: true, sentViaSmtp: true };
-      } catch (serviceErr: any) {
-        console.warn(`[E-TICKET EMAIL DISPATCH] ⚠️ Gmail service attempt failed: ${serviceErr.message}. Trying direct SMTP port 465 fallback...`);
-        // Attempt 2: Direct Port 465 SSL
-        try {
-          const fallbackTransporter = nodemailer.createTransport({
-            host: emailHost,
-            port: 465,
-            secure: true,
-            auth: {
-              user: emailUser,
-              pass: emailPassword.trim()
-            },
-            connectionTimeout: 8000,
-            greetingTimeout: 4000,
-            socketTimeout: 8000,
-            tls: {
-              rejectUnauthorized: false
-            }
-          });
-
-          await fallbackTransporter.sendMail({
-            from: emailFrom,
-            to: targetEmail,
-            subject: `🎫 Confirmed E-Ticket PNR: ${booking.pnr} (${origin} ➔ ${dest}) - wABus`,
-            text: `Your E-Ticket for PNR ${booking.pnr} is confirmed! Route: ${origin} to ${dest}, Date: ${depDate} ${depTime}, Seats: ${seatsText}. Total Paid: ₹${booking.totalAmount}. Show the attached QR code to the bus conductor.`,
-            html: htmlContent,
-            attachments
-          });
-
-          sentBookingConfirmationPnrs.add(booking.pnr);
-          console.log(`[E-TICKET EMAIL DISPATCH] ✉️ Transmitted confirmed E-Ticket PNR: ${booking.pnr} (with PDF attachment) via Port 465 to ${targetEmail}`);
-          return { success: true, sentViaSmtp: true };
-        } catch (smtpErr: any) {
-          console.error(`[E-TICKET EMAIL DISPATCH ERROR] ⚠️ Direct SMTP Port 465 failed: ${smtpErr.message}`);
-        }
-      }
+    if (result.success) {
+      sentBookingConfirmationPnrs.add(booking.pnr);
     }
+    return { success: result.success, sentViaSmtp: result.success };
   } catch (err: any) {
-    console.error(`[E-TICKET EMAIL DISPATCH ERROR] ⚠️ Failed to transmit E-Ticket for PNR ${booking.pnr}:`, err?.message || err);
+    console.error('[E-Ticket Email Delivery Exception]', err?.message || err);
+    return { success: false, sentViaSmtp: false };
   }
-
-  return { success: false, sentViaSmtp: false };
 }
 
 async function sendGiftCardEmail(recipientEmail: string, card: GiftCard): Promise<{ success: boolean; sentViaSmtp: boolean; previewUrl?: string; smtpMessageId?: string; smtpResponse?: string; duplicateSkipped?: boolean }> {
-  const emailHost = process.env.EMAIL_HOST || 'smtp.gmail.com';
-  const emailUser = process.env.EMAIL_USER || 'wonderlightadventure@gmail.com';
-  const rawPassword = process.env.EMAIL_PASSWORD || 'yvlf rizi yibe ieny';
-  const emailPassword = rawPassword.replace(/\s+/g, '');
-  const emailFrom = process.env.EMAIL_FROM || `"wABus Gift Cards" <${emailUser}>`;
+  const rawUser = process.env.EMAIL_USER || 'wonderlightadventure@gmail.com';
+  const emailUser = rawUser.replace(/['"\s]+/g, '').trim();
+  const emailFrom = process.env.EMAIL_FROM || `"MargPath Gift Cards" <${emailUser}>`;
 
   const cleanEmail = (recipientEmail || '').trim().toLowerCase();
   if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('.')) {
@@ -565,12 +506,12 @@ async function sendGiftCardEmail(recipientEmail: string, card: GiftCard): Promis
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 20px; overflow: hidden; background: #ffffff; box-shadow: 0 4px 14px rgba(0,0,0,0.06);">
       <div style="background: linear-gradient(135deg, #D84E55, #B83238); padding: 24px; text-align: center; color: #ffffff;">
         <h1 style="margin: 0; font-size: 24px; font-weight: 900;">🎁 ${card.title || 'Special Gift Card for You!'}</h1>
-        <p style="margin: 4px 0 0 0; font-size: 14px; opacity: 0.9;">From wABus (Wonderlight Adventure Company)</p>
+        <p style="margin: 4px 0 0 0; font-size: 14px; opacity: 0.9;">From MargPath (Explore. Connect. Experience.)</p>
       </div>
 
       <div style="padding: 24px; color: #1e293b; line-height: 1.6;">
         <p style="font-size: 15px;">Hello!</p>
-        <p style="font-size: 14px;">Master Admin (<strong style="color: #D84E55;">wonderlightadventure@gmail.com</strong>) has issued a <strong>₹${card.amount}</strong> wABus Gift Card for you!</p>
+        <p style="font-size: 14px;">Master Admin (<strong style="color: #D84E55;">wonderlightadventure@gmail.com</strong>) has issued a <strong>₹${card.amount}</strong> MargPath Gift Card for you!</p>
 
         ${cardImageHtml}
 
@@ -586,7 +527,7 @@ async function sendGiftCardEmail(recipientEmail: string, card: GiftCard): Promis
           <li>Click the button below or visit <a href="https://busivo.vercel.app/" target="_blank" style="color: #D84E55; font-weight: bold; text-decoration: underline;">https://busivo.vercel.app/</a>.</li>
           <li>Click Account Profile ➔ <strong>Redeem Gift Card / Offer Code</strong>.</li>
           <li>Enter Gift Card Number <strong style="font-family: monospace;">${card.code}</strong> and PIN <strong style="font-family: monospace;">${card.pin}</strong>.</li>
-          <li>₹${card.amount} will be credited instantly to your wABus Wallet balance!</li>
+          <li>₹${card.amount} will be credited instantly to your MargPath Wallet balance!</li>
         </ol>
 
         <!-- Direct Website Link Button -->
@@ -597,86 +538,25 @@ async function sendGiftCardEmail(recipientEmail: string, card: GiftCard): Promis
         </div>
 
         <p style="font-size: 12px; color: #94a3b8; border-top: 1px solid #f1f5f9; padding-top: 16px; margin-top: 20px;">
-          Valid until 31-Dec-2030. Issued by Wonderlight Adventure Co. (${emailUser}).<br/>
+          Valid until 31-Dec-2030. Issued by MargPath (${emailUser}).<br/>
           Official Website: <a href="https://busivo.vercel.app/" target="_blank" style="color: #D84E55; font-weight: bold; text-decoration: underline;">https://busivo.vercel.app/</a>
         </p>
       </div>
     </div>
   `;
 
-  if (emailUser && emailPassword && emailPassword.trim() !== '') {
-    // Attempt 1: Gmail Service (Port 587)
-    try {
-      const transporter = nodemailer.createTransport({
-        service: 'gmail',
-        auth: {
-          user: emailUser,
-          pass: emailPassword.trim()
-        },
-        tls: {
-          rejectUnauthorized: false
-        }
-      });
+  const result = await sendMailWithFallback({
+    from: emailFrom,
+    to: cleanEmail,
+    cc: emailUser,
+    subject: `🎁 You received a ₹${card.amount} MargPath Gift Card! (Code: ${card.code})`,
+    html: htmlContent
+  });
 
-      const info = await transporter.sendMail({
-        from: emailFrom,
-        to: cleanEmail,
-        cc: emailUser,
-        subject: `🎁 You received a ₹${card.amount} wABus Gift Card! (Code: ${card.code})`,
-        html: htmlContent
-      });
-
-      sentAdminGiftCardCodes.add(card.code.trim().toUpperCase());
-      console.log(`[REAL GMAIL SMTP GIFT CARD SUCCESS] Sent from ${emailUser} to ${cleanEmail} & CC ${emailUser} (MsgId: ${info.messageId})`);
-      return { 
-        success: true, 
-        sentViaSmtp: true,
-        smtpMessageId: info.messageId,
-        smtpResponse: info.response
-      };
-    } catch (serviceErr: any) {
-      console.warn(`[GIFT CARD EMAIL DISPATCH] ⚠️ Gmail service attempt failed: ${serviceErr.message}. Trying direct SMTP port 465 SSL fallback...`);
-      // Attempt 2: Direct Port 465 SSL
-      try {
-        const fallbackTransporter = nodemailer.createTransport({
-          host: emailHost,
-          port: 465,
-          secure: true,
-          auth: {
-            user: emailUser,
-            pass: emailPassword.trim()
-          },
-          connectionTimeout: 8000,
-          greetingTimeout: 4000,
-          socketTimeout: 8000,
-          tls: {
-            rejectUnauthorized: false
-          }
-        });
-
-        const info2 = await fallbackTransporter.sendMail({
-          from: emailFrom,
-          to: cleanEmail,
-          cc: emailUser,
-          subject: `🎁 You received a ₹${card.amount} wABus Gift Card! (Code: ${card.code})`,
-          html: htmlContent
-        });
-
-        sentAdminGiftCardCodes.add(card.code.trim().toUpperCase());
-        console.log(`[REAL GMAIL SMTP GIFT CARD SUCCESS PORT 465] Sent from ${emailUser} to ${cleanEmail} (MsgId: ${info2.messageId})`);
-        return { 
-          success: true, 
-          sentViaSmtp: true,
-          smtpMessageId: info2.messageId,
-          smtpResponse: info2.response
-        };
-      } catch (smtpErr: any) {
-        console.error(`[REAL GMAIL SMTP GIFT CARD ERROR] Direct SMTP Port 465 failed: ${smtpErr.message}`);
-      }
-    }
+  if (result.success) {
+    sentAdminGiftCardCodes.add(card.code.trim().toUpperCase());
   }
-
-  return { success: false, sentViaSmtp: false };
+  return { success: result.success, sentViaSmtp: result.success, smtpMessageId: result.messageId };
 }
 
 /**

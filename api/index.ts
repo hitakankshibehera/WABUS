@@ -102,79 +102,99 @@ function generateTicketPdfBuffer(booking: any, qrBuffer: Buffer): Promise<Buffer
       reject(err);
     }
   });
+}/**
+ * Ultra-resilient Gmail Transporter with automatic failover between
+ * Port 587 (STARTTLS) and Port 465 (SSL/TLS).
+ */
+async function sendMailWithFallback(mailOptions: nodemailer.SendMailOptions): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  const rawUser = process.env.EMAIL_USER || 'wonderlightadventure@gmail.com';
+  const emailUser = rawUser.replace(/['"\s]+/g, '').trim();
+  const rawPass = process.env.EMAIL_PASSWORD || 'yvlf rizi yibe ieny';
+  const emailPassword = rawPass.replace(/['"\s]+/g, '').trim();
+
+  // Transporter 1: Direct Port 587 STARTTLS (Explicit host)
+  try {
+    const transporter587 = nodemailer.createTransport({
+      host: 'smtp.gmail.com',
+      port: 587,
+      secure: false, // STARTTLS
+      auth: { user: emailUser, pass: emailPassword },
+      connectionTimeout: 6000,
+      greetingTimeout: 4000,
+      socketTimeout: 6000,
+      tls: { rejectUnauthorized: false }
+    });
+
+    const info = await transporter587.sendMail({
+      from: mailOptions.from || `"MargPath Official" <${emailUser}>`,
+      ...mailOptions
+    });
+    console.log(`[SMTP SUCCESS - Port 587] Email sent to ${mailOptions.to}. Message ID: ${info.messageId}`);
+    return { success: true, messageId: info.messageId };
+  } catch (err1: any) {
+    console.warn(`[SMTP WARN - Port 587 Failed] ${err1?.message || err1}. Attempting Port 465 SSL fallback...`);
+
+    // Transporter 2: Direct Port 465 SSL/TLS (Best for Vercel/AWS Lambda)
+    try {
+      const transporter465 = nodemailer.createTransport({
+        host: 'smtp.gmail.com',
+        port: 465,
+        secure: true, // SSL
+        auth: { user: emailUser, pass: emailPassword },
+        connectionTimeout: 6000,
+        greetingTimeout: 4000,
+        socketTimeout: 6000,
+        tls: { rejectUnauthorized: false }
+      });
+
+      const info2 = await transporter465.sendMail({
+        from: mailOptions.from || `"MargPath Official" <${emailUser}>`,
+        ...mailOptions
+      });
+      console.log(`[SMTP SUCCESS - Port 465 SSL] Email sent to ${mailOptions.to}. Message ID: ${info2.messageId}`);
+      return { success: true, messageId: info2.messageId };
+    } catch (err2: any) {
+      console.error(`[SMTP ERROR - Both Transporters Failed] ${err2?.message || err2}`);
+      return { success: false, error: err2?.message || String(err2) };
+    }
+  }
 }
 
 async function sendOtpEmail(email: string, otp: string): Promise<{ success: boolean; sentViaSmtp: boolean }> {
-  const emailUser = process.env.EMAIL_USER || 'wonderlightadventure@gmail.com';
-  const rawPassword = process.env.EMAIL_PASSWORD || 'yvlf rizi yibe ieny';
-  const emailPassword = rawPassword.replace(/\s+/g, '');
-  const emailFrom = process.env.EMAIL_FROM || `"wABus Verification" <${emailUser}>`;
+  const rawUser = process.env.EMAIL_USER || 'wonderlightadventure@gmail.com';
+  const emailUser = rawUser.replace(/['"\s]+/g, '').trim();
+  const emailFrom = process.env.EMAIL_FROM || `"MargPath Verification" <${emailUser}>`;
 
   const htmlBody = `
     <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 28px; border: 1px solid #e2e8f0; border-radius: 20px; background-color: #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
       <div style="text-align: center; margin-bottom: 24px;">
-        <h2 style="color: #D84E55; margin: 0; font-size: 22px; font-weight: 800;">wABus Verification Code</h2>
-        <p style="color: #64748b; font-size: 13px; margin: 4px 0 0 0; font-weight: 600;">Wonderlight Adventure Company</p>
+        <h2 style="color: #D84E55; margin: 0; font-size: 22px; font-weight: 800;">MargPath Verification Code</h2>
+        <p style="color: #64748b; font-size: 13px; margin: 4px 0 0 0; font-weight: 600;">Explore. Connect. Experience.</p>
       </div>
       <div style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); padding: 24px; border-radius: 16px; text-align: center; margin-bottom: 24px; border: 1px solid #e2e8f0;">
         <p style="margin: 0 0 12px 0; font-size: 14px; color: #475569; font-weight: 600;">Your 6-digit verification code is:</p>
         <div style="font-size: 38px; font-weight: 900; letter-spacing: 8px; color: #D84E55; margin: 12px 0; font-family: monospace;">${otp}</div>
         <p style="margin: 12px 0 0 0; font-size: 12px; color: #ef4444; font-weight: 700;">⏰ Code expires in 5 minutes</p>
       </div>
-      <p style="font-size: 12px; color: #94a3b8; text-align: center; margin: 0; line-height: 1.5;">Sent securely via wABus Identity Transporter (<strong style="color: #475569;">${emailUser}</strong>). Never share this code with anyone.</p>
+      <p style="font-size: 12px; color: #94a3b8; text-align: center; margin: 0; line-height: 1.5;">Sent securely via MargPath Identity Transporter (<strong style="color: #475569;">${emailUser}</strong>). Never share this code with anyone.</p>
     </div>
   `;
 
-  try {
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: { user: emailUser, pass: emailPassword },
-      connectionTimeout: 5000,
-      greetingTimeout: 3000,
-      socketTimeout: 5000,
-      tls: { rejectUnauthorized: false }
-    });
+  const result = await sendMailWithFallback({
+    from: emailFrom,
+    to: email,
+    subject: `${otp} is your 6-digit MargPath Verification Code`,
+    text: `Your 6-digit MargPath verification code is: ${otp}\n\nThis code will expire in 5 minutes.`,
+    html: htmlBody
+  });
 
-    await transporter.sendMail({
-      from: emailFrom,
-      to: email,
-      subject: `${otp} is your 6-digit wABus Verification Code`,
-      text: `Your 6-digit wABus verification code is: ${otp}\n\nThis code will expire in 5 minutes.`,
-      html: htmlBody
-    });
-    return { success: true, sentViaSmtp: true };
-  } catch {
-    try {
-      const fallbackTransporter = nodemailer.createTransport({
-        host: 'smtp.gmail.com',
-        port: 465,
-        secure: true,
-        auth: { user: emailUser, pass: emailPassword },
-        connectionTimeout: 5000,
-        greetingTimeout: 3000,
-        socketTimeout: 5000,
-        tls: { rejectUnauthorized: false }
-      });
-      await fallbackTransporter.sendMail({
-        from: emailFrom,
-        to: email,
-        subject: `${otp} is your 6-digit wABus Verification Code`,
-        text: `Your 6-digit wABus verification code is: ${otp}`,
-        html: htmlBody
-      });
-      return { success: true, sentViaSmtp: true };
-    } catch {
-      return { success: true, sentViaSmtp: false };
-    }
-  }
+  return { success: result.success, sentViaSmtp: result.success };
 }
 
 async function sendBookingConfirmationEmail(booking: any): Promise<{ success: boolean; sentViaSmtp: boolean; duplicateSkipped?: boolean }> {
-  const emailHost = process.env.EMAIL_HOST || 'smtp.gmail.com';
-  const emailUser = process.env.EMAIL_USER || 'wonderlightadventure@gmail.com';
-  const rawBookingPass = process.env.EMAIL_PASSWORD || 'yvlf rizi yibe ieny';
-  const emailPassword = rawBookingPass.replace(/\s+/g, '');
-  const emailFrom = process.env.EMAIL_FROM || `"wABus E-Ticket Confirmation" <${emailUser}>`;
+  const rawUser = process.env.EMAIL_USER || 'wonderlightadventure@gmail.com';
+  const emailUser = rawUser.replace(/['"\s]+/g, '').trim();
+  const emailFrom = process.env.EMAIL_FROM || `"MargPath E-Ticket Confirmation" <${emailUser}>`;
 
   let targetEmail = (booking.contactEmail || '').trim().toLowerCase();
   if (!targetEmail || !targetEmail.includes('@')) {
@@ -209,7 +229,7 @@ async function sendBookingConfirmationEmail(booking: any): Promise<{ success: bo
     const passengerNames = booking.passengers ? booking.passengers.map((p: any) => `${p.name} (${p.gender ? p.gender[0] : ''}${p.age ? ', ' + p.age + 'y' : ''})`).join(', ') : 'Passenger';
     const origin = booking.trip?.originCity || 'Boarding Point';
     const dest = booking.trip?.destinationCity || 'Destination';
-    const depDate = booking.trip?.departureDate || 'Travel Date';
+    const depDate = booking.trip?.departureDate || booking.trip?.travelDate || 'Travel Date';
     const depTime = booking.trip?.departureTime || '';
     const operator = booking.trip?.operatorName || 'OSRTC Volvo Premier';
     const busReg = booking.trip?.busRegistrationNumber || 'OD-02-AX-8910';
@@ -218,7 +238,7 @@ async function sendBookingConfirmationEmail(booking: any): Promise<{ success: bo
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 28px; border: 1px solid #e2e8f0; border-radius: 20px; background-color: #ffffff; box-shadow: 0 4px 14px rgba(0,0,0,0.06);">
         <div style="text-align: center; margin-bottom: 24px; border-bottom: 2px solid #f1f5f9; padding-bottom: 20px;">
           <h2 style="color: #D84E55; margin: 0; font-size: 24px; font-weight: 900;">CONFIRMED E-TICKET</h2>
-          <p style="color: #64748b; font-size: 13px; margin: 4px 0 0 0; font-weight: 700;">Wonderlight Adventure Company &bull; Official Boarding Pass</p>
+          <p style="color: #64748b; font-size: 13px; margin: 4px 0 0 0; font-weight: 700;">MargPath Official Boarding Pass &bull; India in Every Journey</p>
         </div>
 
         <div style="background-color: #D84E55; color: #ffffff; padding: 16px 20px; border-radius: 14px; text-align: center; margin-bottom: 24px;">
@@ -250,42 +270,30 @@ async function sendBookingConfirmationEmail(booking: any): Promise<{ success: bo
             </tr>
             <tr>
               <td style="padding: 6px 0; color: #64748b; font-size: 12px; text-transform: uppercase; font-weight: 700;">Passenger(s)</td>
-              <td style="padding: 6px 0; font-weight: 600; color: #0f172a; text-align: right;">${passengerNames}</td>
+              <td style="padding: 6px 0; font-weight: 700; color: #0f172a; text-align: right;">${passengerNames}</td>
             </tr>
             <tr>
-              <td style="padding: 6px 0; color: #64748b; font-size: 12px; text-transform: uppercase; font-weight: 700;">Boarding Point</td>
-              <td style="padding: 6px 0; font-weight: 700; color: #0f172a; text-align: right;">${booking.boardingPoint?.name || origin} (${booking.boardingPoint?.time || depTime})</td>
-            </tr>
-            <tr>
-              <td style="padding: 6px 0; color: #64748b; font-size: 12px; text-transform: uppercase; font-weight: 700;">Dropping Point</td>
-              <td style="padding: 6px 0; font-weight: 700; color: #0f172a; text-align: right;">${booking.droppingPoint?.name || dest} (${booking.droppingPoint?.time || ''})</td>
-            </tr>
-            <tr style="border-top: 1px border-slate-200;">
-              <td style="padding: 10px 0 0 0; color: #64748b; font-size: 13px; font-weight: 700;">Total Amount Paid</td>
-              <td style="padding: 10px 0 0 0; font-size: 18px; font-weight: 900; color: #16a34a; text-align: right;">₹${(booking.totalAmount || 0).toLocaleString()} (${booking.paymentMethod || 'ONLINE'})</td>
+              <td style="padding: 6px 0; color: #64748b; font-size: 12px; text-transform: uppercase; font-weight: 700;">Total Paid</td>
+              <td style="padding: 6px 0; font-weight: 900; color: #16a34a; text-align: right; font-size: 18px;">₹${booking.totalAmount}</td>
             </tr>
           </table>
         </div>
 
-        <div style="text-align: center; padding: 20px; border: 2px dashed #cbd5e1; border-radius: 16px; margin-bottom: 24px; background-color: #fafafa;">
-          <p style="margin: 0 0 10px 0; font-size: 13px; font-weight: 800; color: #1e293b; text-transform: uppercase;">Conductor Verification QR Code</p>
-          <img src="cid:ticket_qrcode" alt="Boarding Pass QR Code" style="width: 180px; height: 180px; margin: 0 auto; display: block; border-radius: 8px; border: 1px solid #e2e8f0;" />
-          <p style="margin: 10px 0 0 0; font-size: 11px; color: #64748b;">Show this digital QR code to the conductor upon boarding for instant ticket scanning.</p>
+        <div style="text-align: center; margin: 24px 0;">
+          <p style="font-size: 13px; font-weight: 700; color: #475569; margin-bottom: 12px;">Present QR Code to Conductor on Boarding:</p>
+          <img src="cid:ticket_qrcode" alt="Boarding QR Code" style="width: 180px; height: 180px; border-radius: 12px; border: 2px solid #e2e8f0; padding: 6px; background-color: #ffffff;" />
         </div>
 
-        <!-- Footer Action Button -->
         <div style="text-align: center; margin: 24px 0 12px 0;">
           <a href="https://busivo.vercel.app/" target="_blank" style="display: inline-block; background-color: #D84E55; color: #ffffff; padding: 14px 28px; border-radius: 14px; font-weight: 900; font-size: 14px; text-decoration: none; box-shadow: 0 4px 14px rgba(216,78,85,0.3);">
             🚌 View My Journey & Live GPS on busivo.vercel.app
           </a>
         </div>
 
-        <div style="text-align: center; border-top: 1px solid #f1f5f9; padding-top: 16px;">
-          <p style="margin: 0; font-size: 12px; color: #94a3b8;">
-            Dispatched from <strong>Wonderlight Adventure Official API</strong> (${emailUser}).<br/>
-            Official Website: <a href="https://busivo.vercel.app/" target="_blank" style="color: #D84E55; font-weight: bold; text-decoration: underline;">https://busivo.vercel.app/</a> &bull; Support: <strong>+91 94383 18821</strong>
-          </p>
-        </div>
+        <p style="font-size: 12px; color: #94a3b8; text-align: center; border-top: 1px solid #f1f5f9; padding-top: 16px; margin-top: 24px;">
+          PDF E-Ticket is attached. Show QR code to bus conductor during boarding.<br/>
+          MargPath Ecosystem &bull; <a href="https://busivo.vercel.app/" target="_blank" style="color: #D84E55; font-weight: bold; text-decoration: underline;">https://busivo.vercel.app/</a>
+        </p>
       </div>
     `;
 
@@ -301,47 +309,19 @@ async function sendBookingConfirmationEmail(booking: any): Promise<{ success: bo
       });
     }
 
-    try {
-      const transporter = nodemailer.createTransport({
-        service: 'gmail',
-        auth: { user: emailUser, pass: emailPassword },
-        connectionTimeout: 5000,
-        greetingTimeout: 3000,
-        socketTimeout: 5000,
-        tls: { rejectUnauthorized: false }
-      });
-      await transporter.sendMail({
-        from: emailFrom,
-        to: targetEmail,
-        subject: `🎫 Confirmed E-Ticket PNR: ${booking.pnr} (${origin} ➔ ${dest}) - wABus`,
-        text: `Your E-Ticket for PNR ${booking.pnr} is confirmed! Route: ${origin} to ${dest}, Date: ${depDate} ${depTime}, Seats: ${seatsText}. Total Paid: ₹${booking.totalAmount}. Show the attached QR code to the bus conductor.`,
-        html: htmlContent,
-        attachments
-      });
+    const result = await sendMailWithFallback({
+      from: emailFrom,
+      to: targetEmail,
+      subject: `🎫 Confirmed E-Ticket PNR: ${booking.pnr} (${origin} ➔ ${dest}) - MargPath`,
+      text: `Your E-Ticket for PNR ${booking.pnr} is confirmed! Route: ${origin} to ${dest}, Date: ${depDate} ${depTime}, Seats: ${seatsText}. Total Paid: ₹${booking.totalAmount}. Show the attached QR code to the bus conductor.`,
+      html: htmlContent,
+      attachments
+    });
+
+    if (result.success) {
       sentBookingConfirmationPnrs.add(booking.pnr);
-      return { success: true, sentViaSmtp: true };
-    } catch {
-      const fallbackTransporter = nodemailer.createTransport({
-        host: emailHost,
-        port: 465,
-        secure: true,
-        auth: { user: emailUser, pass: emailPassword },
-        connectionTimeout: 5000,
-        greetingTimeout: 3000,
-        socketTimeout: 5000,
-        tls: { rejectUnauthorized: false }
-      });
-      await fallbackTransporter.sendMail({
-        from: emailFrom,
-        to: targetEmail,
-        subject: `🎫 Confirmed E-Ticket PNR: ${booking.pnr} (${origin} ➔ ${dest}) - wABus`,
-        text: `Your E-Ticket for PNR ${booking.pnr} is confirmed! Route: ${origin} to ${dest}, Date: ${depDate} ${depTime}, Seats: ${seatsText}. Total Paid: ₹${booking.totalAmount}.`,
-        html: htmlContent,
-        attachments
-      });
-      sentBookingConfirmationPnrs.add(booking.pnr);
-      return { success: true, sentViaSmtp: true };
     }
+    return { success: result.success, sentViaSmtp: result.success };
   } catch (err: any) {
     console.error('[Vercel E-Ticket Email Delivery Exception]', err?.message || err);
     return { success: false, sentViaSmtp: false };
@@ -349,11 +329,9 @@ async function sendBookingConfirmationEmail(booking: any): Promise<{ success: bo
 }
 
 async function sendGiftCardEmail(recipientEmail: string, card: any): Promise<{ success: boolean; sentViaSmtp: boolean; smtpMessageId?: string; duplicateSkipped?: boolean }> {
-  const emailHost = process.env.EMAIL_HOST || 'smtp.gmail.com';
-  const emailUser = process.env.EMAIL_USER || 'wonderlightadventure@gmail.com';
-  const rawPassword = process.env.EMAIL_PASSWORD || 'yvlf rizi yibe ieny';
-  const emailPassword = rawPassword.replace(/\s+/g, '');
-  const emailFrom = process.env.EMAIL_FROM || `"wABus Gift Cards" <${emailUser}>`;
+  const rawUser = process.env.EMAIL_USER || 'wonderlightadventure@gmail.com';
+  const emailUser = rawUser.replace(/['"\s]+/g, '').trim();
+  const emailFrom = process.env.EMAIL_FROM || `"MargPath Gift Cards" <${emailUser}>`;
 
   const cleanEmail = (recipientEmail || '').trim().toLowerCase();
   if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('.')) {
@@ -368,12 +346,12 @@ async function sendGiftCardEmail(recipientEmail: string, card: any): Promise<{ s
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 20px; overflow: hidden; background: #ffffff; box-shadow: 0 4px 14px rgba(0,0,0,0.06);">
       <div style="background: linear-gradient(135deg, #D84E55, #B83238); padding: 24px; text-align: center; color: #ffffff;">
         <h1 style="margin: 0; font-size: 24px; font-weight: 900;">🎁 ${card.title || 'Special Gift Card for You!'}</h1>
-        <p style="margin: 4px 0 0 0; font-size: 14px; opacity: 0.9;">From wABus (Wonderlight Adventure Company)</p>
+        <p style="margin: 4px 0 0 0; font-size: 14px; opacity: 0.9;">From MargPath (Explore. Connect. Experience.)</p>
       </div>
 
       <div style="padding: 24px; color: #1e293b; line-height: 1.6;">
         <p style="font-size: 15px;">Hello!</p>
-        <p style="font-size: 14px;">Master Admin (<strong style="color: #D84E55;">wonderlightadventure@gmail.com</strong>) has issued a <strong>₹${card.amount}</strong> wABus Gift Card for you!</p>
+        <p style="font-size: 14px;">Master Admin (<strong style="color: #D84E55;">wonderlightadventure@gmail.com</strong>) has issued a <strong>₹${card.amount}</strong> MargPath Gift Card for you!</p>
 
         <div style="background: #fff5f5; border: 2px dashed #fecdd3; border-radius: 16px; padding: 20px; text-align: center; margin: 20px 0;">
           <span style="font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: bold; letter-spacing: 1px; display: block;">Gift Card Number</span>
@@ -387,7 +365,7 @@ async function sendGiftCardEmail(recipientEmail: string, card: any): Promise<{ s
           <li>Click the button below or visit <a href="https://busivo.vercel.app/" target="_blank" style="color: #D84E55; font-weight: bold; text-decoration: underline;">https://busivo.vercel.app/</a>.</li>
           <li>Click Account Profile ➔ <strong>Redeem Gift Card / Offer Code</strong>.</li>
           <li>Enter Gift Card Number <strong style="font-family: monospace;">${card.code}</strong> and PIN <strong style="font-family: monospace;">${card.pin}</strong>.</li>
-          <li>₹${card.amount} will be credited instantly to your wABus Wallet balance!</li>
+          <li>₹${card.amount} will be credited instantly to your MargPath Wallet balance!</li>
         </ol>
 
         <!-- Direct Link Button -->
@@ -398,57 +376,25 @@ async function sendGiftCardEmail(recipientEmail: string, card: any): Promise<{ s
         </div>
 
         <p style="font-size: 12px; color: #94a3b8; border-top: 1px solid #f1f5f9; padding-top: 16px; margin-top: 20px;">
-          Valid until 31-Dec-2030. Issued by Wonderlight Adventure Co. (${emailUser}).<br/>
+          Valid until 31-Dec-2030. Issued by MargPath (${emailUser}).<br/>
           Official Website: <a href="https://busivo.vercel.app/" target="_blank" style="color: #D84E55; font-weight: bold; text-decoration: underline;">https://busivo.vercel.app/</a>
         </p>
       </div>
     </div>
   `;
 
-  try {
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: { user: emailUser, pass: emailPassword },
-      tls: { rejectUnauthorized: false }
-    });
+  const result = await sendMailWithFallback({
+    from: emailFrom,
+    to: cleanEmail,
+    cc: emailUser,
+    subject: `🎁 You received a ₹${card.amount} MargPath Gift Card! (Code: ${card.code})`,
+    html: htmlContent
+  });
 
-    const info = await transporter.sendMail({
-      from: emailFrom,
-      to: cleanEmail,
-      cc: emailUser,
-      subject: `🎁 You received a ₹${card.amount} wABus Gift Card! (Code: ${card.code})`,
-      html: htmlContent
-    });
-
+  if (result.success) {
     sentAdminGiftCardCodes.add(card.code.trim().toUpperCase());
-    return { success: true, sentViaSmtp: true, smtpMessageId: info.messageId };
-  } catch {
-    try {
-      const fallbackTransporter = nodemailer.createTransport({
-        host: emailHost,
-        port: 465,
-        secure: true,
-        auth: { user: emailUser, pass: emailPassword },
-        connectionTimeout: 5000,
-        greetingTimeout: 3000,
-        socketTimeout: 5000,
-        tls: { rejectUnauthorized: false }
-      });
-
-      const info2 = await fallbackTransporter.sendMail({
-        from: emailFrom,
-        to: cleanEmail,
-        cc: emailUser,
-        subject: `🎁 You received a ₹${card.amount} wABus Gift Card! (Code: ${card.code})`,
-        html: htmlContent
-      });
-
-      sentAdminGiftCardCodes.add(card.code.trim().toUpperCase());
-      return { success: true, sentViaSmtp: true, smtpMessageId: info2.messageId };
-    } catch {
-      return { success: false, sentViaSmtp: false };
-    }
   }
+  return { success: result.success, sentViaSmtp: result.success, smtpMessageId: result.messageId };
 }
 
 /**
@@ -971,15 +917,15 @@ app.post(['/api/bookings/checkout', '/bookings/checkout'], async (req, res) => {
     serverBookings.unshift(newBooking);
 
     // Automated Emails & WhatsApp Dispatch
-    sendBookingConfirmationEmail(newBooking).catch(err => console.error('[E-Ticket Email Error]', err));
-    sendWhatsAppBookingNotification(newBooking).catch(err => console.error('[WhatsApp Notification Error]', err));
+    const emailRes = await sendBookingConfirmationEmail(newBooking);
+    const waRes = await sendWhatsAppBookingNotification(newBooking);
 
     return res.json({
       success: true,
       booking: newBooking,
       qrToken: newBooking.qrPayloadHash,
-      whatsAppDelivered: true,
-      emailDelivered: true,
+      whatsAppDelivered: waRes.success,
+      emailDelivered: emailRes.success,
       message: `E-Ticket PNR ${pnr} confirmed and seats updated!`
     });
   } catch (err: any) {
