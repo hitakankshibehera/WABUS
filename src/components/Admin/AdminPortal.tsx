@@ -109,6 +109,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [newSeatPrice, setNewSeatPrice] = useState('450');
   const [newSeatType, setNewSeatType] = useState<'SLEEPER' | 'SEATER'>('SLEEPER');
   const [newSeatStatus, setNewSeatStatus] = useState<string>('AVAILABLE');
+  const [newSeatSide, setNewSeatSide] = useState<'LEFT' | 'RIGHT'>('LEFT');
 
   // Bus Master & Layout Templates State
   const [busesList, setBusesList] = useState<Bus[]>([]);
@@ -1684,8 +1685,9 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
             id: existingSeatIndex >= 0 ? baseSeats[existingSeatIndex].id : `seat-custom-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
             number: cleanNum,
             deck: newSeatDeck,
+            side: newSeatSide,
             row: Math.max(...baseSeats.map((s: any) => s.row || 1), 1) + 1,
-            col: 1,
+            col: newSeatSide === 'LEFT' ? 0 : 2,
             isSleeper: newSeatType === 'SLEEPER',
             basePrice: Number(newSeatPrice) || selectedTripObj?.baseFare || 450,
             status: newSeatStatus,
@@ -1852,7 +1854,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                 </span>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 items-end">
+              <div className="grid grid-cols-2 sm:grid-cols-6 gap-3 items-end">
                 <div>
                   <label className="text-[10px] font-bold text-purple-900 uppercase block mb-1">Seat Number</label>
                   <input
@@ -1874,6 +1876,18 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                   >
                     <option value="LOWER">Lower Deck</option>
                     <option value="UPPER">Upper Deck</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-purple-900 uppercase block mb-1">Side Position</label>
+                  <select
+                    value={newSeatSide}
+                    onChange={(e) => setNewSeatSide(e.target.value as any)}
+                    className="w-full px-3 py-1.5 bg-white border border-purple-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none"
+                  >
+                    <option value="LEFT">Left Side (Single/Window)</option>
+                    <option value="RIGHT">Right Side (Double/Aisle)</option>
                   </select>
                 </div>
 
@@ -1942,9 +1956,18 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                 </div>
               </div>
 
-              {/* Seats Grid Canvas */}
-              <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-3">
-                {activeSeats.map((seat: any) => {
+              {/* Seats Grid Canvas split into Left Side, Middle Aisle, and Right Side */}
+              {(() => {
+                const leftSideSeats = activeSeats.filter((s: any) => {
+                  if (s.side === 'LEFT') return true;
+                  if (s.side === 'RIGHT') return false;
+                  if (s.col !== undefined && s.col !== null) return s.col <= 1;
+                  const numInt = parseInt(String(s.number).replace(/\D/g, ''), 10);
+                  return !isNaN(numInt) && numInt % 3 === 1;
+                });
+                const rightSideSeats = activeSeats.filter((s: any) => !leftSideSeats.includes(s));
+
+                const renderStudioSeatCard = (seat: any) => {
                   const isConductor = seat.status === 'CONDUCTOR_RESERVED';
                   const isFemale = seat.genderRestriction === 'FEMALE_ONLY';
                   const isBooked = seat.status === 'BOOKED';
@@ -1959,7 +1982,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       key={seat.id}
                       className={`p-2.5 rounded-2xl border-2 transition relative flex flex-col items-center justify-between text-center space-y-1 shadow-xs hover:scale-105 ${statusBg}`}
                     >
-                      {/* Delete Seat Button */}
                       <button
                         type="button"
                         onClick={(e) => {
@@ -1994,8 +2016,43 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       </div>
                     </div>
                   );
-                })}
-              </div>
+                };
+
+                return (
+                  <div className="flex flex-col md:flex-row gap-4 items-stretch justify-center">
+                    {/* LEFT SIDE SEATS */}
+                    <div className="flex-1 bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
+                      <div className="text-center font-extrabold text-xs text-slate-700 uppercase tracking-wider border-b border-slate-100 pb-2 flex items-center justify-center gap-1">
+                        <span>⬅️ Left Side ({leftSideSeats.length} Seats / Single Berth)</span>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
+                        {leftSideSeats.map(renderStudioSeatCard)}
+                      </div>
+                    </div>
+
+                    {/* MIDDLE AISLE PATHWAY */}
+                    <div className="w-full md:w-16 bg-slate-200/80 border border-slate-300 rounded-2xl p-2 flex md:flex-col items-center justify-center gap-2 font-mono text-[10px] font-black text-slate-500 uppercase tracking-widest text-center shadow-inner py-4">
+                      <span>🚶</span>
+                      <span>M</span><span>I</span><span>D</span><span>D</span><span>L</span><span>E</span>
+                      <span className="hidden md:inline">A</span>
+                      <span className="hidden md:inline">I</span>
+                      <span className="hidden md:inline">S</span>
+                      <span className="hidden md:inline">L</span>
+                      <span className="hidden md:inline">E</span>
+                    </div>
+
+                    {/* RIGHT SIDE SEATS */}
+                    <div className="flex-1 bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
+                      <div className="text-center font-extrabold text-xs text-slate-700 uppercase tracking-wider border-b border-slate-100 pb-2 flex items-center justify-center gap-1">
+                        <span>Right Side ({rightSideSeats.length} Seats / Double Berth) ➡️</span>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
+                        {rightSideSeats.map(renderStudioSeatCard)}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Rear Bus Footer */}
               <div className="text-center border-t-2 border-slate-200 pt-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">

@@ -215,9 +215,18 @@ export const SeatMatrix: React.FC<SeatMatrixProps> = ({
             </div>
           </div>
 
-          {/* Seat Grid Rows & Universal Seat Grid */}
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2.5">
-            {currentDeckSeats.map((seat) => {
+          {/* Seat Grid Rows & Universal Seat Grid split into Left Side, Middle Aisle, and Right Side */}
+          {(() => {
+            const leftSideSeats = currentDeckSeats.filter((s: any) => {
+              if (s.side === 'LEFT') return true;
+              if (s.side === 'RIGHT') return false;
+              if (s.col !== undefined && s.col !== null) return s.col <= 1;
+              const numInt = parseInt(String(s.number).replace(/\D/g, ''), 10);
+              return !isNaN(numInt) && numInt % 3 === 1;
+            });
+            const rightSideSeats = currentDeckSeats.filter((s: any) => !leftSideSeats.includes(s));
+
+            const renderCustomerSeatCard = (seat: Seat) => {
               const isSelected = selectedSeats.some(s => s.id === seat.id);
               const isBooked = seat.status === 'BOOKED';
               const isLocked = seat.status === 'LOCKED' && seat.lockedBySessionId !== sessionId;
@@ -244,8 +253,43 @@ export const SeatMatrix: React.FC<SeatMatrixProps> = ({
                   </div>
                 </button>
               );
-            })}
-          </div>
+            };
+
+            return (
+              <div className="flex flex-col md:flex-row gap-4 items-stretch justify-center">
+                {/* LEFT SIDE SEATS */}
+                <div className="flex-1 bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
+                  <div className="text-center font-extrabold text-xs text-slate-700 uppercase tracking-wider border-b border-slate-100 pb-2 flex items-center justify-center gap-1">
+                    <span>⬅️ Left Side ({leftSideSeats.length} Seats)</span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                    {leftSideSeats.map(renderCustomerSeatCard)}
+                  </div>
+                </div>
+
+                {/* MIDDLE AISLE PATHWAY */}
+                <div className="w-full md:w-14 bg-slate-200/80 border border-slate-300 rounded-2xl p-2 flex md:flex-col items-center justify-center gap-2 font-mono text-[10px] font-black text-slate-500 uppercase tracking-widest text-center shadow-inner py-4">
+                  <span>🚶</span>
+                  <span>M</span><span>I</span><span>D</span><span>D</span><span>L</span><span>E</span>
+                  <span className="hidden md:inline">A</span>
+                  <span className="hidden md:inline">I</span>
+                  <span className="hidden md:inline">S</span>
+                  <span className="hidden md:inline">L</span>
+                  <span className="hidden md:inline">E</span>
+                </div>
+
+                {/* RIGHT SIDE SEATS */}
+                <div className="flex-1 bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
+                  <div className="text-center font-extrabold text-xs text-slate-700 uppercase tracking-wider border-b border-slate-100 pb-2 flex items-center justify-center gap-1">
+                    <span>Right Side ({rightSideSeats.length} Seats) ➡️</span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                    {rightSideSeats.map(renderCustomerSeatCard)}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       </div>
 
