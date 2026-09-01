@@ -28,25 +28,38 @@ async function safeParseJson(res: Response, defaultError: string): Promise<any> 
  * Helper to synchronize confirmed bookings from local storage and memory
  * into the seat matrices of all trips, marking booked seats as 'BOOKED'.
  */
-function syncBookedSeatsIntoTrips(tripsList: Trip[]): Trip[] {
+function syncBookedSeatsIntoTrips(trips: Trip[]): Trip[] {
   let userBookings: Booking[] = [];
+  let savedMap: Record<string, any[]> = {};
+
   try {
-    const saved = localStorage.getItem('wabus_user_bookings');
-    if (saved) userBookings = JSON.parse(saved);
+    const rawBookings = localStorage.getItem('wabus_user_bookings');
+    if (rawBookings) userBookings = JSON.parse(rawBookings);
+
+    const rawMap = localStorage.getItem('wabus_booked_seats_map');
+    if (rawMap) savedMap = JSON.parse(rawMap);
   } catch {}
 
-  let bookedSeatsMap: Record<string, { seatNumber: string; gender?: string }[]> = {};
-  try {
-    const savedMap = localStorage.getItem('wabus_booked_seats_map');
-    if (savedMap) bookedSeatsMap = JSON.parse(savedMap);
-  } catch {}
+  return trips.map(trip => {
+    // 0. Load custom seat layout from localStorage if configured via Seat Layout Studio
+    const customKey = `wabus_custom_seats_${trip.id}`;
+    const customRegKey = trip.bus?.registrationNumber ? `wabus_custom_seats_${trip.bus.registrationNumber}` : null;
+    const customSeatsRaw = localStorage.getItem(customKey) || (customRegKey ? localStorage.getItem(customRegKey) : null);
+    let currentTripSeats = trip.seats;
+    if (customSeatsRaw) {
+      try {
+        const parsed = JSON.parse(customSeatsRaw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          currentTripSeats = parsed;
+        }
+      } catch {}
+    }
 
-  return tripsList.map(trip => {
     const bookedSeatMap = new Map<string, string>(); // seatNumber -> gender
 
     // 1. From stored map
-    if (bookedSeatsMap[trip.id]) {
-      bookedSeatsMap[trip.id].forEach(item => {
+    if (savedMap[trip.id]) {
+      savedMap[trip.id].forEach(item => {
         if (item && item.seatNumber) {
           bookedSeatMap.set(String(item.seatNumber).toUpperCase(), item.gender || 'MALE');
         }
@@ -66,7 +79,7 @@ function syncBookedSeatsIntoTrips(tripsList: Trip[]): Trip[] {
       }
     });
 
-    const updatedSeats = trip.seats.map(seat => {
+    const updatedSeats = currentTripSeats.map(seat => {
       const seatNumUpper = seat.number.toUpperCase();
       const seatIdUpper = seat.id.toUpperCase();
       const isBooked = seat.status === 'BOOKED' || bookedSeatMap.has(seatNumUpper) || bookedSeatMap.has(seatIdUpper);
@@ -901,7 +914,11 @@ export const api = {
         if (target) {
           target.seats = seats;
           target.availableSeatsCount = seats.filter(s => s.status === 'AVAILABLE').length;
+          if (target.bus?.registrationNumber) {
+            localStorage.setItem(`wabus_custom_seats_${target.bus.registrationNumber}`, JSON.stringify(seats));
+          }
         }
+        localStorage.setItem(`wabus_custom_seats_${tripId}`, JSON.stringify(seats));
         window.dispatchEvent(new Event('wabus_booking_updated'));
         return data;
       }
@@ -913,7 +930,11 @@ export const api = {
     if (target) {
       target.seats = seats;
       target.availableSeatsCount = seats.filter(s => s.status === 'AVAILABLE').length;
+      if (target.bus?.registrationNumber) {
+        localStorage.setItem(`wabus_custom_seats_${target.bus.registrationNumber}`, JSON.stringify(seats));
+      }
     }
+    localStorage.setItem(`wabus_custom_seats_${tripId}`, JSON.stringify(seats));
     window.dispatchEvent(new Event('wabus_booking_updated'));
     return { success: true, trip: target || INITIAL_TRIPS[0] };
   },
