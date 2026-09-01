@@ -1387,7 +1387,7 @@ export const TripSearch: React.FC<TripSearchProps> = ({
                         <div className="text-lg sm:text-xl font-extrabold text-slate-900">{trip.departureTime}</div>
                         <div className="text-xs text-slate-600 font-semibold">{trip.originCity}</div>
                         <div className="text-[11px] text-slate-400 truncate max-w-[130px]">
-                          {trip.boardingPoints[0]?.name || 'Central Terminal'}
+                          {(trip.boardingPoints || [])[0]?.name || 'Central Terminal'}
                         </div>
                       </div>
 
@@ -1408,7 +1408,7 @@ export const TripSearch: React.FC<TripSearchProps> = ({
                         <div className="text-lg sm:text-xl font-extrabold text-slate-900">{trip.arrivalTime}</div>
                         <div className="text-xs text-slate-600 font-semibold">{trip.destinationCity}</div>
                         <div className="text-[11px] text-slate-400 truncate max-w-[130px]">
-                          {trip.droppingPoints[0]?.name || 'Main Stand'}
+                          {(trip.droppingPoints || [])[0]?.name || 'Main Stand'}
                         </div>
                       </div>
                     </div>

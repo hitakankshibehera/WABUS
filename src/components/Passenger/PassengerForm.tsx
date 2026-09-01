@@ -45,8 +45,10 @@ export const PassengerForm: React.FC<PassengerFormProps> = ({
   featureFlags,
 }) => {
   const { currentUser } = useAuth();
-  const [boardingPointId, setBoardingPointId] = useState(trip.boardingPoints[0]?.id || '');
-  const [droppingPointId, setDroppingPointId] = useState(trip.droppingPoints[0]?.id || '');
+  const boardingList = trip.boardingPoints || [];
+  const droppingList = trip.droppingPoints || [];
+  const [boardingPointId, setBoardingPointId] = useState(boardingList[0]?.id || '');
+  const [droppingPointId, setDroppingPointId] = useState(droppingList[0]?.id || '');
   const [contactEmail, setContactEmail] = useState(currentUser?.email || '');
   const [contactPhone, setContactPhone] = useState(currentUser?.phone || '');
   const [optInWhatsApp, setOptInWhatsApp] = useState(featureFlags.enableWhatsAppNotifications);
@@ -145,8 +147,8 @@ export const PassengerForm: React.FC<PassengerFormProps> = ({
     validateCode(couponCode, totalSeatsPrice);
   };
 
-  const selectedBoarding = trip.boardingPoints.find(bp => bp.id === boardingPointId) || trip.boardingPoints[0];
-  const selectedDropping = trip.droppingPoints.find(dp => dp.id === droppingPointId) || trip.droppingPoints[0];
+  const selectedBoarding = boardingList.find(bp => bp.id === boardingPointId) || boardingList[0] || { id: 'bp-1', name: `${trip.originCity} ISBT`, landmark: 'Central Terminal', time: trip.departureTime, contactPhone: '+91 94383 18821' };
+  const selectedDropping = droppingList.find(dp => dp.id === droppingPointId) || droppingList[0] || { id: 'dp-1', name: `${trip.destinationCity} Main Terminal`, landmark: 'Central Stop', time: trip.arrivalTime, contactPhone: '+91 94383 18821' };
 
   const gst = Math.round(totalSeatsPrice * 0.05); // 5% GST
   const finalPayable = Math.max(0, totalSeatsPrice + gst - discountAmount);
@@ -188,7 +190,7 @@ export const PassengerForm: React.FC<PassengerFormProps> = ({
                   Boarding Point ({trip.originCity})
                 </label>
                 <div className="space-y-2">
-                  {trip.boardingPoints.map(bp => (
+                  {boardingList.map(bp => (
                     <label
                       key={bp.id}
                       className={`flex items-center justify-between p-3 rounded-xl border text-xs cursor-pointer transition ${
@@ -222,7 +224,7 @@ export const PassengerForm: React.FC<PassengerFormProps> = ({
                   Dropping Point ({trip.destinationCity})
                 </label>
                 <div className="space-y-2">
-                  {trip.droppingPoints.map(dp => (
+                  {droppingList.map(dp => (
                     <label
                       key={dp.id}
                       className={`flex items-center justify-between p-3 rounded-xl border text-xs cursor-pointer transition ${

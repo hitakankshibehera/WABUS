@@ -868,7 +868,13 @@ app.get(['/api/trips', '/trips'], (req, res) => {
 
   const result = filtered.map((t: any) => ({
     ...t,
-    availableSeatsCount: t.seats.filter((s: any) => s.status === 'AVAILABLE').length
+    boardingPoints: t.boardingPoints && Array.isArray(t.boardingPoints) && t.boardingPoints.length > 0
+      ? t.boardingPoints
+      : [{ id: 'bp-1', name: `${t.originCity || 'Bhubaneswar'} ISBT`, landmark: 'Central Terminal', time: t.departureTime || '08:00 AM' }],
+    droppingPoints: t.droppingPoints && Array.isArray(t.droppingPoints) && t.droppingPoints.length > 0
+      ? t.droppingPoints
+      : [{ id: 'dp-1', name: `${t.destinationCity || 'Puri'} Main Stand`, landmark: 'Central Terminal', time: t.arrivalTime || '10:00 AM' }],
+    availableSeatsCount: t.seats ? t.seats.filter((s: any) => s.status === 'AVAILABLE').length : 30
   }));
 
   return res.json(result);
