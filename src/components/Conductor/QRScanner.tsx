@@ -62,13 +62,29 @@ export const QRScanner: React.FC<QRScannerProps> = ({
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
   const [torchActive, setTorchActive] = useState(false);
 
-  // Auto-start camera when component mounts
+  // Auto-start camera & pre-grant permission when component mounts
   useEffect(() => {
     startCamera('environment');
     return () => {
       stopCamera();
     };
   }, []);
+
+  // Instant zero-delay camera attachment when scanner modal opens
+  useEffect(() => {
+    if (isPhonePeModalOpen && videoRef.current) {
+      if (streamRef.current) {
+        videoRef.current.srcObject = streamRef.current;
+        videoRef.current.setAttribute('playsinline', 'true');
+        videoRef.current.setAttribute('webkit-playsinline', 'true');
+        videoRef.current.setAttribute('muted', 'true');
+        videoRef.current.play().catch(() => {});
+        setCameraActive(true);
+      } else {
+        startCamera(facingMode);
+      }
+    }
+  }, [isPhonePeModalOpen]);
 
   const stopCamera = () => {
     if (streamRef.current) {
@@ -385,7 +401,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({
           type="button"
           onClick={() => {
             setIsPhonePeModalOpen(true);
-            startCamera(facingMode);
+            if (!streamRef.current) startCamera(facingMode);
           }}
           className="w-24 h-24 rounded-full bg-[#673ab7] hover:bg-[#5e35b1] text-white flex flex-col items-center justify-center shadow-2xl shadow-purple-500/40 hover:scale-105 active:scale-95 transition cursor-pointer border-4 border-purple-300/50 group"
           title="Tap to Open PhonePe Style Camera Scanner"
@@ -395,7 +411,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({
         <div>
           <h4 className="text-sm font-black text-slate-900 uppercase tracking-wider">Tap Purple Button to Scan Ticket QR</h4>
           <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
-            Opens native PhonePe/Paytm style fullscreen QR camera scanner to verify customer ticket &amp; payment status.
+            Opens native PhonePe/Paytm style fullscreen QR camera scanner with instant pre-granted live camera.
           </p>
         </div>
       </div>
@@ -408,9 +424,8 @@ export const QRScanner: React.FC<QRScannerProps> = ({
             <button
               onClick={() => {
                 setIsPhonePeModalOpen(false);
-                stopCamera();
               }}
-              className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition cursor-pointer"
+              className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition cursor-pointer font-extrabold text-lg"
             >
               ✕
             </button>
