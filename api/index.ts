@@ -22,9 +22,11 @@ const INITIAL_TRIPS: any[] = [
     availableSeatsCount: 36,
     seats: Array.from({ length: 36 }, (_, i) => ({
       id: `seat-${i + 1}`,
-      number: `L${i + 1}`,
+      number: i < 18 ? `L${i + 1}` : `U${i - 17}`,
+      deck: i < 18 ? 'LOWER' : 'UPPER',
       status: 'AVAILABLE',
       fare: 250,
+      basePrice: 250,
       type: i % 2 === 0 ? 'WINDOW' : 'AISLE'
     }))
   }

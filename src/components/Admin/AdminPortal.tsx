@@ -1624,7 +1624,14 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       {/* TAB: INTERACTIVE BUS SEAT LAYOUT & ARRANGEMENT STUDIO */}
       {activeAdminTab === 'SEAT_LAYOUT' && (() => {
         const selectedTripObj = trips.find(t => t.id === selectedSeatStudioTripId) || trips[0];
-        const currentSeats = editingSeats.length > 0 ? editingSeats : (selectedTripObj?.seats || []);
+        const rawSeats = editingSeats.length > 0 ? editingSeats : (selectedTripObj?.seats || []);
+
+        const currentSeats = rawSeats.map((s: any) => ({
+          ...s,
+          deck: (s.deck || (String(s.number).toUpperCase().startsWith('U') ? 'UPPER' : 'LOWER')).toUpperCase(),
+          number: String(s.number || '').toUpperCase()
+        }));
+
         const lowerSeats = currentSeats.filter((s: any) => s.deck === 'LOWER');
         const upperSeats = currentSeats.filter((s: any) => s.deck === 'UPPER');
         const activeSeats = editingDeck === 'LOWER' ? lowerSeats : upperSeats;
@@ -1671,14 +1678,10 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
           }
 
           const baseSeats = currentSeats;
-          const exists = baseSeats.some((s: any) => String(s.number).toUpperCase() === cleanNum);
-          if (exists) {
-            alert(`Seat ${cleanNum} already exists in this bus layout.`);
-            return;
-          }
+          const existingSeatIndex = baseSeats.findIndex((s: any) => String(s.number).toUpperCase() === cleanNum);
 
           const newSeat = {
-            id: `seat-custom-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+            id: existingSeatIndex >= 0 ? baseSeats[existingSeatIndex].id : `seat-custom-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
             number: cleanNum,
             deck: newSeatDeck,
             row: Math.max(...baseSeats.map((s: any) => s.row || 1), 1) + 1,
@@ -1689,7 +1692,14 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
             genderRestriction: newSeatStatus === 'FEMALE_ONLY' ? 'FEMALE_ONLY' : 'ANY'
           };
 
-          const updatedList = [...baseSeats, newSeat];
+          let updatedList: any[];
+          if (existingSeatIndex >= 0) {
+            updatedList = [...baseSeats];
+            updatedList[existingSeatIndex] = { ...updatedList[existingSeatIndex], ...newSeat };
+          } else {
+            updatedList = [...baseSeats, newSeat];
+          }
+
           setEditingSeats(updatedList);
 
           if (selectedSeatStudioTripId) {
@@ -1697,8 +1707,13 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
             onRefreshTrips();
           }
 
-          setSeatStudioStatusMsg(`✨ Added seat ${cleanNum} (${newSeatDeck} Deck) to bus layout and deployed live!`);
-          setNewSeatNum('');
+          setSeatStudioStatusMsg(existingSeatIndex >= 0
+            ? `✨ Updated seat ${cleanNum} (${newSeatDeck} Deck) properties and deployed live!`
+            : `✨ Added seat ${cleanNum} (${newSeatDeck} Deck) to bus layout and deployed live!`);
+
+          const prefix = newSeatDeck === 'UPPER' ? 'U' : 'L';
+          const nextCount = updatedList.filter((s: any) => s.deck === newSeatDeck).length + 1;
+          setNewSeatNum(`${prefix}${nextCount}`);
         };
 
         const handleRemoveSingleSeat = async (seatId: string) => {
