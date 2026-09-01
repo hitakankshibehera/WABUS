@@ -89,35 +89,18 @@ export const QRScanner: React.FC<QRScannerProps> = ({
 
     let stream: MediaStream | null = null;
     
-    // Tier 1: HD resolution with requested facingMode
     try {
       stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { ideal: mode },
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
-        }
+        video: { facingMode: { ideal: mode } }
       });
     } catch (e1) {
-      // Tier 2: Flexible facingMode constraint
       try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: mode }
-        });
-      } catch (e2) {
-        // Tier 3: Basic video constraint (any mobile camera)
-        try {
-          stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        } catch (e3: any) {
-          console.error('[Mobile Camera Access Exception]', e3);
-          if (e3.name === 'NotAllowedError' || e3.name === 'PermissionDeniedError') {
-            setCameraError('Camera permission blocked by mobile browser. Please tap the lock icon next to the URL, grant Camera permission, and tap Open Camera below.');
-          } else {
-            setCameraError(`Camera hardware unavailable (${e3.message || 'Camera busy'}). Tap "Open Camera" below or upload a ticket photo.`);
-          }
-          setCameraActive(false);
-          return;
-        }
+        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      } catch (e2: any) {
+        console.error('[Mobile Camera Access Exception]', e2);
+        setCameraError('Please allow camera permission in browser settings to scan QR tickets.');
+        setCameraActive(false);
+        return;
       }
     }
 
@@ -126,6 +109,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         videoRef.current.setAttribute('playsinline', 'true');
+        videoRef.current.setAttribute('webkit-playsinline', 'true');
         videoRef.current.setAttribute('muted', 'true');
         videoRef.current.play().catch(() => {});
       }
@@ -481,63 +465,6 @@ export const QRScanner: React.FC<QRScannerProps> = ({
           Scans wABus digital passes, WhatsApp PDF QR tickets, and printed boarding vouchers.
         </p>
 
-        {/* Quick Demo Scan Matrix */}
-        <div className="mt-5 pt-4 border-t border-slate-800 w-full flex flex-col items-center justify-center gap-2">
-          <div className="flex items-center gap-1.5 text-xs text-slate-400 font-semibold mb-1">
-            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-            <span>Interactive Verification Test Matrix (Click to test system rules):</span>
-          </div>
-
-          <div className="flex flex-wrap items-center justify-center gap-2">
-            <button
-              onClick={() => handleQuickDemoScan('BR899401')}
-              className="px-3 py-1.5 rounded-xl bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 text-xs font-mono font-bold border border-emerald-700/60 transition cursor-pointer flex items-center gap-1.5"
-            >
-              <Check className="w-3 h-3 text-emerald-400" />
-              <span>1. Valid Paid (BR899401)</span>
-            </button>
-
-            <button
-              onClick={() => handleQuickDemoScan('BR899402')}
-              className="px-3 py-1.5 rounded-xl bg-amber-950/80 hover:bg-amber-900 text-amber-300 text-xs font-mono font-bold border border-amber-700/60 transition cursor-pointer flex items-center gap-1.5"
-            >
-              <Banknote className="w-3 h-3 text-amber-400" />
-              <span>2. Pay On Board (BR899402)</span>
-            </button>
-
-            <button
-              onClick={() => handleQuickDemoScan('BR899403')}
-              className="px-3 py-1.5 rounded-xl bg-purple-950/80 hover:bg-purple-900 text-purple-300 text-xs font-mono font-bold border border-purple-700/60 transition cursor-pointer flex items-center gap-1.5"
-            >
-              <UserCheck className="w-3 h-3 text-purple-400" />
-              <span>3. Duplicate Scan (BR899403)</span>
-            </button>
-
-            <button
-              onClick={() => handleQuickDemoScan('BR899404')}
-              className="px-3 py-1.5 rounded-xl bg-rose-950/80 hover:bg-rose-900 text-rose-300 text-xs font-mono font-bold border border-rose-700/60 transition cursor-pointer flex items-center gap-1.5"
-            >
-              <XCircle className="w-3 h-3 text-rose-400" />
-              <span>4. Cancelled Ticket (BR899404)</span>
-            </button>
-
-            <button
-              onClick={() => handleQuickDemoScan('BR771099')}
-              className="px-3 py-1.5 rounded-xl bg-red-950/90 hover:bg-red-900 text-red-300 text-xs font-mono font-bold border border-red-600 transition cursor-pointer flex items-center gap-1.5"
-            >
-              <AlertOctagon className="w-3 h-3 text-red-400" />
-              <span>5. Wrong Bus Ticket (BR771099)</span>
-            </button>
-
-            <button
-              onClick={() => handleQuickDemoScan('FAKE_TAMPERED_QR_99')}
-              className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-mono font-bold border border-slate-700 transition cursor-pointer flex items-center gap-1.5"
-            >
-              <AlertTriangle className="w-3 h-3 text-slate-400" />
-              <span>6. Forged QR Hash</span>
-            </button>
-          </div>
-        </div>
       </div>
 
       {/* Manual Input Search Fallback */}
