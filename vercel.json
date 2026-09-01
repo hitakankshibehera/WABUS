@@ -1,12 +1,19 @@
 {
   "version": 2,
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api" },
-    { "source": "/api", "destination": "/api" },
-    { "source": "/auth/(.*)", "destination": "/api" },
-    { "source": "/trips/(.*)", "destination": "/api" },
-    { "source": "/bookings/(.*)", "destination": "/api" },
-    { "source": "/admin/(.*)", "destination": "/api" },
-    { "source": "/((?!assets/|.*\\..*).*)", "destination": "/index.html" }
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/api",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/((?!api/|assets/|logo.*|favicon.*|.*\\..*).*)",
+      "destination": "/index.html"
+    }
   ]
 }
