@@ -46,6 +46,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const autoResetTimerRef = useRef<any>(null);
 
   const [scanResult, setScanResult] = useState<{
     valid: boolean;
@@ -341,6 +342,14 @@ export const QRScanner: React.FC<QRScannerProps> = ({
         announcePhonePeVoice('Invalid Ticket. Verification Failed.');
         setScanResult(res);
       }
+
+      // Auto-reset after 2.5 seconds to proceed straight to next scan
+      if (autoResetTimerRef.current) clearTimeout(autoResetTimerRef.current);
+      autoResetTimerRef.current = setTimeout(() => {
+        setScanResult(null);
+        setInputCode('');
+        setIsScanning(false);
+      }, 2500);
     } catch (err: any) {
       soundEngine.playError();
       announcePhonePeVoice('Verification error. Ticket not found.');
@@ -437,6 +446,27 @@ export const QRScanner: React.FC<QRScannerProps> = ({
               ?
             </div>
           </div>
+
+          {/* Real-time PhonePe Verified Scan Toast Sheet */}
+          {scanResult && (
+            <div className="absolute inset-x-4 top-20 z-30 p-4 rounded-2xl bg-emerald-600 text-white shadow-2xl border border-emerald-400 animate-in slide-in-from-top flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <CheckCircle2 className="w-8 h-8 text-white shrink-0" />
+                <div>
+                  <h4 className="font-extrabold text-sm text-white">✓ TICKET VERIFIED - BOARDED</h4>
+                  <p className="text-xs text-emerald-100 font-semibold mt-0.5">
+                    {scanResult.booking?.passengers ? scanResult.booking.passengers.map(p => `${p.name} (Seat ${p.seatNumber})`).join(', ') : 'Passenger Ticket'}
+                  </p>
+                  <span className="text-[10px] text-emerald-200 block font-mono">
+                    ₹{scanResult.booking?.totalAmount || 450} &bull; PNR: {scanResult.booking?.pnr || 'MARGPASS'}
+                  </span>
+                </div>
+              </div>
+              <div className="text-right shrink-0">
+                <span className="text-[10px] bg-white/20 px-2 py-1 rounded-md text-white font-bold block">Next Scan Ready</span>
+              </div>
+            </div>
+          )}
 
           {/* PhonePe Viewfinder Frame */}
           <div className="flex-1 flex flex-col items-center justify-center my-4 relative">
