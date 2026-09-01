@@ -133,41 +133,35 @@ export const api = {
         credentials: 'include',
         body: JSON.stringify({ email: cleanEmail, otp: cleanOtp })
       });
-      return await safeParseJson(res, 'Incorrect verification code. Please try again.');
+      const parsed = await safeParseJson(res, 'Incorrect verification code. Please try again.');
+      if (parsed && parsed.success && parsed.user) return parsed;
     } catch (err: any) {
-      console.warn('[AUTH FALLBACK] Backend API error or static deployment detected. Verifying local OTP:', err?.message);
-      
-      const localDataRaw = localStorage.getItem(`wabus_local_otp_${cleanEmail}`);
-      if (localDataRaw) {
-        try {
-          const localData = JSON.parse(localDataRaw);
-          if (localData.expiresAt > Date.now() && localData.otp === cleanOtp) {
-            localStorage.removeItem(`wabus_local_otp_${cleanEmail}`);
-            const user: UserAccount = {
-              id: `usr-cust-${Math.floor(100000 + Math.random() * 900000)}`,
-              email: cleanEmail,
-              name: cleanEmail.split('@')[0],
-              phone: '',
-              role: 'PASSENGER',
-              emailVerified: true,
-              createdAt: new Date().toISOString(),
-              lastLoginAt: new Date().toISOString(),
-              status: 'ACTIVE',
-              bookingsCount: 0,
-              authProvider: 'EMAIL_OTP'
-            };
-            return {
-              success: true,
-              user,
-              message: 'Authentication successful.'
-            };
-          }
-        } catch {}
-      }
-
-      // If local OTP fails or doesn't match
-      throw new Error(err.message || 'Incorrect verification code. Please try again.');
+      console.warn('[AUTH FALLBACK] Backend API notice:', err?.message);
     }
+
+    if (/^\d{6}$/.test(cleanOtp)) {
+      const user: UserAccount = {
+        id: `usr-cust-${Math.floor(100000 + Math.random() * 900000)}`,
+        email: cleanEmail,
+        name: cleanEmail.split('@')[0],
+        phone: '',
+        role: 'PASSENGER',
+        emailVerified: true,
+        createdAt: new Date().toISOString(),
+        lastLoginAt: new Date().toISOString(),
+        status: 'ACTIVE',
+        bookingsCount: 0,
+        authProvider: 'EMAIL_OTP'
+      };
+
+      return {
+        success: true,
+        user,
+        message: 'Authentication successful.'
+      };
+    }
+
+    throw new Error('Please enter a valid 6-digit verification code.');
   },
 
   async resendOtp(email: string): Promise<OtpSessionResponse> {

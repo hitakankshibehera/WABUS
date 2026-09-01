@@ -159,6 +159,9 @@ export const AuthModal: React.FC = () => {
     try {
       await verifyEmailOtp(email.trim(), code);
       setSuccessMsg('Authentication successful! Logged in.');
+      setTimeout(() => {
+        closeAuthModal();
+      }, 400);
     } catch (err: any) {
       setErrorMsg(err.message || 'Incorrect verification code. Please try again.');
     } finally {
