@@ -66,11 +66,18 @@ export const SeatMatrix: React.FC<SeatMatrixProps> = ({
     return () => clearInterval(interval);
   }, [lockExpiresAt, selectedSeats]);
 
-  const lowerDeckSeats = liveSeats.filter(s => s.deck === 'LOWER');
-  const upperDeckSeats = liveSeats.filter(s => s.deck === 'UPPER');
+  const normalizedSeats = (liveSeats || []).map((s: any, idx: number) => ({
+    ...s,
+    deck: (s.deck || (String(s.number || '').toUpperCase().startsWith('U') ? 'UPPER' : 'LOWER')).toUpperCase(),
+    number: String(s.number || `L${idx + 1}`).toUpperCase(),
+    basePrice: Number(s.basePrice || s.fare || trip.baseFare || 450)
+  }));
+
+  const lowerDeckSeats = normalizedSeats.filter(s => s.deck === 'LOWER');
+  const upperDeckSeats = normalizedSeats.filter(s => s.deck === 'UPPER');
   const hasUpperDeck = upperDeckSeats.length > 0;
 
-  const currentDeckSeats = activeDeck === 'LOWER' ? lowerDeckSeats : upperDeckSeats;
+  const currentDeckSeats = activeDeck === 'LOWER' ? lowerDeckSeats : (upperDeckSeats.length > 0 ? upperDeckSeats : lowerDeckSeats);
 
   // Group by rows
   const maxRow = Math.max(...currentDeckSeats.map(s => s.row), 1);
@@ -208,139 +215,34 @@ export const SeatMatrix: React.FC<SeatMatrixProps> = ({
             </div>
           </div>
 
-          {/* Seat Grid Rows */}
-          <div className="space-y-3">
-            {rows.map(rowNum => {
-              const rowSeats = currentDeckSeats.filter(s => s.row === rowNum);
-              const leftSingle = rowSeats.find(s => s.col === 0);
-              const leftAisle = rowSeats.find(s => s.col === 1);
-              const right1 = rowSeats.find(s => s.col === 2);
-              const right2 = rowSeats.find(s => s.col === 3);
+          {/* Seat Grid Rows & Universal Seat Grid */}
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2.5">
+            {currentDeckSeats.map((seat) => {
+              const isSelected = selectedSeats.some(s => s.id === seat.id);
+              const isBooked = seat.status === 'BOOKED';
+              const isLocked = seat.status === 'LOCKED' && seat.lockedBySessionId !== sessionId;
+              const isConductor = seat.status === 'CONDUCTOR_RESERVED';
 
               return (
-                <div key={rowNum} className="flex items-center justify-between gap-1.5 sm:gap-2">
-                  {/* Left Column (Single Berth or 2 Seater) */}
-                  <div className="flex items-center gap-1.5">
-                    {leftSingle && (
-                      <button
-                        onClick={() => handleSeatClick(leftSingle)}
-                        disabled={leftSingle.status === 'BOOKED' || (leftSingle.status === 'LOCKED' && leftSingle.lockedBySessionId !== sessionId)}
-                        className={`relative rounded-lg border flex flex-col items-center justify-center transition cursor-pointer ${
-                          leftSingle.isSleeper ? 'w-18 sm:w-22 h-13 p-1.5' : 'w-10 sm:w-11 h-11'
-                        } ${getSeatColor(leftSingle)}`}
-                      >
-                        {leftSingle.isSleeper ? (
-                          <div className="w-full h-full flex flex-col justify-between items-start">
-                            <div className="flex items-center justify-between w-full">
-                              <span className="text-[11px] font-bold">{leftSingle.number}</span>
-                              <div className="w-3.5 h-2 rounded-xs bg-slate-300 border border-slate-400/50" />
-                            </div>
-                            <div className="flex items-center justify-between w-full text-[10px]">
-                              <span className="font-extrabold">₹{leftSingle.basePrice}</span>
-                              {leftSingle.status === 'LOCKED' && leftSingle.lockedBySessionId !== sessionId && (
-                                <Lock className="w-2.5 h-2.5 text-amber-700" />
-                              )}
-                              {leftSingle.genderRestriction === 'FEMALE_ONLY' && (
-                                <span className="text-[9px] text-pink-600 font-bold">♀</span>
-                              )}
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="flex flex-col items-center">
-                            <span className="text-xs font-bold">{leftSingle.number}</span>
-                            <span className="text-[9px] text-slate-500 font-semibold">₹{leftSingle.basePrice}</span>
-                          </div>
-                        )}
-                      </button>
-                    )}
-
-                    {leftAisle && (
-                      <button
-                        onClick={() => handleSeatClick(leftAisle)}
-                        disabled={leftAisle.status === 'BOOKED' || (leftAisle.status === 'LOCKED' && leftAisle.lockedBySessionId !== sessionId)}
-                        className={`w-10 sm:w-11 h-11 rounded-lg border flex flex-col items-center justify-center transition cursor-pointer ${getSeatColor(
-                          leftAisle
-                        )}`}
-                      >
-                        <span className="text-xs font-bold">{leftAisle.number}</span>
-                        <span className="text-[9px] text-slate-500 font-semibold">₹{leftAisle.basePrice}</span>
-                      </button>
-                    )}
+                <button
+                  key={seat.id}
+                  type="button"
+                  onClick={() => handleSeatClick(seat)}
+                  disabled={isBooked || isLocked || isConductor}
+                  className={`p-3 rounded-2xl border-2 flex flex-col items-center justify-between transition cursor-pointer shadow-xs hover:scale-105 active:scale-95 ${getSeatColor(seat)}`}
+                >
+                  <div className="text-[10px] font-extrabold uppercase tracking-wider opacity-75">
+                    {seat.isSleeper ? 'Berth' : 'Seat'}
                   </div>
 
-                  {/* Aisle Spacer */}
-                  <div className="flex-1 flex justify-center items-center py-1">
-                    <span className="text-[9px] uppercase font-mono font-bold tracking-widest text-slate-300 select-none">
-                      AISLE
-                    </span>
+                  <div className="font-mono text-sm font-black tracking-tight my-1">
+                    {seat.number}
                   </div>
 
-                  {/* Right Column (Double Berths or 2 Seater) */}
-                  <div className="flex items-center gap-1.5">
-                    {right1 && (
-                      <button
-                        onClick={() => handleSeatClick(right1)}
-                        disabled={right1.status === 'BOOKED' || (right1.status === 'LOCKED' && right1.lockedBySessionId !== sessionId)}
-                        className={`relative rounded-lg border flex flex-col items-center justify-center transition cursor-pointer ${
-                          right1.isSleeper ? 'w-18 sm:w-22 h-13 p-1.5' : 'w-10 sm:w-11 h-11'
-                        } ${getSeatColor(right1)}`}
-                      >
-                        {right1.isSleeper ? (
-                          <div className="w-full h-full flex flex-col justify-between items-start">
-                            <div className="flex items-center justify-between w-full">
-                              <span className="text-[11px] font-bold">{right1.number}</span>
-                              <div className="w-3.5 h-2 rounded-xs bg-slate-300 border border-slate-400/50" />
-                            </div>
-                            <div className="flex items-center justify-between w-full text-[10px]">
-                              <span className="font-extrabold">₹{right1.basePrice}</span>
-                              {right1.status === 'LOCKED' && right1.lockedBySessionId !== sessionId && (
-                                <Lock className="w-2.5 h-2.5 text-amber-700" />
-                              )}
-                              {right1.genderRestriction === 'FEMALE_ONLY' && (
-                                <span className="text-[9px] text-pink-600 font-bold">♀</span>
-                              )}
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="flex flex-col items-center">
-                            <span className="text-xs font-bold">{right1.number}</span>
-                            <span className="text-[9px] text-slate-500 font-semibold">₹{right1.basePrice}</span>
-                          </div>
-                        )}
-                      </button>
-                    )}
-
-                    {right2 && (
-                      <button
-                        onClick={() => handleSeatClick(right2)}
-                        disabled={right2.status === 'BOOKED' || (right2.status === 'LOCKED' && right2.lockedBySessionId !== sessionId)}
-                        className={`relative rounded-lg border flex flex-col items-center justify-center transition cursor-pointer ${
-                          right2.isSleeper ? 'w-18 sm:w-22 h-13 p-1.5' : 'w-10 sm:w-11 h-11'
-                        } ${getSeatColor(right2)}`}
-                      >
-                        {right2.isSleeper ? (
-                          <div className="w-full h-full flex flex-col justify-between items-start">
-                            <div className="flex items-center justify-between w-full">
-                              <span className="text-[11px] font-bold">{right2.number}</span>
-                              <div className="w-3.5 h-2 rounded-xs bg-slate-300 border border-slate-400/50" />
-                            </div>
-                            <div className="flex items-center justify-between w-full text-[10px]">
-                              <span className="font-extrabold">₹{right2.basePrice}</span>
-                              {right2.status === 'LOCKED' && right2.lockedBySessionId !== sessionId && (
-                                <Lock className="w-2.5 h-2.5 text-amber-700" />
-                              )}
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="flex flex-col items-center">
-                            <span className="text-xs font-bold">{right2.number}</span>
-                            <span className="text-[9px] text-slate-500 font-semibold">₹{right2.basePrice}</span>
-                          </div>
-                        )}
-                      </button>
-                    )}
+                  <div className="text-[10px] font-extrabold">
+                    ₹{seat.basePrice}
                   </div>
-                </div>
+                </button>
               );
             })}
           </div>
