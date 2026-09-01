@@ -131,32 +131,38 @@ function generate6DigitOtp(): string {
 }
 
 /**
- * Ultra-resilient Gmail Transporter with dual-transporter failover:
- * Primary: Port 465 SSL Direct (smtp.gmail.com)
- * Fallback: Gmail Service Transporter
+ * Resilient Gmail Transporter with guaranteed credential fallback
+ * and 3-tier transporter failover (Port 465 SSL ➔ Gmail Service ➔ Port 587 STARTTLS).
  */
 async function sendMailWithFallback(mailOptions: nodemailer.SendMailOptions): Promise<{ success: boolean; messageId?: string; error?: string }> {
-  const rawUser = process.env.EMAIL_USER || 'wonderlightadventure@gmail.com';
-  const emailUser = rawUser.replace(/['"\s]+/g, '').trim();
-  const rawPass = process.env.EMAIL_PASSWORD || 'yvlf rizi yibe ieny';
-  const emailPassword = rawPass.replace(/['"\s]+/g, '').trim();
+  let emailUser = (process.env.EMAIL_USER || '').replace(/['"\s]+/g, '').trim();
+  if (!emailUser || !emailUser.includes('@')) {
+    emailUser = 'wonderlightadventure@gmail.com';
+  }
 
-  // Transporter 1: Direct Port 465 SSL
+  let emailPassword = (process.env.EMAIL_PASSWORD || '').replace(/['"\s]+/g, '').trim();
+  if (!emailPassword || emailPassword.length < 8) {
+    emailPassword = 'yvlfriziyibeieny';
+  }
+
+  const senderFrom = mailOptions.from || `"MargPath Official" <${emailUser}>`;
+
+  // Transporter 1: Direct Port 465 SSL (smtp.gmail.com)
   try {
     const transporter465 = nodemailer.createTransport({
       host: 'smtp.gmail.com',
       port: 465,
       secure: true,
       auth: { user: emailUser, pass: emailPassword },
-      connectionTimeout: 8000,
+      connectionTimeout: 7000,
       greetingTimeout: 4000,
-      socketTimeout: 8000,
+      socketTimeout: 7000,
       tls: { rejectUnauthorized: false }
     } as any);
 
     const info = await transporter465.sendMail({
-      from: mailOptions.from || `"MargPath Official" <${emailUser}>`,
-      ...mailOptions
+      ...mailOptions,
+      from: senderFrom
     });
     console.log(`[SMTP SUCCESS - Port 465 SSL] Email sent to ${mailOptions.to}. Message ID: ${info.messageId}`);
     return { success: true, messageId: info.messageId };
@@ -168,21 +174,45 @@ async function sendMailWithFallback(mailOptions: nodemailer.SendMailOptions): Pr
       const transporterService = nodemailer.createTransport({
         service: 'gmail',
         auth: { user: emailUser, pass: emailPassword },
-        connectionTimeout: 8000,
+        connectionTimeout: 7000,
         greetingTimeout: 4000,
-        socketTimeout: 8000,
+        socketTimeout: 7000,
         tls: { rejectUnauthorized: false }
       } as any);
 
       const info2 = await transporterService.sendMail({
-        from: mailOptions.from || `"MargPath Official" <${emailUser}>`,
-        ...mailOptions
+        ...mailOptions,
+        from: senderFrom
       });
       console.log(`[SMTP SUCCESS - Gmail Service] Email sent to ${mailOptions.to}. Message ID: ${info2.messageId}`);
       return { success: true, messageId: info2.messageId };
     } catch (err2: any) {
-      console.error(`[SMTP ERROR - Both Transporters Failed] ${err2?.message || err2}`);
-      return { success: false, error: err2?.message || String(err2) };
+      console.warn(`[SMTP WARN - Gmail Service Failed] ${err2?.message || err2}. Trying Port 587 STARTTLS fallback...`);
+
+      // Transporter 3: Port 587 STARTTLS
+      try {
+        const transporter587 = nodemailer.createTransport({
+          host: 'smtp.gmail.com',
+          port: 587,
+          secure: false,
+          requireTLS: true,
+          auth: { user: emailUser, pass: emailPassword },
+          connectionTimeout: 7000,
+          greetingTimeout: 4000,
+          socketTimeout: 7000,
+          tls: { rejectUnauthorized: false }
+        } as any);
+
+        const info3 = await transporter587.sendMail({
+          ...mailOptions,
+          from: senderFrom
+        });
+        console.log(`[SMTP SUCCESS - Port 587 STARTTLS] Email sent to ${mailOptions.to}. Message ID: ${info3.messageId}`);
+        return { success: true, messageId: info3.messageId };
+      } catch (err3: any) {
+        console.error(`[SMTP ERROR - All Transporters Failed] ${err3?.message || err3}`);
+        return { success: false, error: err3?.message || String(err3) };
+      }
     }
   }
 }
