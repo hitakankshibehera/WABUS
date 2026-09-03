@@ -28,11 +28,12 @@ import {
   MOCK_ROUTES,
   MOCK_BUSES,
   INITIAL_CONDUCTORS,
+  INITIAL_TEAM_MEMBERS,
   generateSleeperSeats,
   generateSeaterSeats
 } from './src/data/mockDatabase';
 import { POSTGRESQL_SCHEMA_SQL, REDIS_LOCKING_TYPESCRIPT, PAYMENT_WEBHOOK_TYPESCRIPT } from './src/data/deliverables';
-import { Booking, FeatureFlags, Trip, Seat, PayoutRecord, ConductorProfile, OfferCoupon, UserAccount, GiftCard } from './src/types';
+import { Booking, FeatureFlags, Trip, Seat, PayoutRecord, ConductorProfile, OfferCoupon, UserAccount, GiftCard, TeamMember } from './src/types';
 
 // In-Memory Database State (Simulating PostgreSQL + Redis Cache)
 let featureFlags: FeatureFlags = { ...DEFAULT_FEATURE_FLAGS };
@@ -40,6 +41,8 @@ let trips: Trip[] = JSON.parse(JSON.stringify(INITIAL_TRIPS));
 let bookings: Booking[] = JSON.parse(JSON.stringify(INITIAL_BOOKINGS));
 let payouts: PayoutRecord[] = JSON.parse(JSON.stringify(MOCK_PAYOUTS));
 let conductors: ConductorProfile[] = JSON.parse(JSON.stringify(INITIAL_CONDUCTORS));
+let teamMembers: TeamMember[] = JSON.parse(JSON.stringify(INITIAL_TEAM_MEMBERS));
+
 
 // User Accounts Database Store
 let registeredUsers: UserAccount[] = [
@@ -2641,7 +2644,60 @@ app.use(express.json());
   });
 
   // ==========================================
-  // 10. API: CODE DELIVERABLES (DDL, REDIS, WEBHOOK)
+  // 10. API: MANAGEMENT TEAM ENDPOINTS
+  // ==========================================
+  app.get('/api/team-members', (req, res) => {
+    const sorted = [...teamMembers].sort((a, b) => (a.displayOrder || 99) - (b.displayOrder || 99));
+    res.json(sorted);
+  });
+
+  app.post('/api/admin/team-members', (req, res) => {
+    const { id, name, role, bio, imageUrl, displayOrder, email, linkedinUrl } = req.body;
+    if (!name || !role || !bio) {
+      return res.status(400).json({ error: 'Name, Role/Title, and Bio description are required.' });
+    }
+
+    if (id) {
+      const idx = teamMembers.findIndex(m => m.id === id);
+      if (idx !== -1) {
+        teamMembers[idx] = {
+          ...teamMembers[idx],
+          name: String(name).trim(),
+          role: String(role).trim(),
+          bio: String(bio).trim(),
+          imageUrl: imageUrl ? String(imageUrl).trim() : teamMembers[idx].imageUrl,
+          displayOrder: Number(displayOrder) || teamMembers[idx].displayOrder || 1,
+          email: email ? String(email).trim() : undefined,
+          linkedinUrl: linkedinUrl ? String(linkedinUrl).trim() : undefined
+        };
+        return res.json({ success: true, member: teamMembers[idx], message: `Team member ${name} updated successfully!` });
+      }
+    }
+
+    const newMember: TeamMember = {
+      id: `tm-${Date.now()}`,
+      name: String(name).trim(),
+      role: String(role).trim(),
+      bio: String(bio).trim(),
+      imageUrl: imageUrl ? String(imageUrl).trim() : 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=400&auto=format&fit=crop&q=80',
+      displayOrder: Number(displayOrder) || teamMembers.length + 1,
+      email: email ? String(email).trim() : undefined,
+      linkedinUrl: linkedinUrl ? String(linkedinUrl).trim() : undefined,
+      createdAt: new Date().toISOString()
+    };
+
+    teamMembers.push(newMember);
+    res.json({ success: true, member: newMember, message: `Team member ${name} (${role}) added successfully!` });
+  });
+
+  app.delete('/api/admin/team-members/:id', (req, res) => {
+    const { id } = req.params;
+    teamMembers = teamMembers.filter(m => m.id !== id);
+    res.json({ success: true, message: 'Team member deleted successfully.' });
+  });
+
+  // ==========================================
+  // 11. API: CODE DELIVERABLES (DDL, REDIS, WEBHOOK)
   // ==========================================
   app.get('/api/deliverables', (req, res) => {
     res.json({

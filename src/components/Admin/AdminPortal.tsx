@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { FeatureFlags, PayoutRecord, Trip, Route, Bus, OfferCoupon, CoachType, Booking, SeatLayoutTemplate, InventoryAuditLog } from '../../types';
+import { FeatureFlags, PayoutRecord, Trip, Route, Bus, OfferCoupon, CoachType, Booking, SeatLayoutTemplate, InventoryAuditLog, TeamMember } from '../../types';
 import { api } from '../../services/api';
+
 import { useAuth } from '../../context/AuthContext';
 import { 
   ShieldCheck, 
@@ -49,8 +50,9 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   onRefreshTrips,
 }) => {
   const { currentUser, loginAdmin, signupAdmin, switchDemoRole, logout } = useAuth();
-  const [activeAdminTab, setActiveAdminTab] = useState<'FEATURE_FLAGS' | 'BOOKINGS' | 'SCHEDULES' | 'OFFERS' | 'PAYOUTS' | 'ANALYTICS' | 'CUSTOMERS' | 'SEAT_LAYOUT' | 'BUS_MANAGEMENT' | 'LIVE_INVENTORY' | 'AUDIT_LOGS'>('FEATURE_FLAGS');
+  const [activeAdminTab, setActiveAdminTab] = useState<'FEATURE_FLAGS' | 'BOOKINGS' | 'SCHEDULES' | 'OFFERS' | 'PAYOUTS' | 'ANALYTICS' | 'CUSTOMERS' | 'SEAT_LAYOUT' | 'BUS_MANAGEMENT' | 'LIVE_INVENTORY' | 'AUDIT_LOGS' | 'TEAM_MANAGEMENT'>('FEATURE_FLAGS');
   const [payouts, setPayouts] = useState<PayoutRecord[]>([]);
+
   const [isCronRunning, setIsCronRunning] = useState(false);
   const [cronMessage, setCronMessage] = useState<string | null>(null);
   const [customers, setCustomers] = useState<any[]>([]);
@@ -118,6 +120,90 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [liveInventoryTripId, setLiveInventoryTripId] = useState<string>('');
   const [liveInventoryData, setLiveInventoryData] = useState<any>(null);
   const [liveInvStatusMsg, setLiveInvStatusMsg] = useState<string | null>(null);
+
+  // Executive Management Team State
+  const [teamMembersList, setTeamMembersList] = useState<TeamMember[]>([]);
+  const [teamEditingId, setTeamEditingId] = useState<string | null>(null);
+  const [teamName, setTeamName] = useState('');
+  const [teamRole, setTeamRole] = useState('');
+  const [teamBio, setTeamBio] = useState('');
+  const [teamImageUrl, setTeamImageUrl] = useState('');
+  const [teamDisplayOrder, setTeamDisplayOrder] = useState('1');
+  const [teamEmail, setTeamEmail] = useState('');
+  const [teamLinkedinUrl, setTeamLinkedinUrl] = useState('');
+  const [teamStatusMsg, setTeamStatusMsg] = useState<string | null>(null);
+  const [isTeamSaving, setIsTeamSaving] = useState(false);
+
+  const fetchTeamMembersList = async () => {
+    try {
+      const list = await api.getTeamMembers();
+      setTeamMembersList(list);
+    } catch (err) {
+      console.warn('Failed to load team members:', err);
+    }
+  };
+
+  const handleSaveTeamMember = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!teamName.trim() || !teamRole.trim() || !teamBio.trim()) {
+      alert('Please enter Name, Role/Title, and Bio description.');
+      return;
+    }
+
+    setIsTeamSaving(true);
+    setTeamStatusMsg(null);
+    try {
+      const res = await api.saveTeamMember({
+        id: teamEditingId || undefined,
+        name: teamName.trim(),
+        role: teamRole.trim(),
+        bio: teamBio.trim(),
+        imageUrl: teamImageUrl.trim() || 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=400&auto=format&fit=crop&q=80',
+        displayOrder: Number(teamDisplayOrder) || 1,
+        email: teamEmail.trim() || undefined,
+        linkedinUrl: teamLinkedinUrl.trim() || undefined
+      });
+      setTeamStatusMsg(`✅ ${res.message}`);
+      setTeamEditingId(null);
+      setTeamName('');
+      setTeamRole('');
+      setTeamBio('');
+      setTeamImageUrl('');
+      setTeamDisplayOrder('1');
+      setTeamEmail('');
+      setTeamLinkedinUrl('');
+      await fetchTeamMembersList();
+    } catch (err: any) {
+      alert(err.message || 'Failed to save team member');
+    } finally {
+      setIsTeamSaving(false);
+    }
+  };
+
+  const handleEditTeamMember = (member: TeamMember) => {
+    setTeamEditingId(member.id);
+    setTeamName(member.name);
+    setTeamRole(member.role);
+    setTeamBio(member.bio);
+    setTeamImageUrl(member.imageUrl);
+    setTeamDisplayOrder(String(member.displayOrder || 1));
+    setTeamEmail(member.email || '');
+    setTeamLinkedinUrl(member.linkedinUrl || '');
+    setTeamStatusMsg(`Editing profile for ${member.name} (${member.role})`);
+    window.scrollTo({ top: 300, behavior: 'smooth' });
+  };
+
+  const handleDeleteTeamMember = async (id: string, name: string) => {
+    if (!confirm(`Are you sure you want to remove executive ${name} from the Management Team?`)) return;
+    try {
+      await api.deleteTeamMember(id);
+      setTeamStatusMsg(`🗑️ Removed ${name} from Management Team.`);
+      await fetchTeamMembersList();
+    } catch (err: any) {
+      alert('Failed to delete team member');
+    }
+  };
+
 
   // Bus Master Form State
   const [masterRegNum, setMasterRegNum] = useState('OD-02-AX-8910');
@@ -455,7 +541,9 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   useEffect(() => {
     loadPayoutsAndRoutes();
     fetchBookingsList();
+    fetchTeamMembersList();
   }, []);
+
 
   const handleAdminAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -833,6 +921,19 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
               <Clock className="w-3.5 h-3.5" />
               <span>Audit Logs</span>
             </button>
+            <button
+              onClick={() => {
+                setActiveAdminTab('TEAM_MANAGEMENT');
+                fetchTeamMembersList();
+              }}
+              className={`px-3.5 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1.5 ${
+                activeAdminTab === 'TEAM_MANAGEMENT' ? 'bg-[#D84E55] text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <User className="w-3.5 h-3.5" />
+              <span>Management Team ({teamMembersList.length})</span>
+            </button>
+
             <button
               onClick={() => setActiveAdminTab('OFFERS')}
               className={`px-3.5 py-1.5 rounded-xl transition cursor-pointer ${
@@ -3141,6 +3242,240 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
           </div>
         </div>
       )}
+
+      {/* =========================================================
+         TAB 12: MANAGEMENT TEAM & EXECUTIVE BIOS (CEO, CTO, etc.)
+         ========================================================= */}
+      {activeAdminTab === 'TEAM_MANAGEMENT' && (
+        <div className="space-y-6 animate-in fade-in duration-200">
+          <div className="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-4">
+              <div>
+                <h3 className="text-lg font-black text-gray-900 flex items-center gap-2">
+                  <User className="w-5 h-5 text-[#D84E55]" />
+                  <span>Management Team & Executive Bios Studio</span>
+                </h3>
+                <p className="text-xs text-gray-500 mt-1">
+                  Add, edit, or remove executive leadership profiles (CEO, CTO, COO) displayed on the consumer "Know about wABus" page.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={fetchTeamMembersList}
+                  className="px-3.5 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Refresh List</span>
+                </button>
+              </div>
+            </div>
+
+            {teamStatusMsg && (
+              <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-2xl text-xs font-bold text-[#D84E55] flex items-center justify-between">
+                <span>{teamStatusMsg}</span>
+                {teamEditingId && (
+                  <button
+                    onClick={() => {
+                      setTeamEditingId(null);
+                      setTeamName('');
+                      setTeamRole('');
+                      setTeamBio('');
+                      setTeamImageUrl('');
+                      setTeamDisplayOrder('1');
+                      setTeamEmail('');
+                      setTeamLinkedinUrl('');
+                      setTeamStatusMsg(null);
+                    }}
+                    className="text-xs text-slate-700 underline font-bold"
+                  >
+                    Cancel Editing
+                  </button>
+                )}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              {/* Form Column */}
+              <div className="lg:col-span-5 bg-slate-50/70 border border-slate-200 rounded-3xl p-5 space-y-4">
+                <h4 className="font-extrabold text-slate-900 text-sm flex items-center gap-2">
+                  <Plus className="w-4 h-4 text-[#D84E55]" />
+                  <span>{teamEditingId ? 'Edit Executive Member' : 'Add New Management Member'}</span>
+                </h4>
+
+                <form onSubmit={handleSaveTeamMember} className="space-y-3.5 text-xs">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
+                      Full Name *
+                    </label>
+                    <input
+                      type="text"
+                      value={teamName}
+                      onChange={e => setTeamName(e.target.value)}
+                      placeholder="e.g. Prakash Sangam"
+                      className="w-full bg-white border border-slate-300 rounded-xl p-2.5 text-xs text-slate-900 font-semibold focus:border-[#D84E55] focus:outline-none"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
+                      Role / Title *
+                    </label>
+                    <input
+                      type="text"
+                      value={teamRole}
+                      onChange={e => setTeamRole(e.target.value)}
+                      placeholder="e.g. CEO, CTO, COO"
+                      className="w-full bg-white border border-slate-300 rounded-xl p-2.5 text-xs text-slate-900 font-semibold focus:border-[#D84E55] focus:outline-none font-mono"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
+                      Profile Image URL
+                    </label>
+                    <input
+                      type="url"
+                      value={teamImageUrl}
+                      onChange={e => setTeamImageUrl(e.target.value)}
+                      placeholder="https://images.unsplash.com/..."
+                      className="w-full bg-white border border-slate-300 rounded-xl p-2.5 text-xs text-slate-900 focus:border-[#D84E55] focus:outline-none"
+                    />
+                  </div>
+
+                  {/* Image Preview */}
+                  {teamImageUrl && (
+                    <div className="flex items-center gap-3 p-2 bg-white rounded-xl border border-slate-200">
+                      <img src={teamImageUrl} alt="Preview" className="w-12 h-12 rounded-full object-cover border border-[#D84E55]" />
+                      <span className="text-[10px] text-slate-500 font-medium">Image Preview Thumbnail</span>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
+                      Detailed Bio Description *
+                    </label>
+                    <textarea
+                      rows={4}
+                      value={teamBio}
+                      onChange={e => setTeamBio(e.target.value)}
+                      placeholder="Write full background biography, prior leadership positions, degrees, and responsibilities..."
+                      className="w-full bg-white border border-slate-300 rounded-xl p-2.5 text-xs text-slate-900 leading-relaxed focus:border-[#D84E55] focus:outline-none"
+                      required
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
+                        Display Order
+                      </label>
+                      <input
+                        type="number"
+                        value={teamDisplayOrder}
+                        onChange={e => setTeamDisplayOrder(e.target.value)}
+                        placeholder="1"
+                        className="w-full bg-white border border-slate-300 rounded-xl p-2.5 text-xs text-slate-900 font-mono focus:border-[#D84E55] focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
+                        Work Email
+                      </label>
+                      <input
+                        type="email"
+                        value={teamEmail}
+                        onChange={e => setTeamEmail(e.target.value)}
+                        placeholder="ceo@wabus.in"
+                        className="w-full bg-white border border-slate-300 rounded-xl p-2.5 text-xs text-slate-900 focus:border-[#D84E55] focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isTeamSaving}
+                    className="w-full py-3 rounded-2xl bg-[#D84E55] hover:bg-[#C33E44] text-white font-extrabold text-xs uppercase tracking-wider shadow-md transition cursor-pointer disabled:opacity-50"
+                  >
+                    {isTeamSaving ? 'Saving Profile...' : teamEditingId ? 'Update Team Member' : 'Add Team Member'}
+                  </button>
+                </form>
+              </div>
+
+              {/* Members List Cards Column */}
+              <div className="lg:col-span-7 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-extrabold text-slate-900 text-sm">
+                    Current Management Team ({teamMembersList.length})
+                  </h4>
+                  <span className="text-[10px] text-slate-400">Live on "Know about wABus"</span>
+                </div>
+
+                {teamMembersList.length === 0 ? (
+                  <div className="p-8 text-center text-slate-400 text-xs bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                    No executive team members added yet. Fill out the form to publish CEO/CTO profiles!
+                  </div>
+                ) : (
+                  <div className="space-y-4 max-h-[600px] overflow-y-auto pr-1">
+                    {teamMembersList.map(member => (
+                      <div
+                        key={member.id}
+                        className="p-4 bg-white border border-slate-200 rounded-2xl shadow-xs hover:shadow-md transition space-y-3"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-center gap-3">
+                            <img
+                              src={member.imageUrl}
+                              alt={member.name}
+                              className="w-14 h-14 rounded-full object-cover border-2 border-[#D84E55]/30 shrink-0"
+                              onError={e => {
+                                (e.target as HTMLElement).setAttribute('src', 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=400&auto=format&fit=crop&q=80');
+                              }}
+                            />
+                            <div>
+                              <div className="font-extrabold text-slate-900 text-sm flex items-center gap-2">
+                                <span>{member.name}</span>
+                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-50 text-[#D84E55] font-black border border-rose-200">
+                                  {member.role}
+                                </span>
+                              </div>
+                              <span className="text-[10px] text-slate-400 font-mono">Order: #{member.displayOrder || 1} {member.email && `• ${member.email}`}</span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button
+                              onClick={() => handleEditTeamMember(member)}
+                              className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition cursor-pointer"
+                              title="Edit Member"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleDeleteTeamMember(member.id, member.name)}
+                              className="p-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 transition cursor-pointer"
+                              title="Delete Member"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+
+                        <p className="text-xs text-slate-600 leading-relaxed bg-slate-50 p-3 rounded-xl border border-slate-100 line-clamp-3">
+                          {member.bio}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* =========================================================
          DISPATCHED GIFT CARD EMAIL PREVIEW MODAL
          ========================================================= */}

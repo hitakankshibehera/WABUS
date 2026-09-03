@@ -1,5 +1,6 @@
-import { Trip, Booking, FeatureFlags, PayoutRecord, Route, ConductorProfile, OfferCoupon, UserAccount, OtpSessionResponse, VerifyOtpResponse, GiftCard, Bus, Seat, SeatLayoutTemplate, InventoryAuditLog } from '../types';
-import { INITIAL_TRIPS, MOCK_BUSES, MOCK_ROUTES, INITIAL_CONDUCTORS, INITIAL_BOOKINGS, MOCK_PAYOUTS, DEFAULT_FEATURE_FLAGS, generateSleeperSeats, generateSeaterSeats } from '../data/mockDatabase';
+import { Trip, Booking, FeatureFlags, PayoutRecord, Route, ConductorProfile, OfferCoupon, UserAccount, OtpSessionResponse, VerifyOtpResponse, GiftCard, Bus, Seat, SeatLayoutTemplate, InventoryAuditLog, TeamMember } from '../types';
+import { INITIAL_TRIPS, MOCK_BUSES, MOCK_ROUTES, INITIAL_CONDUCTORS, INITIAL_BOOKINGS, MOCK_PAYOUTS, DEFAULT_FEATURE_FLAGS, INITIAL_TEAM_MEMBERS, generateSleeperSeats, generateSeaterSeats } from '../data/mockDatabase';
+
 
 async function safeParseJson(res: Response, defaultError: string): Promise<any> {
   const contentType = res.headers.get('content-type') || '';
@@ -1098,5 +1099,108 @@ export const api = {
   async getDeliverables(): Promise<{ postgresqlSchema: string; redisLockingModule: string; webhookHandler: string }> {
     const res = await fetch('/api/deliverables');
     return res.json();
+  },
+
+  async getTeamMembers(): Promise<TeamMember[]> {
+    let localMembers: TeamMember[] = [];
+    try {
+      const saved = localStorage.getItem('wabus_team_members');
+      if (saved) localMembers = JSON.parse(saved);
+    } catch {}
+
+    try {
+      const res = await fetch('/api/team-members');
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          return data;
+        }
+      }
+    } catch {}
+
+    return localMembers.length > 0 ? localMembers : INITIAL_TEAM_MEMBERS;
+  },
+
+  async saveTeamMember(member: Partial<TeamMember>): Promise<{ success: boolean; member: TeamMember; message: string }> {
+    try {
+      const res = await fetch('/api/admin/team-members', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(member)
+      });
+      const data = await safeParseJson(res, 'Failed to save team member');
+      if (data && data.success) {
+        // Sync to local storage
+        const current = await api.getTeamMembers();
+        const updated = member.id 
+          ? current.map(m => m.id === member.id ? data.member : m)
+          : [...current, data.member];
+        localStorage.setItem('wabus_team_members', JSON.stringify(updated));
+        window.dispatchEvent(new Event('wabus_team_updated'));
+        return data;
+      }
+    } catch (err: any) {
+      console.warn('[TEAM SAVE FALLBACK]', err);
+    }
+
+    // Local Storage fallback
+    const current = await api.getTeamMembers();
+    let savedMember: TeamMember;
+
+    if (member.id) {
+      savedMember = {
+        id: member.id,
+        name: member.name || 'Executive',
+        role: member.role || 'Management',
+        bio: member.bio || '',
+        imageUrl: member.imageUrl || 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=400&auto=format&fit=crop&q=80',
+        displayOrder: member.displayOrder || 1,
+        email: member.email,
+        linkedinUrl: member.linkedinUrl
+      };
+      const updated = current.map(m => m.id === member.id ? savedMember : m);
+      localStorage.setItem('wabus_team_members', JSON.stringify(updated));
+    } else {
+      savedMember = {
+        id: `tm-${Date.now()}`,
+        name: member.name || 'New Executive',
+        role: member.role || 'Executive',
+        bio: member.bio || '',
+        imageUrl: member.imageUrl || 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=400&auto=format&fit=crop&q=80',
+        displayOrder: member.displayOrder || current.length + 1,
+        email: member.email,
+        linkedinUrl: member.linkedinUrl,
+        createdAt: new Date().toISOString()
+      };
+      localStorage.setItem('wabus_team_members', JSON.stringify([...current, savedMember]));
+    }
+
+    window.dispatchEvent(new Event('wabus_team_updated'));
+    return {
+      success: true,
+      member: savedMember,
+      message: `Team member ${savedMember.name} (${savedMember.role}) saved successfully!`
+    };
+  },
+
+  async deleteTeamMember(id: string): Promise<{ success: boolean; message: string }> {
+    try {
+      const res = await fetch(`/api/admin/team-members/${id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (res.ok) {
+        const current = await api.getTeamMembers();
+        const updated = current.filter(m => m.id !== id);
+        localStorage.setItem('wabus_team_members', JSON.stringify(updated));
+        window.dispatchEvent(new Event('wabus_team_updated'));
+        return data;
+      }
+    } catch {}
+
+    const current = await api.getTeamMembers();
+    const updated = current.filter(m => m.id !== id);
+    localStorage.setItem('wabus_team_members', JSON.stringify(updated));
+    window.dispatchEvent(new Event('wabus_team_updated'));
+    return { success: true, message: 'Team member removed successfully.' };
   }
 };
+

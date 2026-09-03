@@ -456,3 +456,16 @@ export interface LiveTrackingResponse {
   };
   notifications: BusTrackingNotification[];
 }
+
+export interface TeamMember {
+  id: string;
+  name: string;
+  role: string; // e.g. "CEO", "CTO", "COO"
+  bio: string;
+  imageUrl: string;
+  displayOrder?: number;
+  email?: string;
+  linkedinUrl?: string;
+  createdAt?: string;
+}
+

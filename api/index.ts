@@ -137,7 +137,38 @@ const serverAuditLogs: any[] = [
   }
 ];
 
+const serverTeamMembers: any[] = [
+  {
+    id: 'tm-1',
+    name: 'Prakash Sangam',
+    role: 'CEO',
+    bio: 'Prakash Sangam has been Chief Executive Officer of wABus since June 2014. Prior to wABus, he served as an Executive Vice President of Info Edge India (Naukri group), heading two group businesses namely Shiksha.com and Jeevansathi.com. He\'s also worked as General Manager of Marketing and Innovation at Airtel and has also had multiple roles across Marketing, Brand Management and Sales at Hindustan Unilever. Prakash has completed his MBA from IIM Calcutta and also holds an Honours degree in Production Engineering from Mumbai University.',
+    imageUrl: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=400&auto=format&fit=crop&q=80',
+    displayOrder: 1,
+    email: 'prakash.sangam@wabus.in'
+  },
+  {
+    id: 'tm-2',
+    name: 'Anoop Menon',
+    role: 'CTO',
+    bio: 'Anoop Menon serves as Chief Technology Officer at wABus. Anoop plays an integral role in setting the company\'s strategic direction, development and future growth. At wABus, he leads effective delivery of scalable systems to the customers, agents and bus operators by incorporating the latest technology. A tech enthusiast, Anoop comes with over 18 years of extensive experience in building scalable and high-performing products across telecom, internet and mobile ecommerce domains. Anoop strongly believes that hard work and commitment can overcome the barriers to success. He completed BE in Mechanical Engineering from Madras University and loves sports, movies, TV and music.',
+    imageUrl: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=400&auto=format&fit=crop&q=80',
+    displayOrder: 2,
+    email: 'anoop.menon@wabus.in'
+  },
+  {
+    id: 'tm-3',
+    name: 'Sunita Sharma',
+    role: 'COO - Chief Operating Officer',
+    bio: 'Sunita Sharma oversees national fleet operations, operator relations, and passenger safety ecosystems across wABus corridors. With over 16 years of leadership experience in logistics and transport infrastructure, she led multi-city network scaling at leading Indian mobility platforms. She holds a Master\'s degree in Supply Chain Management from XLRI Jamshedpur.',
+    imageUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&auto=format&fit=crop&q=80',
+    displayOrder: 3,
+    email: 'sunita.sharma@wabus.in'
+  }
+];
+
 const redisLocks = new Map<string, { sessionId: string; expiresAt: number }>();
+
 const otpStore = new Map<string, { hash: string; salt: string; expiresAt: number; resendAllowedAt: number }>();
 const sentBookingConfirmationPnrs = new Set<string>();
 const sentAdminGiftCardCodes = new Set<string>();
@@ -1042,6 +1073,57 @@ app.post(['/api/admin/trips/update-seats', '/admin/trips/update-seats'], (req, r
 });
 
 // 6d. Layout Templates Endpoint
+app.get(['/api/team-members', '/team-members'], (req, res) => {
+  const sorted = [...serverTeamMembers].sort((a, b) => (a.displayOrder || 99) - (b.displayOrder || 99));
+  res.json(sorted);
+});
+
+app.post(['/api/admin/team-members', '/admin/team-members'], (req, res) => {
+  const { id, name, role, bio, imageUrl, displayOrder, email, linkedinUrl } = req.body;
+  if (!name || !role || !bio) {
+    return res.status(400).json({ error: 'Name, Role, and Bio are required.' });
+  }
+
+  if (id) {
+    const idx = serverTeamMembers.findIndex(m => m.id === id);
+    if (idx !== -1) {
+      serverTeamMembers[idx] = {
+        ...serverTeamMembers[idx],
+        name: String(name).trim(),
+        role: String(role).trim(),
+        bio: String(bio).trim(),
+        imageUrl: imageUrl ? String(imageUrl).trim() : serverTeamMembers[idx].imageUrl,
+        displayOrder: Number(displayOrder) || serverTeamMembers[idx].displayOrder || 1,
+        email: email ? String(email).trim() : undefined,
+        linkedinUrl: linkedinUrl ? String(linkedinUrl).trim() : undefined
+      };
+      return res.json({ success: true, member: serverTeamMembers[idx], message: `Team member ${name} updated!` });
+    }
+  }
+
+  const newMember = {
+    id: `tm-${Date.now()}`,
+    name: String(name).trim(),
+    role: String(role).trim(),
+    bio: String(bio).trim(),
+    imageUrl: imageUrl ? String(imageUrl).trim() : 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=400&auto=format&fit=crop&q=80',
+    displayOrder: Number(displayOrder) || serverTeamMembers.length + 1,
+    email: email ? String(email).trim() : undefined,
+    linkedinUrl: linkedinUrl ? String(linkedinUrl).trim() : undefined,
+    createdAt: new Date().toISOString()
+  };
+
+  serverTeamMembers.push(newMember);
+  res.json({ success: true, member: newMember, message: `Team member ${name} added!` });
+});
+
+app.delete(['/api/admin/team-members/:id', '/admin/team-members/:id'], (req, res) => {
+  const { id } = req.params;
+  const idx = serverTeamMembers.findIndex(m => m.id === id);
+  if (idx !== -1) serverTeamMembers.splice(idx, 1);
+  res.json({ success: true, message: 'Team member removed.' });
+});
+
 app.get(['/api/admin/layouts', '/admin/layouts'], (req, res) => {
   return res.json(serverLayoutTemplates);
 });

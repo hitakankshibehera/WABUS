@@ -21,8 +21,9 @@ import {
   Eye,
   EyeOff
 } from 'lucide-react';
-import { Booking } from '../../types';
+import { Booking, TeamMember } from '../../types';
 import { api } from '../../services/api';
+
 
 interface WalletTx {
   id: string;
@@ -469,68 +470,160 @@ export const GiftCardModal: React.FC<{ isOpen: boolean; onClose: () => void }> =
 };
 
 // ==========================================
-// 3. Know About wABus Modal
+// ==========================================
+// 3. Know About wABus Modal (Dynamic Management Team & Bios - redBus Layout)
 // ==========================================
 export const AboutModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const loadTeam = async () => {
+    try {
+      const data = await api.getTeamMembers();
+      setTeamMembers(data);
+    } catch {
+      setTeamMembers([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  React.useEffect(() => {
+    if (isOpen) {
+      loadTeam();
+    }
+    const handleUpdate = () => loadTeam();
+    window.addEventListener('wabus_team_updated', handleUpdate);
+    return () => window.removeEventListener('wabus_team_updated', handleUpdate);
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-      <div className="bg-white rounded-3xl max-w-md w-full overflow-hidden shadow-2xl border border-slate-100 relative">
-        <div className="bg-gradient-to-r from-slate-900 to-slate-800 text-white p-5 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center text-white border border-white/10">
-              <Building2 className="w-5 h-5 text-[#D84E55]" />
+    <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-5 animate-in fade-in duration-200">
+      <div className="bg-white rounded-3xl max-w-4xl w-full overflow-hidden shadow-2xl border border-slate-100 relative flex flex-col max-h-[92vh]">
+        
+        {/* Header Bar */}
+        <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-[#9E2A2B] text-white p-5 flex items-center justify-between shrink-0 shadow-md">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-white/10 flex items-center justify-center text-white border border-white/20 shrink-0">
+              <Building2 className="w-6 h-6 text-[#D84E55]" />
             </div>
             <div>
-              <h3 className="font-extrabold text-base leading-tight">Know About MargPath</h3>
-              <p className="text-[11px] text-slate-300">Explore. Connect. Experience.</p>
+              <h3 className="font-black text-lg leading-tight tracking-tight">Know About wABus</h3>
+              <p className="text-xs text-rose-100 font-medium">Explore. Connect. Experience. India in Every Journey.</p>
             </div>
           </div>
           <button 
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition cursor-pointer"
+            className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/25 text-white flex items-center justify-center transition cursor-pointer"
+            title="Close"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="p-5 space-y-4 text-xs text-slate-600 leading-relaxed max-h-[75vh] overflow-y-auto">
-          <p>
-            <strong className="text-slate-900 font-bold">MargPath</strong> is India&apos;s leading next-generation journey & bus ticketing ecosystem serving over 25+ million passengers across 100+ cities. India in Every Journey.
-          </p>
+        {/* Scrollable Body Content - RedBus Exact Layout */}
+        <div className="p-6 sm:p-8 space-y-8 text-slate-700 leading-relaxed overflow-y-auto flex-1">
+          
+          {/* Section 1: About Us */}
+          <div className="space-y-3 border-b border-slate-100 pb-6">
+            <h2 className="text-xl sm:text-2xl font-black text-[#D84E55] tracking-tight">
+              About us
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed font-medium">
+              wABus (MargPath) is India&apos;s largest online bus ticketing platform that has transformed bus travel in the country by bringing ease and convenience to millions of Indians who travel using buses. Founded with a vision to redefine intercity mobility, wABus is India&apos;s leading online travel ecosystem providing widest choice, superior customer service, lowest prices and unmatched benefits. wABus has served over 25 million customers across India with real-time AIS-140 GPS tracking, Redis distributed seat locks, and instant WhatsApp PDF QR boarding passes.
+            </p>
 
-          <div className="space-y-2 pt-1 border-t border-slate-100">
-            <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider">Key Highlights</h4>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
-                <span className="font-extrabold text-slate-900 text-sm block font-mono">25M+</span>
-                <span className="text-[10px] text-slate-500">Tickets Booked</span>
+            {/* Quick stats row */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3">
+              <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-2xl text-center">
+                <span className="text-lg font-black font-mono text-slate-900 block">25M+</span>
+                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Happy Passengers</span>
               </div>
-              <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
-                <span className="font-extrabold text-slate-900 text-sm block font-mono">10,000+</span>
-                <span className="text-[10px] text-slate-500">Buses Tracked Live</span>
+              <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-2xl text-center">
+                <span className="text-lg font-black font-mono text-slate-900 block">10,000+</span>
+                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Buses On Fleet</span>
               </div>
-              <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
-                <span className="font-extrabold text-[#D84E55] text-sm block font-mono">100%</span>
-                <span className="text-[10px] text-slate-500">Free Cancellation</span>
+              <div className="p-3 bg-rose-50 border border-rose-200 rounded-2xl text-center">
+                <span className="text-lg font-black font-mono text-[#D84E55] block">100%</span>
+                <span className="text-[10px] text-[#D84E55] font-bold uppercase tracking-wider">Flexi Refund</span>
               </div>
-              <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
-                <span className="font-extrabold text-emerald-600 text-sm block font-mono">WhatsApp</span>
-                <span className="text-[10px] text-slate-500">Instant PDF QR Pass</span>
+              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl text-center">
+                <span className="text-lg font-black font-mono text-emerald-700 block">24x7</span>
+                <span className="text-[10px] text-emerald-800 font-bold uppercase tracking-wider">Customer Support</span>
               </div>
             </div>
           </div>
 
-          <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-[#D84E55] font-semibold text-[11px] flex items-center gap-2">
-            <ShieldCheck className="w-4 h-4 shrink-0" />
-            <span>256-Bit SSL Encrypted &amp; AIS-140 GPS Compliance</span>
+          {/* Section 2: Management Team */}
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl sm:text-2xl font-black text-[#D84E55] tracking-tight">
+                Management Team
+              </h2>
+              <span className="text-[11px] font-bold text-slate-400 bg-slate-100 px-2.5 py-1 rounded-full">
+                {teamMembers.length} Executive Leader{teamMembers.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+
+            {isLoading ? (
+              <div className="py-12 text-center text-slate-400 text-xs">
+                Loading executive profiles...
+              </div>
+            ) : teamMembers.length === 0 ? (
+              <div className="py-12 text-center text-slate-400 text-xs bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                No management team members found. Add team members from the Master Admin Panel!
+              </div>
+            ) : (
+              <div className="space-y-8">
+                {teamMembers.map(member => (
+                  <div 
+                    key={member.id}
+                    className="flex flex-col sm:flex-row items-start gap-5 sm:gap-6 p-4 sm:p-5 rounded-2xl hover:bg-slate-50/80 transition border border-slate-100"
+                  >
+                    {/* Profile Picture Thumbnail */}
+                    <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full overflow-hidden shrink-0 border-3 border-[#D84E55]/20 shadow-md bg-slate-100 mx-auto sm:mx-0">
+                      <img 
+                        src={member.imageUrl} 
+                        alt={member.name}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLElement).setAttribute('src', 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=400&auto=format&fit=crop&q=80');
+                        }}
+                      />
+                    </div>
+
+                    {/* Content Block */}
+                    <div className="space-y-2 text-center sm:text-left flex-1 min-w-0">
+                      <h3 className="text-base sm:text-lg font-black text-[#D84E55] leading-snug">
+                        {member.name}, {member.role}
+                      </h3>
+                      <p className="text-xs sm:text-xs text-slate-600 leading-relaxed font-normal">
+                        {member.bio}
+                      </p>
+                      {member.email && (
+                        <div className="pt-1 text-[11px] text-slate-400 font-mono font-semibold">
+                          ✉️ {member.email}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Footer Note */}
+          <div className="pt-4 border-t border-slate-100 text-center text-[11px] text-slate-400">
+            &copy; {new Date().getFullYear()} wABus (MargPath Official Ecosystem). Executive profiles are dynamically managed via Master Admin Security Gateway.
           </div>
         </div>
       </div>
     </div>
   );
 };
+
 
 // ==========================================
 // 4. Instant Cancel Ticket & Refund Modal

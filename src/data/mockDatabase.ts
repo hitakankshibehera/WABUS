@@ -1,4 +1,5 @@
-import { Bus, Route, Trip, Seat, FeatureFlags, Booking, PayoutRecord, ConductorProfile, SeatLayoutTemplate, InventoryAuditLog } from '../types';
+import { Bus, Route, Trip, Seat, FeatureFlags, Booking, PayoutRecord, ConductorProfile, SeatLayoutTemplate, InventoryAuditLog, TeamMember } from '../types';
+
 
 export const INITIAL_SEAT_LAYOUT_TEMPLATES: SeatLayoutTemplate[] = [
   {
@@ -978,3 +979,37 @@ export const MOCK_PAYOUTS: PayoutRecord[] = [
     totalPassengers: 310,
   }
 ];
+
+export const INITIAL_TEAM_MEMBERS: TeamMember[] = [
+  {
+    id: 'tm-1',
+    name: 'Prakash Sangam',
+    role: 'CEO',
+    bio: 'Prakash Sangam has been Chief Executive Officer of wABus since June 2014. Prior to wABus, he served as an Executive Vice President of Info Edge India (Naukri group), heading two group businesses namely Shiksha.com and Jeevansathi.com. He\'s also worked as General Manager of Marketing and Innovation at Airtel and has also had multiple roles across Marketing, Brand Management and Sales at Hindustan Unilever. Prakash has completed his MBA from IIM Calcutta and also holds an Honours degree in Production Engineering from Mumbai University.',
+    imageUrl: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=400&auto=format&fit=crop&q=80',
+    displayOrder: 1,
+    email: 'prakash.sangam@wabus.in',
+    linkedinUrl: 'https://linkedin.com'
+  },
+  {
+    id: 'tm-2',
+    name: 'Anoop Menon',
+    role: 'CTO',
+    bio: 'Anoop Menon serves as Chief Technology Officer at wABus. Anoop plays an integral role in setting the company\'s strategic direction, development and future growth. At wABus, he leads effective delivery of scalable systems to the customers, agents and bus operators by incorporating the latest technology. A tech enthusiast, Anoop comes with over 18 years of extensive experience in building scalable and high-performing products across telecom, internet and mobile ecommerce domains. Anoop strongly believes that hard work and commitment can overcome the barriers to success. He completed BE in Mechanical Engineering from Madras University and loves sports, movies, TV and music.',
+    imageUrl: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=400&auto=format&fit=crop&q=80',
+    displayOrder: 2,
+    email: 'anoop.menon@wabus.in',
+    linkedinUrl: 'https://linkedin.com'
+  },
+  {
+    id: 'tm-3',
+    name: 'Sunita Sharma',
+    role: 'COO - Chief Operating Officer',
+    bio: 'Sunita Sharma oversees national fleet operations, operator relations, and passenger safety ecosystems across wABus corridors. With over 16 years of leadership experience in logistics and transport infrastructure, she led multi-city network scaling at leading Indian mobility platforms. She holds a Master\'s degree in Supply Chain Management from XLRI Jamshedpur.',
+    imageUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&auto=format&fit=crop&q=80',
+    displayOrder: 3,
+    email: 'sunita.sharma@wabus.in',
+    linkedinUrl: 'https://linkedin.com'
+  }
+];
+
