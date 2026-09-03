@@ -143,6 +143,23 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     }
   };
 
+  const handleImageFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        alert('Please select a valid image file (PNG, JPG, JPEG, WEBP, etc.).');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          setTeamImageUrl(String(event.target.result));
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleSaveTeamMember = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!teamName.trim() || !teamRole.trim() || !teamBio.trim()) {
@@ -179,6 +196,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       setIsTeamSaving(false);
     }
   };
+
 
   const handleEditTeamMember = (member: TeamMember) => {
     setTeamEditingId(member.id);
@@ -3334,24 +3352,49 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
                   <div>
                     <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
-                      Profile Image URL
+                      Employee Photo (Upload File or Enter URL)
                     </label>
-                    <input
-                      type="url"
-                      value={teamImageUrl}
-                      onChange={e => setTeamImageUrl(e.target.value)}
-                      placeholder="https://images.unsplash.com/..."
-                      className="w-full bg-white border border-slate-300 rounded-xl p-2.5 text-xs text-slate-900 focus:border-[#D84E55] focus:outline-none"
-                    />
+                    <div className="space-y-2">
+                      <label className="w-full px-3.5 py-2.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl text-xs font-bold text-[#D84E55] flex items-center justify-center gap-2 cursor-pointer transition shadow-2xs">
+                        <span>📁 Choose Picture File from Device</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleImageFileUpload}
+                          className="hidden"
+                        />
+                      </label>
+
+                      <input
+                        type="text"
+                        value={teamImageUrl}
+                        onChange={e => setTeamImageUrl(e.target.value)}
+                        placeholder="Or paste web image link (https://...)"
+                        className="w-full bg-white border border-slate-300 rounded-xl p-2.5 text-xs text-slate-900 focus:border-[#D84E55] focus:outline-none"
+                      />
+                    </div>
                   </div>
 
-                  {/* Image Preview */}
+                  {/* Image Preview Thumbnail with Clear Button */}
                   {teamImageUrl && (
-                    <div className="flex items-center gap-3 p-2 bg-white rounded-xl border border-slate-200">
-                      <img src={teamImageUrl} alt="Preview" className="w-12 h-12 rounded-full object-cover border border-[#D84E55]" />
-                      <span className="text-[10px] text-slate-500 font-medium">Image Preview Thumbnail</span>
+                    <div className="flex items-center justify-between p-2.5 bg-white rounded-xl border border-slate-200 shadow-2xs">
+                      <div className="flex items-center gap-3">
+                        <img src={teamImageUrl} alt="Preview" className="w-12 h-12 rounded-full object-cover border-2 border-[#D84E55]" />
+                        <div>
+                          <span className="text-xs font-bold text-slate-900 block">Employee Photo Loaded</span>
+                          <span className="text-[10px] text-emerald-700 font-semibold">✓ Ready to display on Know About wABus</span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setTeamImageUrl('')}
+                        className="text-xs text-rose-600 font-bold hover:underline px-2 py-1 cursor-pointer"
+                      >
+                        Remove
+                      </button>
                     </div>
                   )}
+
 
                   <div>
                     <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
