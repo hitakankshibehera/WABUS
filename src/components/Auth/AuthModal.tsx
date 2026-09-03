@@ -249,64 +249,67 @@ export const AuthModal: React.FC = () => {
               : `We sent a 6-digit verification code to ${email}`}
           </p>
 
-          {/* Role Tabs */}
-          <div className="grid grid-cols-3 gap-1 bg-black/20 p-1 rounded-xl mt-4">
-            <button
-              type="button"
-              onClick={() => {
-                setActiveRole('PASSENGER');
-                setAuthMethod('EMAIL_OTP');
-                setOtpStep('EMAIL');
-                setErrorMsg(null);
-              }}
-              className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-bold transition cursor-pointer ${
-                activeRole === 'PASSENGER'
-                  ? 'bg-white text-[#D84E55] shadow-xs'
-                  : 'text-white/80 hover:text-white hover:bg-white/10'
-              }`}
-            >
-              <User className="w-3.5 h-3.5" />
-              <span>Passenger</span>
-            </button>
+          {/* Role Tabs (Only rendered when opened from explicit staff gateways) */}
+          {(authModalInitialRole === 'ADMIN' || authModalInitialRole === 'CONDUCTOR') && (
+            <div className="grid grid-cols-3 gap-1 bg-black/20 p-1 rounded-xl mt-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveRole('PASSENGER');
+                  setAuthMethod('EMAIL_OTP');
+                  setOtpStep('EMAIL');
+                  setErrorMsg(null);
+                }}
+                className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-bold transition cursor-pointer ${
+                  activeRole === 'PASSENGER'
+                    ? 'bg-white text-[#D84E55] shadow-xs'
+                    : 'text-white/80 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                <User className="w-3.5 h-3.5" />
+                <span>Passenger</span>
+              </button>
 
-            <button
-              type="button"
-              onClick={() => {
-                setActiveRole('CONDUCTOR');
-                setAuthMethod('PASSWORD');
-                setEmail('conductor.bijay@osrtc.gov.in');
-                setErrorMsg(null);
-              }}
-              className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-bold transition cursor-pointer ${
-                activeRole === 'CONDUCTOR'
-                  ? 'bg-white text-[#D84E55] shadow-xs'
-                  : 'text-white/80 hover:text-white hover:bg-white/10'
-              }`}
-            >
-              <Smartphone className="w-3.5 h-3.5" />
-              <span>Conductor</span>
-            </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveRole('CONDUCTOR');
+                  setAuthMethod('PASSWORD');
+                  setEmail('conductor.bijay@osrtc.gov.in');
+                  setErrorMsg(null);
+                }}
+                className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-bold transition cursor-pointer ${
+                  activeRole === 'CONDUCTOR'
+                    ? 'bg-white text-[#D84E55] shadow-xs'
+                    : 'text-white/80 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                <Smartphone className="w-3.5 h-3.5" />
+                <span>Conductor</span>
+              </button>
 
-            <button
-              type="button"
-              onClick={() => {
-                setActiveRole('ADMIN');
-                setAuthMethod('PASSWORD');
-                setEmail('wonderlightadventure@gmail.com');
-                setPassword('Wa@1234');
-                setErrorMsg(null);
-              }}
-              className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-bold transition cursor-pointer ${
-                activeRole === 'ADMIN'
-                  ? 'bg-white text-[#D84E55] shadow-xs'
-                  : 'text-white/80 hover:text-white hover:bg-white/10'
-              }`}
-            >
-              <ShieldCheck className="w-3.5 h-3.5" />
-              <span>Admin</span>
-            </button>
-          </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveRole('ADMIN');
+                  setAuthMethod('PASSWORD');
+                  setEmail('wonderlightadventure@gmail.com');
+                  setPassword('Wa@1234');
+                  setErrorMsg(null);
+                }}
+                className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-bold transition cursor-pointer ${
+                  activeRole === 'ADMIN'
+                    ? 'bg-white text-[#D84E55] shadow-xs'
+                    : 'text-white/80 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span>Admin</span>
+              </button>
+            </div>
+          )}
         </div>
+
 
         {/* Modal Body */}
         <div className="p-6 space-y-4">
@@ -353,18 +356,7 @@ export const AuthModal: React.FC = () => {
             </>
           )}
 
-          {/* Quick Demo Preset */}
-          <div className="flex items-center justify-between bg-red-50/50 p-2.5 rounded-xl border border-red-100">
-            <span className="text-xs font-semibold text-slate-700">Testing Demo Account?</span>
-            <button
-              type="button"
-              onClick={() => switchDemoRole(activeRole)}
-              className="text-xs font-bold text-[#D84E55] hover:bg-red-100 px-2.5 py-1 rounded-lg transition flex items-center gap-1 cursor-pointer border border-red-200 bg-white"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-[#D84E55]" />
-              <span>Instant Log In ({activeRole})</span>
-            </button>
-          </div>
+
 
           {errorMsg && (
             <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-[#D84E55] font-semibold flex items-center gap-2">

@@ -343,48 +343,11 @@ export const ConductorPortal: React.FC<ConductorPortalProps> = ({
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>
-
-          {/* Quick Demo One Click Logins */}
-          <div className="pt-3 border-t border-slate-100 flex flex-col gap-2">
-            <span className="text-xs text-slate-500 font-semibold">Demo Staff Accounts:</span>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setCondEmpId('COND-7890');
-                  setCondPin('7890');
-                  loginConductor('COND-7890', '7890');
-                }}
-                className="text-xs font-bold text-[#D84E55] bg-red-50 hover:bg-red-100 p-2.5 rounded-xl border border-red-200 transition flex items-center justify-between cursor-pointer"
-              >
-                <div className="text-left">
-                  <div className="font-bold">Bijay Nayak</div>
-                  <div className="text-[10px] text-slate-500 font-mono">Bus: OD-02-AX-8910</div>
-                </div>
-                <Sparkles className="w-3.5 h-3.5 text-red-500" />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setCondEmpId('COND-4421');
-                  setCondPin('4421');
-                  loginConductor('COND-4421', '4421');
-                }}
-                className="text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 p-2.5 rounded-xl border border-blue-200 transition flex items-center justify-between cursor-pointer"
-              >
-                <div className="text-left">
-                  <div className="font-bold">Ramesh Sahu</div>
-                  <div className="text-[10px] text-slate-500 font-mono">Bus: OD-05-BQ-3456</div>
-                </div>
-                <Sparkles className="w-3.5 h-3.5 text-blue-500" />
-              </button>
-            </div>
-          </div>
         </div>
       </div>
     );
   }
+
 
   return (
     <div className="space-y-6">

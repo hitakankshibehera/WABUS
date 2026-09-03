@@ -805,23 +805,11 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>
-
-          {/* Quick Demo One Click Login */}
-          <div className="pt-3 border-t border-gray-100 flex items-center justify-between">
-            <span className="text-xs text-gray-500">Master Admin Access:</span>
-            <button
-              type="button"
-              onClick={() => switchDemoRole('ADMIN')}
-              className="text-xs font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 px-3 py-1.5 rounded-xl border border-purple-200 transition flex items-center gap-1.5 cursor-pointer"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>1-Click Master Admin (wonderlightadventure@gmail.com)</span>
-            </button>
-          </div>
         </div>
       </div>
     );
   }
+
 
   return (
     <div className="space-y-6">
