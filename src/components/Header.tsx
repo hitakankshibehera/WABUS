@@ -172,17 +172,21 @@ export const Header: React.FC<HeaderProps> = ({
               <span>Bus Tickets</span>
             </button>
 
-            <button
-              onClick={() => setActiveTab('CONDUCTOR')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-150 cursor-pointer ${
-                activeTab === 'CONDUCTOR'
-                  ? 'bg-red-50 text-[#D84E55] border border-red-200 shadow-xs'
-                  : 'text-gray-600 hover:text-[#D84E55] hover:bg-gray-50'
-              }`}
-            >
-              <Smartphone className={`w-4 h-4 ${activeTab === 'CONDUCTOR' ? 'text-[#D84E55]' : 'text-gray-500'}`} />
-              <span>Conductor App</span>
-            </button>
+            {/* Conductor App tab is ONLY visible when on /conductor or activeTab is CONDUCTOR */}
+            {activeTab === 'CONDUCTOR' && (
+              <button
+                onClick={() => setActiveTab('CONDUCTOR')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-150 cursor-pointer ${
+                  activeTab === 'CONDUCTOR'
+                    ? 'bg-red-50 text-[#D84E55] border border-red-200 shadow-xs'
+                    : 'text-gray-600 hover:text-[#D84E55] hover:bg-gray-50'
+                }`}
+              >
+                <Smartphone className={`w-4 h-4 ${activeTab === 'CONDUCTOR' ? 'text-[#D84E55]' : 'text-gray-500'}`} />
+                <span>Conductor App</span>
+              </button>
+            )}
+
 
             {/* Master Admin tab is ONLY visible when on /admin or when role is ADMIN */}
             {(activeTab === 'ADMIN' || currentUser?.role === 'ADMIN') && (
@@ -489,30 +493,33 @@ export const Header: React.FC<HeaderProps> = ({
                     </div>
                   </div>
 
-                  {/* Section 4: Role Portals */}
-                  <div className="pt-2 border-t border-gray-100 space-y-1">
-                    <span className="text-[10px] uppercase font-bold text-slate-400 px-1">Platform Portals</span>
-                    <div className="grid grid-cols-2 gap-2 pt-1">
-                      <button
-                        onClick={() => {
-                          setIsAccountMenuOpen(false);
-                          setActiveTab('CONDUCTOR');
-                        }}
-                        className="p-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 text-[11px] font-bold transition cursor-pointer text-center border border-amber-200"
-                      >
-                        Conductor Staff
-                      </button>
-                      <button
-                        onClick={() => {
-                          setIsAccountMenuOpen(false);
-                          setActiveTab('ADMIN');
-                        }}
-                        className="p-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-900 text-[11px] font-bold transition cursor-pointer text-center border border-[#D84E55]/30"
-                      >
-                        Master Admin
-                      </button>
+                  {/* Section 4: Role Portals (Only visible on staff URLs /conductor or /admin or to staff accounts) */}
+                  {(activeTab === 'ADMIN' || activeTab === 'CONDUCTOR' || activeTab === 'ARCHITECTURE' || currentUser?.role === 'ADMIN' || currentUser?.role === 'CONDUCTOR') && (
+                    <div className="pt-2 border-t border-gray-100 space-y-1">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 px-1">Platform Portals</span>
+                      <div className="grid grid-cols-2 gap-2 pt-1">
+                        <button
+                          onClick={() => {
+                            setIsAccountMenuOpen(false);
+                            setActiveTab('CONDUCTOR');
+                          }}
+                          className="p-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 text-[11px] font-bold transition cursor-pointer text-center border border-amber-200"
+                        >
+                          Conductor Staff
+                        </button>
+                        <button
+                          onClick={() => {
+                            setIsAccountMenuOpen(false);
+                            setActiveTab('ADMIN');
+                          }}
+                          className="p-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-900 text-[11px] font-bold transition cursor-pointer text-center border border-[#D84E55]/30"
+                        >
+                          Master Admin
+                        </button>
+                      </div>
                     </div>
-                  </div>
+                  )}
+
                 </div>
               )}
             </div>
@@ -590,14 +597,17 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           )}
 
-          <button
-            onClick={() => setActiveTab('CONDUCTOR')}
-            className={`flex-1 py-1.5 px-2 text-center text-xs font-bold rounded-lg transition whitespace-nowrap ${
-              activeTab === 'CONDUCTOR' ? 'bg-[#D84E55] text-white shadow-xs' : 'text-gray-600 hover:bg-gray-50'
-            }`}
-          >
-            Conductor
-          </button>
+          {activeTab === 'CONDUCTOR' && (
+            <button
+              onClick={() => setActiveTab('CONDUCTOR')}
+              className={`flex-1 py-1.5 px-2 text-center text-xs font-bold rounded-lg transition whitespace-nowrap ${
+                activeTab === 'CONDUCTOR' ? 'bg-[#D84E55] text-white shadow-xs' : 'text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              Conductor
+            </button>
+          )}
+
           {(activeTab === 'ADMIN' || currentUser?.role === 'ADMIN') && (
             <button
               onClick={() => setActiveTab('ADMIN')}
