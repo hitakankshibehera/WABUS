@@ -873,8 +873,24 @@ app.use(express.json());
     const cleanDigits = phone.replace(/\D/g, '');
     const tenDigitPhone = cleanDigits.slice(-10);
 
-    // 1. Try Fast2SMS (Popular Indian SMS Gateway)
-    const fast2smsKey = process.env.FAST2SMS_API_KEY || process.env.SMS_API_KEY;
+    // 1. Try 2Factor.in (Popular Indian Instant OTP Gateway)
+    const twoFactorKey = process.env.TWOFACTOR_API_KEY || process.env.SMS_API_KEY;
+    if (twoFactorKey) {
+      try {
+        const res = await fetch(`https://2factor.in/API/V1/${twoFactorKey}/SMS/91${tenDigitPhone}/${otp}/OTPSMS`, {
+          method: 'GET'
+        });
+        if (res.ok) {
+          console.log(`[SMS SUCCESS - 2Factor] OTP sent to +91 ${tenDigitPhone}`);
+          return { success: true, gateway: '2Factor' };
+        }
+      } catch (twoErr) {
+        console.warn('[SMS WARN - 2Factor Failed]', twoErr);
+      }
+    }
+
+    // 2. Try Fast2SMS (Popular Indian Bulk SMS & OTP Gateway)
+    const fast2smsKey = process.env.FAST2SMS_API_KEY;
     if (fast2smsKey) {
       try {
         const res = await fetch(`https://www.fast2sms.com/dev/bulkV2?authorization=${fast2smsKey}&route=otp&variables_values=${otp}&numbers=${tenDigitPhone}`, {
@@ -882,7 +898,7 @@ app.use(express.json());
           headers: { 'cache-control': 'no-cache' }
         });
         if (res.ok) {
-          console.log(`[SMS SUCCESS - Fast2SMS] OTP sent to ${phone}`);
+          console.log(`[SMS SUCCESS - Fast2SMS] OTP sent to +91 ${tenDigitPhone}`);
           return { success: true, gateway: 'Fast2SMS' };
         }
       } catch (fErr) {
@@ -890,7 +906,23 @@ app.use(express.json());
       }
     }
 
-    // 2. Try Twilio SMS Gateway
+    // 3. Try MSG91 OTP Gateway
+    const msg91Key = process.env.MSG91_AUTH_KEY;
+    if (msg91Key) {
+      try {
+        const res = await fetch(`https://api.msg91.com/api/v5/otp?authkey=${msg91Key}&mobile=91${tenDigitPhone}&otp=${otp}`, {
+          method: 'POST'
+        });
+        if (res.ok) {
+          console.log(`[SMS SUCCESS - MSG91] OTP sent to +91 ${tenDigitPhone}`);
+          return { success: true, gateway: 'MSG91' };
+        }
+      } catch (m91Err) {
+        console.warn('[SMS WARN - MSG91 Failed]', m91Err);
+      }
+    }
+
+    // 4. Try Twilio SMS Gateway
     const twilioSid = process.env.TWILIO_ACCOUNT_SID;
     const twilioToken = process.env.TWILIO_AUTH_TOKEN;
     const twilioPhone = process.env.TWILIO_PHONE_NUMBER;
@@ -911,7 +943,7 @@ app.use(express.json());
           body: params.toString()
         });
         if (res.ok) {
-          console.log(`[SMS SUCCESS - Twilio] OTP sent to ${phone}`);
+          console.log(`[SMS SUCCESS - Twilio] OTP sent to +91 ${tenDigitPhone}`);
           return { success: true, gateway: 'Twilio' };
         }
       } catch (tErr) {
@@ -919,7 +951,26 @@ app.use(express.json());
       }
     }
 
-    // 3. Try WhatsApp Cloud API Message
+    // 5. Try Textlocal SMS Gateway
+    const textlocalKey = process.env.TEXTLOCAL_API_KEY;
+    if (textlocalKey) {
+      try {
+        const params = new URLSearchParams();
+        params.append('apikey', textlocalKey);
+        params.append('numbers', `91${tenDigitPhone}`);
+        params.append('message', `Your MargPath verification code is ${otp}. Valid for 5 minutes.`);
+
+        const res = await fetch(`https://api.textlocal.in/send/?${params.toString()}`);
+        if (res.ok) {
+          console.log(`[SMS SUCCESS - Textlocal] OTP sent to +91 ${tenDigitPhone}`);
+          return { success: true, gateway: 'Textlocal' };
+        }
+      } catch (tlErr) {
+        console.warn('[SMS WARN - Textlocal Failed]', tlErr);
+      }
+    }
+
+    // 6. Try WhatsApp Cloud API Message
     const waToken = process.env.WHATSAPP_ACCESS_TOKEN;
     const waPhoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
     if (waToken && waPhoneId) {
@@ -939,7 +990,7 @@ app.use(express.json());
           })
         });
         if (res.ok) {
-          console.log(`[SMS SUCCESS - WhatsApp Cloud API] OTP sent to ${phone}`);
+          console.log(`[SMS SUCCESS - WhatsApp Cloud API] OTP sent to +91 ${tenDigitPhone}`);
           return { success: true, gateway: 'WhatsApp' };
         }
       } catch (wErr) {
