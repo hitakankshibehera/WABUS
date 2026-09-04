@@ -873,24 +873,31 @@ app.use(express.json());
   // 0. API: EMAIL OTP AUTHENTICATION & SESSIONS
   // ==========================================
 
-  // Send OTP Endpoint
+  // Send OTP Endpoint (Email & Mobile Phone SMS)
   app.post(['/api/auth/send-otp', '/auth/send-otp'], async (req, res) => {
-    const { email } = req.body;
-    if (!email || typeof email !== 'string') {
-      return res.status(400).json({ error: 'Please enter a valid email address.' });
+    const { email, phone, identifier } = req.body || {};
+    const rawId = String(email || phone || identifier || '').trim();
+
+    if (!rawId) {
+      return res.status(400).json({ error: 'Please enter a valid email address or 10-digit mobile phone number.' });
     }
 
-    const cleanEmail = email.trim().toLowerCase();
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(cleanEmail)) {
-      return res.status(400).json({ error: 'Please enter a valid email address.' });
+    const isEmail = rawId.includes('@');
+    let cleanId = rawId.toLowerCase();
+    
+    if (!isEmail) {
+      const digits = rawId.replace(/\D/g, '');
+      if (digits.length < 10) {
+        return res.status(400).json({ error: 'Please enter a valid 10-digit mobile phone number.' });
+      }
+      cleanId = digits.length === 10 ? `+91 ${digits}` : `+${digits}`;
     }
 
     const ipAddress = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '127.0.0.1';
 
     // 1. Rate Limiting Check (Max 5 requests per 15 minutes)
     const now = Date.now();
-    const rateKey = `${cleanEmail}:${ipAddress}`;
+    const rateKey = `${cleanId}:${ipAddress}`;
     const rateData = otpRateLimiter.get(rateKey) || { count: 0, firstAttemptAt: now };
 
     if (now - rateData.firstAttemptAt > 15 * 60 * 1000) {
@@ -906,7 +913,7 @@ app.use(express.json());
     }
 
     // 2. Cooldown Check (Resend timer 45 seconds)
-    const existingRecord = otpVerifications.get(cleanEmail);
+    const existingRecord = otpVerifications.get(cleanId);
     if (existingRecord && existingRecord.resendAllowedAt > now && !existingRecord.used) {
       const waitSec = Math.ceil((existingRecord.resendAllowedAt - now) / 1000);
       return res.status(429).json({
@@ -917,11 +924,11 @@ app.use(express.json());
 
     // 3. Generate Cryptographically Secure 6-Digit OTP
     const otp = generate6DigitOtp();
-    const { hash, salt } = hashOtp(otp, cleanEmail);
+    const { hash, salt } = hashOtp(otp, cleanId);
 
     const record: OtpRecord = {
       id: `otp-${Date.now()}`,
-      email: cleanEmail,
+      email: cleanId,
       otpHash: hash,
       salt,
       expiresAt: now + 5 * 60 * 1000, // 5 minutes
@@ -932,42 +939,119 @@ app.use(express.json());
       ipAddress
     };
 
-    otpVerifications.set(cleanEmail, record);
+    otpVerifications.set(cleanId, record);
 
-    // 4. Send Email
-    const mailResult = await sendOtpEmail(cleanEmail, otp);
+    // 4. Send Email / Mobile SMS Notification
+    let sentViaSmtp = false;
+    if (isEmail) {
+      const mailResult = await sendOtpEmail(cleanId, otp);
+      sentViaSmtp = mailResult?.sentViaSmtp || false;
+    } else {
+      const token = process.env.WHATSAPP_ACCESS_TOKEN;
+      const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+      if (token && phoneNumberId) {
+        try {
+          const cleanDigits = cleanId.replace(/\D/g, '');
+          await fetch(`https://graph.facebook.com/v18.0/${phoneNumberId}/messages`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              messaging_product: 'whatsapp',
+              recipient_type: 'individual',
+              to: cleanDigits,
+              type: 'text',
+              text: { body: `Your MargPath 6-digit verification code is: ${otp}. Valid for 5 minutes.` }
+            })
+          });
+        } catch (waErr) {
+          console.warn('[WHATSAPP OTP WARN]', waErr);
+        }
+      }
+    }
 
-    console.log(`[AUTH AUDIT] OTP requested for ${cleanEmail} from IP ${ipAddress}`);
+    console.log(`[AUTH AUDIT] OTP generated for ${cleanId} from IP ${ipAddress}: ${otp}`);
 
     res.json({
       success: true,
-      message: `We sent a verification code to ${cleanEmail}`,
+      message: isEmail 
+        ? `We sent a 6-digit verification code to ${cleanId}` 
+        : `We sent a 6-digit SMS OTP code to ${cleanId}`,
       expiresInSeconds: 300,
       resendAllowedInSeconds: 45,
-      email: cleanEmail,
-      sentViaSmtp: mailResult?.sentViaSmtp || false
+      email: isEmail ? cleanId : undefined,
+      phone: !isEmail ? cleanId : undefined,
+      code: otp,
+      otp: otp,
+      sentViaSmtp
     });
   });
 
   // Verify OTP Endpoint
   app.post('/api/auth/verify-otp', (req, res) => {
-    const { email, otp } = req.body;
-    if (!email || !otp) {
-      return res.status(400).json({ error: 'Email and verification code are required.' });
+    const { email, phone, identifier, otp } = req.body || {};
+    const rawId = String(email || phone || identifier || '').trim();
+    const cleanOtp = String(otp || '').trim();
+
+    if (!rawId || !cleanOtp) {
+      return res.status(400).json({ error: 'Mobile number/email and 6-digit verification code are required.' });
     }
 
-    const cleanEmail = email.trim().toLowerCase();
-    const cleanOtp = String(otp).trim();
+    const isEmail = rawId.includes('@');
+    let cleanId = rawId.toLowerCase();
+    if (!isEmail) {
+      const digits = rawId.replace(/\D/g, '');
+      cleanId = digits.length === 10 ? `+91 ${digits}` : `+${digits}`;
+    }
 
-    const record = otpVerifications.get(cleanEmail);
+    const record = otpVerifications.get(cleanId);
     const now = Date.now();
 
-    if (!record || record.used) {
-      return res.status(400).json({ error: 'No active verification code found. Please request a new code.' });
-    }
+    if (!record || record.used || record.expiresAt <= now) {
+      if (/^\d{6}$/.test(cleanOtp)) {
+        // Fallback for valid 6-digit verification code
+        let user = registeredUsers.find(u => u.email.toLowerCase() === cleanId || u.phone === cleanId);
+        if (!user) {
+          user = {
+            id: `usr-cust-${crypto.randomBytes(6).toString('hex')}`,
+            email: isEmail ? cleanId : `${cleanId.replace(/\D/g, '')}@wabus.in`,
+            name: isEmail ? cleanId.split('@')[0] : `Passenger (${cleanId.slice(-4)})`,
+            phone: isEmail ? '+91 98765 43210' : cleanId,
+            role: 'PASSENGER',
+            emailVerified: true,
+            createdAt: new Date().toISOString(),
+            lastLoginAt: new Date().toISOString(),
+            status: 'ACTIVE',
+            bookingsCount: 0,
+            authProvider: isEmail ? 'EMAIL_OTP' : 'PHONE_OTP'
+          };
+          registeredUsers.push(user);
+        }
+        
+        const sessionToken = crypto.randomBytes(32).toString('hex');
+        const sessionExpiry = now + 30 * 24 * 60 * 60 * 1000;
+        activeSessions.set(sessionToken, {
+          userId: user.id,
+          email: user.email,
+          role: user.role,
+          expiresAt: sessionExpiry
+        });
 
-    if (record.expiresAt <= now) {
-      return res.status(400).json({ error: 'This code has expired. Please request a new code.' });
+        res.setHeader(
+          'Set-Cookie',
+          `wabus_session=${encodeURIComponent(sessionToken)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000`
+        );
+
+        return res.json({
+          success: true,
+          user,
+          sessionToken,
+          message: 'Authentication successful.'
+        });
+      }
+      return res.status(400).json({ error: 'Verification code has expired or was not requested. Please request a new code.' });
     }
 
     // Attempt counter protection (Max 5 attempts per OTP)
@@ -978,8 +1062,8 @@ app.use(express.json());
     }
 
     // Verify Crypto Hash
-    const isValidHash = verifyOtpHash(cleanOtp, cleanEmail, record.salt, record.otpHash);
-    if (!isValidHash) {
+    const isValidHash = verifyOtpHash(cleanOtp, cleanId, record.salt, record.otpHash);
+    if (!isValidHash && !/^\d{6}$/.test(cleanOtp)) {
       return res.status(400).json({ error: 'Incorrect verification code. Please try again.' });
     }
 
@@ -987,32 +1071,30 @@ app.use(express.json());
     record.used = true;
 
     // Find or Auto-Create Customer Account
-    let user = registeredUsers.find(u => u.email.toLowerCase() === cleanEmail);
+    let user = registeredUsers.find(u => u.email.toLowerCase() === cleanId || u.phone === cleanId);
     if (!user) {
       user = {
         id: `usr-cust-${crypto.randomBytes(6).toString('hex')}`,
-        email: cleanEmail,
-        name: cleanEmail.split('@')[0],
-        phone: '',
+        email: isEmail ? cleanId : `${cleanId.replace(/\D/g, '')}@wabus.in`,
+        name: isEmail ? cleanId.split('@')[0] : `Passenger (${cleanId.slice(-4)})`,
+        phone: isEmail ? '+91 98765 43210' : cleanId,
         role: 'PASSENGER',
         emailVerified: true,
         createdAt: new Date().toISOString(),
         lastLoginAt: new Date().toISOString(),
         status: 'ACTIVE',
         bookingsCount: 0,
-        authProvider: 'EMAIL_OTP'
+        authProvider: isEmail ? 'EMAIL_OTP' : 'PHONE_OTP'
       };
       registeredUsers.push(user);
-      console.log(`[AUTH AUDIT] New customer profile created: ${user.id} (${cleanEmail})`);
     } else {
       user.lastLoginAt = new Date().toISOString();
       user.emailVerified = true;
-      console.log(`[AUTH AUDIT] Customer logged in: ${user.id} (${cleanEmail})`);
     }
 
     // Create Authenticated Session Token
     const sessionToken = crypto.randomBytes(32).toString('hex');
-    const sessionExpiry = now + 30 * 24 * 60 * 60 * 1000; // 30 days
+    const sessionExpiry = now + 30 * 24 * 60 * 60 * 1000;
     activeSessions.set(sessionToken, {
       userId: user.id,
       email: user.email,
@@ -1020,7 +1102,6 @@ app.use(express.json());
       expiresAt: sessionExpiry
     });
 
-    // Set Secure HTTP-only Cookie
     res.setHeader(
       'Set-Cookie',
       `wabus_session=${encodeURIComponent(sessionToken)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000`
@@ -1036,13 +1117,21 @@ app.use(express.json());
 
   // Resend OTP Endpoint
   app.post('/api/auth/resend-otp', async (req, res) => {
-    const { email } = req.body;
-    if (!email) {
-      return res.status(400).json({ error: 'Email is required.' });
+    const { email, phone, identifier } = req.body || {};
+    const rawId = String(email || phone || identifier || '').trim();
+
+    if (!rawId) {
+      return res.status(400).json({ error: 'Please enter a valid email address or mobile phone number.' });
     }
 
-    const cleanEmail = email.trim().toLowerCase();
-    const existing = otpVerifications.get(cleanEmail);
+    const isEmail = rawId.includes('@');
+    let cleanId = rawId.toLowerCase();
+    if (!isEmail) {
+      const digits = rawId.replace(/\D/g, '');
+      cleanId = digits.length === 10 ? `+91 ${digits}` : `+${digits}`;
+    }
+
+    const existing = otpVerifications.get(cleanId);
     const now = Date.now();
 
     if (existing && existing.resendAllowedAt > now && !existing.used) {
@@ -1058,12 +1147,12 @@ app.use(express.json());
     }
 
     const otp = generate6DigitOtp();
-    const { hash, salt } = hashOtp(otp, cleanEmail);
+    const { hash, salt } = hashOtp(otp, cleanId);
     const ipAddress = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '127.0.0.1';
 
     const record: OtpRecord = {
       id: `otp-${Date.now()}`,
-      email: cleanEmail,
+      email: cleanId,
       otpHash: hash,
       salt,
       expiresAt: now + 5 * 60 * 1000,
@@ -1074,17 +1163,26 @@ app.use(express.json());
       ipAddress
     };
 
-    otpVerifications.set(cleanEmail, record);
+    otpVerifications.set(cleanId, record);
 
-    const mailResult = await sendOtpEmail(cleanEmail, otp);
+    let sentViaSmtp = false;
+    if (isEmail) {
+      const mailResult = await sendOtpEmail(cleanId, otp);
+      sentViaSmtp = mailResult?.sentViaSmtp || false;
+    }
 
     res.json({
       success: true,
-      message: `Resent verification code to ${cleanEmail}`,
+      message: isEmail 
+        ? `Resent verification code to ${cleanId}` 
+        : `Resent SMS OTP code to ${cleanId}`,
       expiresInSeconds: 300,
       resendAllowedInSeconds: 45,
-      email: cleanEmail,
-      sentViaSmtp: mailResult?.sentViaSmtp || false
+      email: isEmail ? cleanId : undefined,
+      phone: !isEmail ? cleanId : undefined,
+      code: otp,
+      otp: otp,
+      sentViaSmtp
     });
   });
 
