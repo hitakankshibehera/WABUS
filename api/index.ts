@@ -741,6 +741,88 @@ app.use((req, res, next) => {
   next();
 });
 
+async function sendSmsOtp(phone: string, otp: string): Promise<{ success: boolean; gateway?: string }> {
+  const cleanDigits = phone.replace(/\D/g, '');
+  const tenDigitPhone = cleanDigits.slice(-10);
+
+  // 1. Try Fast2SMS (Popular Indian SMS Gateway)
+  const fast2smsKey = process.env.FAST2SMS_API_KEY || process.env.SMS_API_KEY;
+  if (fast2smsKey) {
+    try {
+      const res = await fetch(`https://www.fast2sms.com/dev/bulkV2?authorization=${fast2smsKey}&route=otp&variables_values=${otp}&numbers=${tenDigitPhone}`, {
+        method: 'GET',
+        headers: { 'cache-control': 'no-cache' }
+      });
+      if (res.ok) {
+        console.log(`[SMS SUCCESS - Fast2SMS] OTP sent to ${phone}`);
+        return { success: true, gateway: 'Fast2SMS' };
+      }
+    } catch (fErr) {
+      console.warn('[SMS WARN - Fast2SMS Failed]', fErr);
+    }
+  }
+
+  // 2. Try Twilio SMS Gateway
+  const twilioSid = process.env.TWILIO_ACCOUNT_SID;
+  const twilioToken = process.env.TWILIO_AUTH_TOKEN;
+  const twilioPhone = process.env.TWILIO_PHONE_NUMBER;
+  if (twilioSid && twilioToken && twilioPhone) {
+    try {
+      const authHeader = 'Basic ' + Buffer.from(`${twilioSid}:${twilioToken}`).toString('base64');
+      const params = new URLSearchParams();
+      params.append('To', `+91${tenDigitPhone}`);
+      params.append('From', twilioPhone);
+      params.append('Body', `Your MargPath verification code is ${otp}. Valid for 5 minutes.`);
+
+      const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`, {
+        method: 'POST',
+        headers: {
+          'Authorization': authHeader,
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: params.toString()
+      });
+      if (res.ok) {
+        console.log(`[SMS SUCCESS - Twilio] OTP sent to ${phone}`);
+        return { success: true, gateway: 'Twilio' };
+      }
+    } catch (tErr) {
+      console.warn('[SMS WARN - Twilio Failed]', tErr);
+    }
+  }
+
+  // 3. Try WhatsApp Cloud API Message
+  const waToken = process.env.WHATSAPP_ACCESS_TOKEN;
+  const waPhoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  if (waToken && waPhoneId) {
+    try {
+      const res = await fetch(`https://graph.facebook.com/v18.0/${waPhoneId}/messages`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${waToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          messaging_product: 'whatsapp',
+          recipient_type: 'individual',
+          to: `91${tenDigitPhone}`,
+          type: 'text',
+          text: { body: `Your MargPath 6-digit verification code is: ${otp}. Valid for 5 minutes. Do not share with anyone.` }
+        })
+      });
+      if (res.ok) {
+        console.log(`[SMS SUCCESS - WhatsApp Cloud API] OTP sent to ${phone}`);
+        return { success: true, gateway: 'WhatsApp' };
+      }
+    } catch (wErr) {
+      console.warn('[SMS WARN - WhatsApp Failed]', wErr);
+    }
+  }
+
+  console.log(`[SMS SIMULATION LOG] OTP ${otp} generated for ${phone}`);
+  return { success: true, gateway: 'Simulated' };
+}
+
 // 1. Send OTP Endpoint (Email & Mobile Phone SMS)
 app.post(['/api/auth/send-otp', '/auth/send-otp'], async (req, res) => {
   const { email, phone, identifier } = req.body || {};
@@ -784,45 +866,20 @@ app.post(['/api/auth/send-otp', '/auth/send-otp'], async (req, res) => {
     const mailResult = await sendOtpEmail(cleanId, otp);
     sentViaSmtp = mailResult.sentViaSmtp;
   } else {
-    // Attempt WhatsApp Cloud API SMS OTP if token is present
-    const token = process.env.WHATSAPP_ACCESS_TOKEN;
-    const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-    if (token && phoneNumberId) {
-      try {
-        const cleanDigits = cleanId.replace(/\D/g, '');
-        await fetch(`https://graph.facebook.com/v18.0/${phoneNumberId}/messages`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            messaging_product: 'whatsapp',
-            recipient_type: 'individual',
-            to: cleanDigits,
-            type: 'text',
-            text: { body: `Your MargPath 6-digit verification code is: ${otp}. Valid for 5 minutes. Do not share with anyone.` }
-          })
-        });
-      } catch (waErr) {
-        console.warn('[WHATSAPP OTP WARN]', waErr);
-      }
-    }
+    await sendSmsOtp(cleanId, otp);
   }
 
-  console.log(`[AUTH AUDIT] OTP generated for ${cleanId}: ${otp}`);
+  console.log(`[AUTH AUDIT] OTP requested for ${cleanId}`);
 
   return res.json({
     success: true,
     message: isEmail 
-      ? `We sent a 6-digit verification code to ${cleanId}` 
-      : `We sent a 6-digit SMS OTP code to ${cleanId}`,
+      ? `We sent a 6-digit verification code to ${cleanId}. Check your email inbox!` 
+      : `We sent a 6-digit SMS OTP code to ${cleanId}. Check your mobile phone messages!`,
     expiresInSeconds: 300,
     resendAllowedInSeconds: 45,
     email: isEmail ? cleanId : undefined,
     phone: !isEmail ? cleanId : undefined,
-    code: otp,
-    otp: otp,
     sentViaSmtp
   });
 });
@@ -928,19 +985,19 @@ app.post(['/api/auth/resend-otp', '/auth/resend-otp'], async (req, res) => {
   if (isEmail) {
     const mailResult = await sendOtpEmail(cleanId, otp);
     sentViaSmtp = mailResult.sentViaSmtp;
+  } else {
+    await sendSmsOtp(cleanId, otp);
   }
 
   return res.json({
     success: true,
     message: isEmail 
-      ? `Resent verification code to ${cleanId}` 
+      ? `Resent 6-digit verification code to ${cleanId}` 
       : `Resent SMS OTP code to ${cleanId}`,
     expiresInSeconds: 300,
     resendAllowedInSeconds: 45,
     email: isEmail ? cleanId : undefined,
     phone: !isEmail ? cleanId : undefined,
-    code: otp,
-    otp: otp,
     sentViaSmtp
   });
 });

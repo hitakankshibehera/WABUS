@@ -128,12 +128,10 @@ export const api = {
       return {
         success: true,
         message: isEmail 
-          ? `We sent a 6-digit verification code to ${cleanId}` 
-          : `We sent a 6-digit SMS OTP code to ${cleanId}`,
+          ? `We sent a 6-digit verification code to ${cleanId}. Check your email inbox!` 
+          : `We sent a 6-digit SMS OTP code to ${cleanId}. Check your mobile phone messages!`,
         email: isEmail ? cleanId : undefined,
         phone: !isEmail ? cleanId : undefined,
-        code: generatedOtp,
-        otp: generatedOtp,
         expiresInSeconds: 300,
         resendAllowedInSeconds: 45,
         sentViaSmtp: false
@@ -214,12 +212,10 @@ export const api = {
       return {
         success: true,
         message: isEmail 
-          ? `A new verification code was sent to ${cleanId}` 
+          ? `A new 6-digit verification code was sent to ${cleanId}` 
           : `A new SMS OTP code was sent to ${cleanId}`,
         email: isEmail ? cleanId : undefined,
         phone: !isEmail ? cleanId : undefined,
-        code: generatedOtp,
-        otp: generatedOtp,
         expiresInSeconds: 300,
         resendAllowedInSeconds: 45,
         sentViaSmtp: false
