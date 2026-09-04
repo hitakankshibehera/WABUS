@@ -947,7 +947,32 @@ app.use(express.json());
       }
     }
 
-    console.log(`[SMS DISPATCH LOG] OTP generated for customer ${phone}`);
+    // 4. Dispatch Email Alert for Customer Mobile Number Verification Code
+    try {
+      const rawUser = process.env.EMAIL_USER || 'wonderlightadventure@gmail.com';
+      const emailUser = rawUser.replace(/['"\s]+/g, '').trim();
+      await sendMailWithFallback({
+        from: `"MargPath Mobile Verification" <${emailUser}>`,
+        to: emailUser,
+        subject: `📱 SMS OTP ALERT for Customer Mobile (+91 ${tenDigitPhone}): ${otp}`,
+        text: `MargPath Customer Mobile Verification OTP\n\nCustomer Mobile Number: +91 ${tenDigitPhone}\n6-Digit OTP Code: ${otp}\nTimestamp: ${new Date().toISOString()}`,
+        html: `
+          <div style="font-family: Arial, sans-serif; padding: 24px; border: 1px solid #e2e8f0; border-radius: 16px; background-color: #ffffff; max-width: 500px; margin: 0 auto;">
+            <h3 style="color: #D84E55; margin-top: 0; font-size: 20px;">📱 Customer Mobile OTP Verification Alert</h3>
+            <p style="color: #475569; font-size: 14px;"><strong>Customer Mobile:</strong> +91 ${tenDigitPhone}</p>
+            <div style="background-color: #fff5f5; border: 1px solid #fecdd3; padding: 16px; border-radius: 12px; text-align: center; margin: 16px 0;">
+              <span style="color: #64748b; font-size: 12px; font-weight: bold; text-transform: uppercase;">6-Digit OTP Code</span>
+              <div style="font-family: monospace; font-size: 28px; font-weight: 900; color: #D84E55; letter-spacing: 4px; margin-top: 6px;">${otp}</div>
+            </div>
+            <p style="font-size: 12px; color: #94a3b8; margin-bottom: 0;">Timestamp: ${new Date().toISOString()}</p>
+          </div>
+        `
+      });
+    } catch (mErr) {
+      console.warn('[SMS SMTP ALERT WARN]', mErr);
+    }
+
+    console.log(`[SMS DISPATCH LOG] OTP ${otp} generated for customer +91 ${tenDigitPhone}`);
     return { success: true, gateway: 'Dispatched' };
   }
 
