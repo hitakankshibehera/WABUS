@@ -544,6 +544,31 @@ export const AuthModal: React.FC = () => {
                 </div>
               </div>
 
+              {displayedOtp && (
+                <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 p-3.5 rounded-2xl text-center space-y-2 shadow-xs animate-in fade-in zoom-in-95">
+                  <div className="text-xs font-extrabold text-amber-900 flex items-center justify-center gap-1.5">
+                    <Sparkles className="w-4 h-4 text-amber-600 animate-pulse" />
+                    <span>Your 6-Digit OTP Code:</span>
+                  </div>
+                  <div className="flex items-center justify-center gap-3 pt-0.5">
+                    <span className="font-mono text-2xl font-black tracking-widest text-[#D84E55] bg-white px-4 py-1.5 rounded-xl border border-amber-300 shadow-2xs">
+                      {displayedOtp}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOtp(displayedOtp);
+                        handleVerifyOtp(displayedOtp);
+                      }}
+                      className="text-xs font-bold bg-[#D84E55] hover:bg-[#c44349] text-white px-3.5 py-2 rounded-xl transition shadow-sm cursor-pointer flex items-center gap-1.5"
+                    >
+                      <span>Auto-fill & Verify</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div>
                 <label className="block text-center text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
                   Enter 6-Digit Verification OTP

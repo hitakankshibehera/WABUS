@@ -132,6 +132,8 @@ export const api = {
           : `We sent a 6-digit SMS OTP code to ${cleanId}`,
         email: isEmail ? cleanId : undefined,
         phone: !isEmail ? cleanId : undefined,
+        code: generatedOtp,
+        otp: generatedOtp,
         expiresInSeconds: 300,
         resendAllowedInSeconds: 45,
         sentViaSmtp: false
@@ -216,6 +218,8 @@ export const api = {
           : `A new SMS OTP code was sent to ${cleanId}`,
         email: isEmail ? cleanId : undefined,
         phone: !isEmail ? cleanId : undefined,
+        code: generatedOtp,
+        otp: generatedOtp,
         expiresInSeconds: 300,
         resendAllowedInSeconds: 45,
         sentViaSmtp: false
