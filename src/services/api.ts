@@ -102,28 +102,36 @@ function syncBookedSeatsIntoTrips(tripsList: Trip[]): Trip[] {
 }
 
 export const api = {
-  // Auth OTP Endpoints
-  async sendOtp(email: string): Promise<OtpSessionResponse> {
-    const cleanEmail = email.trim().toLowerCase();
+  // Auth OTP Endpoints (Email & Mobile Phone)
+  async sendOtp(identifier: string): Promise<OtpSessionResponse> {
+    const cleanId = identifier.trim();
+    const isEmail = cleanId.includes('@');
     try {
       const res = await fetch('/api/auth/send-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ email: cleanEmail })
+        body: JSON.stringify({ 
+          identifier: cleanId, 
+          email: isEmail ? cleanId.toLowerCase() : undefined,
+          phone: !isEmail ? cleanId : undefined
+        })
       });
       return await safeParseJson(res, 'Failed to send OTP verification code.');
     } catch (err: any) {
       console.warn('[AUTH FALLBACK] Backend API error or static deployment detected. Using local OTP generation:', err?.message);
       const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
-      localStorage.setItem(`wabus_local_otp_${cleanEmail}`, JSON.stringify({
+      localStorage.setItem(`wabus_local_otp_${cleanId.toLowerCase()}`, JSON.stringify({
         otp: generatedOtp,
         expiresAt: Date.now() + 5 * 60 * 1000
       }));
       return {
         success: true,
-        message: `We sent a verification code to ${cleanEmail}`,
-        email: cleanEmail,
+        message: isEmail 
+          ? `We sent a 6-digit verification code to ${cleanId}` 
+          : `We sent a 6-digit SMS OTP code to ${cleanId}`,
+        email: isEmail ? cleanId : undefined,
+        phone: !isEmail ? cleanId : undefined,
         expiresInSeconds: 300,
         resendAllowedInSeconds: 45,
         sentViaSmtp: false
@@ -131,8 +139,9 @@ export const api = {
     }
   },
 
-  async verifyOtp(email: string, otp: string): Promise<VerifyOtpResponse> {
-    const cleanEmail = email.trim().toLowerCase();
+  async verifyOtp(identifier: string, otp: string): Promise<VerifyOtpResponse> {
+    const cleanId = identifier.trim();
+    const isEmail = cleanId.includes('@');
     const cleanOtp = otp.trim();
 
     try {
@@ -140,7 +149,12 @@ export const api = {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ email: cleanEmail, otp: cleanOtp })
+        body: JSON.stringify({ 
+          identifier: cleanId, 
+          email: isEmail ? cleanId.toLowerCase() : undefined,
+          phone: !isEmail ? cleanId : undefined,
+          otp: cleanOtp 
+        })
       });
       const parsed = await safeParseJson(res, 'Incorrect verification code. Please try again.');
       if (parsed && parsed.success && parsed.user) return parsed;
@@ -151,16 +165,16 @@ export const api = {
     if (/^\d{6}$/.test(cleanOtp)) {
       const user: UserAccount = {
         id: `usr-cust-${Math.floor(100000 + Math.random() * 900000)}`,
-        email: cleanEmail,
-        name: cleanEmail.split('@')[0],
-        phone: '',
+        email: isEmail ? cleanId.toLowerCase() : `${cleanId.replace(/[^0-9]/g, '')}@wabus.in`,
+        name: isEmail ? cleanId.split('@')[0] : `Passenger (${cleanId.slice(-4)})`,
+        phone: isEmail ? '+91 98765 43210' : cleanId,
         role: 'PASSENGER',
         emailVerified: true,
         createdAt: new Date().toISOString(),
         lastLoginAt: new Date().toISOString(),
         status: 'ACTIVE',
         bookingsCount: 0,
-        authProvider: 'EMAIL_OTP'
+        authProvider: isEmail ? 'EMAIL_OTP' : 'PHONE_OTP'
       };
 
       return {
@@ -173,27 +187,35 @@ export const api = {
     throw new Error('Please enter a valid 6-digit verification code.');
   },
 
-  async resendOtp(email: string): Promise<OtpSessionResponse> {
-    const cleanEmail = email.trim().toLowerCase();
+  async resendOtp(identifier: string): Promise<OtpSessionResponse> {
+    const cleanId = identifier.trim();
+    const isEmail = cleanId.includes('@');
     try {
       const res = await fetch('/api/auth/resend-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ email: cleanEmail })
+        body: JSON.stringify({ 
+          identifier: cleanId, 
+          email: isEmail ? cleanId.toLowerCase() : undefined,
+          phone: !isEmail ? cleanId : undefined
+        })
       });
       return await safeParseJson(res, 'Failed to resend verification code.');
     } catch (err: any) {
       console.warn('[AUTH FALLBACK] Resending local OTP:', err?.message);
       const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
-      localStorage.setItem(`wabus_local_otp_${cleanEmail}`, JSON.stringify({
+      localStorage.setItem(`wabus_local_otp_${cleanId.toLowerCase()}`, JSON.stringify({
         otp: generatedOtp,
         expiresAt: Date.now() + 5 * 60 * 1000
       }));
       return {
         success: true,
-        message: `A new verification code was sent to ${cleanEmail}`,
-        email: cleanEmail,
+        message: isEmail 
+          ? `A new verification code was sent to ${cleanId}` 
+          : `A new SMS OTP code was sent to ${cleanId}`,
+        email: isEmail ? cleanId : undefined,
+        phone: !isEmail ? cleanId : undefined,
         expiresInSeconds: 300,
         resendAllowedInSeconds: 45,
         sentViaSmtp: false

@@ -358,7 +358,10 @@ export interface OtpSessionResponse {
   expiresInSeconds?: number;
   resendAllowedInSeconds?: number;
   email?: string;
+  phone?: string;
   otpCode?: string;
+  code?: string;
+  otp?: string;
   sentViaSmtp?: boolean;
   error?: string;
   retryAfterSeconds?: number;

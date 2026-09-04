@@ -38,11 +38,12 @@ export const AuthModal: React.FC = () => {
   } = useAuth();
 
   const [activeRole, setActiveRole] = useState<UserRole>('PASSENGER');
-  const [authMethod, setAuthMethod] = useState<'EMAIL_OTP' | 'PASSWORD'>('EMAIL_OTP');
+  const [authMethod, setAuthMethod] = useState<'EMAIL_OTP' | 'PHONE_OTP' | 'PASSWORD'>('EMAIL_OTP');
 
   // OTP Flow States
-  const [otpStep, setOtpStep] = useState<'EMAIL' | 'OTP'>('EMAIL');
+  const [otpStep, setOtpStep] = useState<'INPUT' | 'OTP'>('INPUT');
   const [email, setEmail] = useState('user@example.com');
+  const [phoneInput, setPhoneInput] = useState('9876543210');
   const [otp, setOtp] = useState('');
   const [resendCountdown, setResendCountdown] = useState(45);
   const [canResend, setCanResend] = useState(false);
@@ -51,7 +52,6 @@ export const AuthModal: React.FC = () => {
   // Fallback Password States for Admin/Conductor
   const [password, setPassword] = useState('');
   const [name, setName] = useState('Rahul Sharma');
-  const [phone, setPhone] = useState('+91 98765 43210');
 
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
@@ -62,7 +62,7 @@ export const AuthModal: React.FC = () => {
   useEffect(() => {
     if (isAuthModalOpen) {
       setActiveRole(authModalInitialRole || 'PASSENGER');
-      setOtpStep('EMAIL');
+      setOtpStep('INPUT');
       setOtp('');
       setErrorMsg(null);
       setSuccessMsg(null);
@@ -76,6 +76,7 @@ export const AuthModal: React.FC = () => {
         setPassword('');
       } else {
         setEmail('user@example.com');
+        setPhoneInput('9876543210');
         setAuthMethod('EMAIL_OTP');
       }
     }
@@ -108,34 +109,58 @@ export const AuthModal: React.FC = () => {
     setCanResend(false);
   };
 
+  const getActiveTargetIdentifier = () => {
+    if (authMethod === 'PHONE_OTP') {
+      const cleanPhone = phoneInput.replace(/[^0-9]/g, '');
+      return cleanPhone.startsWith('91') && cleanPhone.length > 10 ? `+${cleanPhone}` : `+91 ${cleanPhone}`;
+    }
+    return email.trim();
+  };
+
   const handleSendOtp = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    const cleanEmail = email.trim();
-    if (!cleanEmail || (!cleanEmail.includes('@') && cleanEmail.length < 10)) {
-      setErrorMsg('Please enter a valid email address or 10-digit mobile number.');
-      return;
-    }
-
-    setIsLoading(true);
     setErrorMsg(null);
     setSuccessMsg(null);
 
+    let targetIdentifier = '';
+    if (authMethod === 'PHONE_OTP') {
+      const cleanDigits = phoneInput.replace(/[^0-9]/g, '');
+      if (cleanDigits.length < 10) {
+        setErrorMsg('Please enter a valid 10-digit mobile phone number.');
+        return;
+      }
+      targetIdentifier = cleanDigits.length === 10 ? `+91 ${cleanDigits}` : `+${cleanDigits}`;
+    } else {
+      const cleanEmail = email.trim();
+      if (!cleanEmail || !cleanEmail.includes('@')) {
+        setErrorMsg('Please enter a valid email address.');
+        return;
+      }
+      targetIdentifier = cleanEmail;
+    }
+
+    setIsLoading(true);
+
     try {
-      const res = await sendEmailOtp(cleanEmail);
+      const res = await sendEmailOtp(targetIdentifier);
       setOtpStep('OTP');
       setOtp('');
       if (res.code || res.otp) {
         setDisplayedOtp(res.code || res.otp);
       }
       startResendTimer(res.resendAllowedInSeconds || 45);
-      setSuccessMsg(`We sent a 6-digit verification code to ${res.email || cleanEmail}. Please check your email inbox!`);
+      setSuccessMsg(
+        authMethod === 'PHONE_OTP'
+          ? `We sent a 6-digit SMS OTP code to ${targetIdentifier}. Check your phone messages!`
+          : `We sent a 6-digit verification code to ${targetIdentifier}. Please check your email inbox!`
+      );
     } catch (err: any) {
       const errMsg = err.message || '';
       if (errMsg.toLowerCase().includes('wait') || errMsg.toLowerCase().includes('active verification')) {
         setOtpStep('OTP');
         setOtp('');
         startResendTimer(45);
-        setSuccessMsg(`An active 6-digit verification code was already sent to ${cleanEmail}. Check your email inbox!`);
+        setSuccessMsg(`An active 6-digit code was already dispatched to ${targetIdentifier}. Please check your inbox/messages!`);
       } else {
         setErrorMsg(errMsg || 'Failed to send verification code. Please try again.');
       }
@@ -152,12 +177,14 @@ export const AuthModal: React.FC = () => {
       return;
     }
 
+    const targetIdentifier = getActiveTargetIdentifier();
+
     setIsLoading(true);
     setErrorMsg(null);
     setSuccessMsg(null);
 
     try {
-      await verifyEmailOtp(email.trim(), code);
+      await verifyEmailOtp(targetIdentifier, code);
       setSuccessMsg('Authentication successful! Logged in.');
       setTimeout(() => {
         closeAuthModal();
@@ -171,19 +198,24 @@ export const AuthModal: React.FC = () => {
 
   const handleResendOtp = async () => {
     if (!canResend || isLoading) return;
+    const targetIdentifier = getActiveTargetIdentifier();
 
     setIsLoading(true);
     setErrorMsg(null);
     setSuccessMsg(null);
 
     try {
-      const res = await resendEmailOtp(email.trim());
+      const res = await resendEmailOtp(targetIdentifier);
       setOtp('');
       if (res.code || res.otp) {
         setDisplayedOtp(res.code || res.otp);
       }
       startResendTimer(res.resendAllowedInSeconds || 45);
-      setSuccessMsg(`A new 6-digit verification code was sent to ${email.trim()}`);
+      setSuccessMsg(
+        authMethod === 'PHONE_OTP'
+          ? `A new SMS OTP code was sent to ${targetIdentifier}`
+          : `A new 6-digit verification code was sent to ${targetIdentifier}`
+      );
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to resend code. Please try again later.');
     } finally {
@@ -240,13 +272,13 @@ export const AuthModal: React.FC = () => {
           </div>
           <h2 className="text-xl sm:text-2xl font-black text-white">
             {activeRole === 'PASSENGER' 
-              ? (otpStep === 'EMAIL' ? 'Sign in to continue' : 'Verify your email') 
+              ? (otpStep === 'INPUT' ? 'Sign in to continue' : 'Enter Verification Code') 
               : `${activeRole} Portal Access`}
           </h2>
           <p className="text-xs text-red-100 mt-1">
-            {otpStep === 'EMAIL'
-              ? 'Enter your email address and we will send you a one-time verification code.'
-              : `We sent a 6-digit verification code to ${email}`}
+            {otpStep === 'INPUT'
+              ? 'Select your preferred verification method to sign in or create an account.'
+              : `We sent a 6-digit OTP code to ${getActiveTargetIdentifier()}`}
           </p>
 
           {/* Role Tabs (Only rendered when opened from explicit staff gateways) */}
@@ -257,7 +289,7 @@ export const AuthModal: React.FC = () => {
                 onClick={() => {
                   setActiveRole('PASSENGER');
                   setAuthMethod('EMAIL_OTP');
-                  setOtpStep('EMAIL');
+                  setOtpStep('INPUT');
                   setErrorMsg(null);
                 }}
                 className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-bold transition cursor-pointer ${
@@ -350,13 +382,11 @@ export const AuthModal: React.FC = () => {
 
               <div className="flex items-center gap-3">
                 <div className="h-px flex-1 bg-gray-200" />
-                <span className="text-[11px] font-bold text-gray-400 uppercase">Or Passwordless Email OTP</span>
+                <span className="text-[11px] font-bold text-gray-400 uppercase">Or Passwordless OTP Verification</span>
                 <div className="h-px flex-1 bg-gray-200" />
               </div>
             </>
           )}
-
-
 
           {errorMsg && (
             <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-[#D84E55] font-semibold flex items-center gap-2">
@@ -372,66 +402,134 @@ export const AuthModal: React.FC = () => {
             </div>
           )}
 
-          {/* STEP 1: EMAIL INPUT FOR OTP */}
-          {activeRole === 'PASSENGER' && authMethod === 'EMAIL_OTP' && otpStep === 'EMAIL' && (
-            <form onSubmit={handleSendOtp} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                  Email Address
-                </label>
-                <div className="relative">
-                  <Mail className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="name@domain.com"
-                    required
-                    disabled={isLoading}
-                    className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold focus:outline-none focus:border-[#D84E55] focus:bg-white transition"
-                  />
-                </div>
+          {/* STEP 1: METHOD SELECTION & INPUT FOR OTP */}
+          {activeRole === 'PASSENGER' && otpStep === 'INPUT' && (
+            <div className="space-y-4">
+              {/* Method Selector Tabs: Email OTP vs Phone OTP */}
+              <div className="grid grid-cols-2 gap-1.5 p-1 bg-gray-100 rounded-xl border border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthMethod('EMAIL_OTP');
+                    setErrorMsg(null);
+                  }}
+                  className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg text-xs font-extrabold transition cursor-pointer ${
+                    authMethod === 'EMAIL_OTP'
+                      ? 'bg-white text-[#D84E55] shadow-xs'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'
+                  }`}
+                >
+                  <Mail className="w-4 h-4" />
+                  <span>Email Verification</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthMethod('PHONE_OTP');
+                    setErrorMsg(null);
+                  }}
+                  className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg text-xs font-extrabold transition cursor-pointer ${
+                    authMethod === 'PHONE_OTP'
+                      ? 'bg-white text-[#D84E55] shadow-xs'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'
+                  }`}
+                >
+                  <Phone className="w-4 h-4" />
+                  <span>Mobile Phone SMS</span>
+                </button>
               </div>
 
-              <button
-                type="submit"
-                disabled={isLoading || !email}
-                className="w-full py-3.5 bg-[#D84E55] hover:bg-[#c44349] text-white font-bold text-sm rounded-xl shadow-md flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-60"
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Generating OTP...</span>
-                  </>
+              {/* Form Input based on selected Method */}
+              <form onSubmit={handleSendOtp} className="space-y-4 pt-1">
+                {authMethod === 'EMAIL_OTP' ? (
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                      Email Address
+                    </label>
+                    <div className="relative">
+                      <Mail className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="name@domain.com"
+                        required
+                        disabled={isLoading}
+                        className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold focus:outline-none focus:border-[#D84E55] focus:bg-white transition"
+                      />
+                    </div>
+                  </div>
                 ) : (
-                  <>
-                    <span>Send Verification Code</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                      Mobile Phone Number
+                    </label>
+                    <div className="relative flex items-center">
+                      <div className="absolute left-3.5 top-1/2 -translate-y-1/2 flex items-center gap-1 text-slate-500 font-bold text-xs select-none border-r border-slate-200 pr-2">
+                        <span>🇮🇳</span>
+                        <span>+91</span>
+                      </div>
+                      <input
+                        type="tel"
+                        value={phoneInput}
+                        onChange={(e) => setPhoneInput(e.target.value.replace(/[^0-9\s]/g, ''))}
+                        placeholder="98765 43210"
+                        maxLength={12}
+                        required
+                        disabled={isLoading}
+                        className="w-full pl-20 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold focus:outline-none focus:border-[#D84E55] focus:bg-white transition tracking-wide font-mono"
+                      />
+                    </div>
+                  </div>
                 )}
-              </button>
-            </form>
+
+                <button
+                  type="submit"
+                  disabled={isLoading || (authMethod === 'EMAIL_OTP' ? !email : !phoneInput)}
+                  className="w-full py-3.5 bg-[#D84E55] hover:bg-[#c44349] text-white font-bold text-sm rounded-xl shadow-md flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-60"
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Sending Verification Code...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>
+                        {authMethod === 'PHONE_OTP' ? 'Send Mobile SMS Code' : 'Send Email Verification Code'}
+                      </span>
+                      <ArrowRight className="w-4 h-4" />
+                    </>
+                  )}
+                </button>
+              </form>
+            </div>
           )}
 
           {/* STEP 2: 6-DIGIT OTP VERIFICATION */}
-          {activeRole === 'PASSENGER' && authMethod === 'EMAIL_OTP' && otpStep === 'OTP' && (
+          {activeRole === 'PASSENGER' && otpStep === 'OTP' && (
             <div className="space-y-4">
               <div className="flex items-center justify-between bg-slate-50 p-3 rounded-xl border border-slate-200">
                 <div className="flex items-center gap-2">
-                  <Mail className="w-4 h-4 text-slate-500" />
-                  <span className="text-xs font-bold text-slate-800">{email}</span>
+                  {authMethod === 'PHONE_OTP' ? (
+                    <Phone className="w-4 h-4 text-slate-500" />
+                  ) : (
+                    <Mail className="w-4 h-4 text-slate-500" />
+                  )}
+                  <span className="text-xs font-bold text-slate-800">{getActiveTargetIdentifier()}</span>
                 </div>
                 <button
                   type="button"
                   onClick={() => {
-                    setOtpStep('EMAIL');
+                    setOtpStep('INPUT');
                     setOtp('');
                     setErrorMsg(null);
                   }}
                   className="text-xs font-bold text-[#D84E55] hover:underline flex items-center gap-1 cursor-pointer"
                 >
                   <Edit2 className="w-3 h-3" />
-                  <span>Change email</span>
+                  <span>Change {authMethod === 'PHONE_OTP' ? 'number' : 'email'}</span>
                 </button>
               </div>
 
@@ -441,13 +539,14 @@ export const AuthModal: React.FC = () => {
                   <span>Verification Code Dispatched!</span>
                 </div>
                 <div className="text-[11px] text-emerald-700 font-medium">
-                  We sent a 6-digit verification code to <strong className="text-slate-900 font-bold">{email}</strong>. Check your email inbox!
+                  We sent a 6-digit verification code to{' '}
+                  <strong className="text-slate-900 font-bold">{getActiveTargetIdentifier()}</strong>.
                 </div>
               </div>
 
               <div>
                 <label className="block text-center text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
-                  Enter 6-Digit OTP Code
+                  Enter 6-Digit Verification OTP
                 </label>
                 
                 <OtpInput

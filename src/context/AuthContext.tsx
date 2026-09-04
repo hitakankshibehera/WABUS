@@ -17,6 +17,9 @@ export interface AuthContextType {
   currentUser: UserAccount | null;
   firebaseUser: FirebaseUser | null;
   isFirebaseConnected: boolean;
+  sendOtp: (identifier: string) => Promise<any>;
+  verifyOtp: (identifier: string, otp: string) => Promise<UserAccount>;
+  resendOtp: (identifier: string) => Promise<any>;
   sendEmailOtp: (email: string) => Promise<any>;
   verifyEmailOtp: (email: string, otp: string) => Promise<UserAccount>;
   resendEmailOtp: (email: string) => Promise<any>;
@@ -168,12 +171,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => { isMounted = false; };
   }, []);
 
-  const sendEmailOtp = async (email: string) => {
-    return await api.sendOtp(email);
+  const sendOtp = async (identifier: string) => {
+    return await api.sendOtp(identifier);
   };
 
-  const verifyEmailOtp = async (email: string, otp: string): Promise<UserAccount> => {
-    const res = await api.verifyOtp(email, otp);
+  const verifyOtp = async (identifier: string, otp: string): Promise<UserAccount> => {
+    const res = await api.verifyOtp(identifier, otp);
     if (res.user) {
       setCurrentUser(res.user);
       closeAuthModal();
@@ -182,8 +185,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     throw new Error(res.error || 'Verification failed');
   };
 
+  const resendOtp = async (identifier: string) => {
+    return await api.resendOtp(identifier);
+  };
+
+  const sendEmailOtp = async (email: string) => {
+    return await sendOtp(email);
+  };
+
+  const verifyEmailOtp = async (email: string, otp: string): Promise<UserAccount> => {
+    return await verifyOtp(email, otp);
+  };
+
   const resendEmailOtp = async (email: string) => {
-    return await api.resendOtp(email);
+    return await resendOtp(email);
   };
 
   useEffect(() => {
@@ -521,6 +536,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         currentUser,
         firebaseUser,
         isFirebaseConnected,
+        sendOtp,
+        verifyOtp,
+        resendOtp,
         sendEmailOtp,
         verifyEmailOtp,
         resendEmailOtp,

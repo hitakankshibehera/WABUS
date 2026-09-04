@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import type SMTPTransport from 'nodemailer/lib/smtp-transport';
 
 async function testPooledTransport() {
   console.log('--- Testing Pooled Transport (Ultra Fast) ---');
@@ -18,7 +19,7 @@ async function testPooledTransport() {
     greetingTimeout: 3000,
     socketTimeout: 5000,
     tls: { rejectUnauthorized: false }
-  });
+  } as SMTPTransport.Options);
 
   for (let i = 1; i <= 3; i++) {
     console.log(`\nAttempting pooled email #${i}...`);

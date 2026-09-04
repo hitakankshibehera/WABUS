@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import type SMTPTransport from 'nodemailer/lib/smtp-transport';
 
 async function testEmail() {
   const emailUser = 'wonderlightadventure@gmail.com';
@@ -6,11 +7,10 @@ async function testEmail() {
 
   console.log('Sending test email via Gmail SMTP Port 465 SSL (pool: false)...');
 
-  const transporter = nodemailer.createTransport({
+  const smtpOptions: SMTPTransport.Options = {
     host: 'smtp.gmail.com',
     port: 465,
     secure: true,
-    pool: false,
     auth: {
       user: emailUser,
       pass: emailPassword,
@@ -18,7 +18,9 @@ async function testEmail() {
     tls: {
       rejectUnauthorized: false
     }
-  });
+  };
+
+  const transporter = nodemailer.createTransport(smtpOptions);
 
   try {
     const info = await transporter.sendMail({
