@@ -1,4 +1,4 @@
-import { Bus, Route, Trip, Seat, FeatureFlags, Booking, PayoutRecord, ConductorProfile, SeatLayoutTemplate, InventoryAuditLog, TeamMember } from '../types';
+import { Bus, Route, Trip, Seat, FeatureFlags, Booking, PayoutRecord, ConductorProfile, SeatLayoutTemplate, InventoryAuditLog, TeamMember, OfferCoupon } from '../types';
 
 
 export const INITIAL_SEAT_LAYOUT_TEMPLATES: SeatLayoutTemplate[] = [
@@ -1010,6 +1010,83 @@ export const INITIAL_TEAM_MEMBERS: TeamMember[] = [
     displayOrder: 3,
     email: 'sunita.sharma@wabus.in',
     linkedinUrl: 'https://linkedin.com'
+  }
+];
+
+export const INITIAL_OFFERS: OfferCoupon[] = [
+  {
+    id: 'off-1',
+    code: 'BHARAT100',
+    title: 'Bharat First Ride Offer',
+    description: 'Flat ₹100 instant discount on all AC Sleeper & Seater bookings across all corridors.',
+    discountType: 'FLAT',
+    discountValue: 100,
+    minBookingAmount: 300,
+    isLive: true,
+    validUntil: '2026-12-31',
+    badgeTag: 'FLAT ₹100 OFF',
+    savingsText: 'Save up to ₹100 on bus tickets',
+    category: 'BUS',
+    imageUrl: 'https://cdn.iconscout.com/icon/free/png-256/free-bus-1782265-1512503.png',
+    termsAndConditions: [
+      'Offer valid on minimum booking transaction value of ₹300.',
+      'Discount applicable once per user account.',
+      'Applicable on all AC Sleeper, Seater, and Volvo buses on wABus.',
+      'wABus reserves the right to withdraw or alter the offer without prior notice.'
+    ],
+    howToUse: [
+      'Search buses for your route and select your preferred seats.',
+      'Proceed to passenger info page.',
+      'Enter BHARAT100 in the Promo Code section and click Apply.',
+      'Enjoy ₹100 instant discount on your total booking fare!'
+    ]
+  },
+  {
+    id: 'off-2',
+    code: 'WABUS50',
+    title: 'wABus Primo Savings',
+    description: '₹50 instant cashback for wABus app & website passengers.',
+    discountType: 'FLAT',
+    discountValue: 50,
+    minBookingAmount: 200,
+    isLive: true,
+    validUntil: '2026-12-31',
+    badgeTag: 'SAVE ₹50',
+    savingsText: 'Save up to ₹50 on bus bookings',
+    category: 'BUS',
+    imageUrl: 'https://cdn.iconscout.com/icon/free/png-256/free-bus-1782265-1512503.png',
+    termsAndConditions: [
+      'Valid on minimum booking value of ₹200.',
+      'Can be redeemed on all bus routes nationwide.',
+      'Valid for both online UPI/Card payments and Pay-on-Boarding COD.'
+    ],
+    howToUse: [
+      'Select bus seats and proceed to checkout.',
+      'Apply coupon WABUS50 before completing payment.'
+    ]
+  },
+  {
+    id: 'off-3',
+    code: 'FESTIVE150',
+    title: 'Festival Coach Special',
+    description: '₹150 off on Night Sleeper Luxury Coaches for holiday travel.',
+    discountType: 'FLAT',
+    discountValue: 150,
+    minBookingAmount: 500,
+    isLive: true,
+    validUntil: '2026-10-31',
+    badgeTag: 'FESTIVE ₹150 OFF',
+    savingsText: 'Save up to ₹150 on luxury coaches',
+    category: 'BUS',
+    imageUrl: 'https://cdn.iconscout.com/icon/free/png-256/free-bus-1782265-1512503.png',
+    termsAndConditions: [
+      'Valid on Night Coach sleeper bookings worth ₹500 or more.',
+      'Non-transferable and non-refundable upon ticket cancellation.'
+    ],
+    howToUse: [
+      'Select a Night Sleeper bus for your journey.',
+      'Enter FESTIVE150 at passenger payment step.'
+    ]
   }
 ];
 

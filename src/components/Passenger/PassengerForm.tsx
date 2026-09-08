@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Trip, Seat, BoardingPoint, DroppingPoint, PassengerDetails, FeatureFlags, OfferCoupon } from '../../types';
 import { api } from '../../services/api';
+import { INITIAL_OFFERS } from '../../data/mockDatabase';
 import { useAuth } from '../../context/AuthContext';
 import { 
   MapPin, 
@@ -87,7 +88,7 @@ export const PassengerForm: React.FC<PassengerFormProps> = ({
   }, [currentUser]);
 
   // Offers & Coupon State
-  const [availableOffers, setAvailableOffers] = useState<OfferCoupon[]>([]);
+  const [availableOffers, setAvailableOffers] = useState<OfferCoupon[]>(INITIAL_OFFERS);
   const [couponCode, setCouponCode] = useState('BHARAT100');
   const [appliedCoupon, setAppliedCoupon] = useState<string | null>('BHARAT100');
   const [discountAmount, setDiscountAmount] = useState<number>(100);
@@ -101,7 +102,9 @@ export const PassengerForm: React.FC<PassengerFormProps> = ({
   React.useEffect(() => {
     api.getOffers()
       .then(offers => {
-        setAvailableOffers(offers);
+        if (offers && offers.length > 0) {
+          setAvailableOffers(offers);
+        }
         // Pre-validate default coupon
         validateCode('BHARAT100', totalSeatsPrice);
       })

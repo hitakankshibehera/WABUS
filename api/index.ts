@@ -167,6 +167,108 @@ const serverTeamMembers: any[] = [
   }
 ];
 
+const serverOffers: any[] = [
+  {
+    id: 'off-1',
+    code: 'BHARAT100',
+    title: 'Bharat First Ride Offer',
+    description: 'Flat ₹100 instant discount on all AC Sleeper & Seater bookings across all corridors.',
+    discountType: 'FLAT',
+    discountValue: 100,
+    minBookingAmount: 300,
+    isLive: true,
+    validUntil: '2026-12-31',
+    badgeTag: 'FLAT ₹100 OFF',
+    savingsText: 'Save up to ₹100 on bus tickets',
+    category: 'BUS',
+    imageUrl: 'https://cdn.iconscout.com/icon/free/png-256/free-bus-1782265-1512503.png',
+    termsAndConditions: [
+      'Offer valid on minimum booking transaction value of ₹300.',
+      'Discount applicable once per user account.',
+      'Applicable on all AC Sleeper, Seater, and Volvo buses on wABus.',
+      'wABus reserves the right to withdraw or alter the offer without prior notice.'
+    ],
+    howToUse: [
+      'Search buses for your route and select your preferred seats.',
+      'Proceed to passenger info page.',
+      'Enter BHARAT100 in the Promo Code section and click Apply.',
+      'Enjoy ₹100 instant discount on your total booking fare!'
+    ]
+  },
+  {
+    id: 'off-2',
+    code: 'WABUS50',
+    title: 'wABus Primo Savings',
+    description: '₹50 instant cashback for wABus app & website passengers.',
+    discountType: 'FLAT',
+    discountValue: 50,
+    minBookingAmount: 200,
+    isLive: true,
+    validUntil: '2026-12-31',
+    badgeTag: 'SAVE ₹50',
+    savingsText: 'Save up to ₹50 on bus bookings',
+    category: 'BUS',
+    imageUrl: 'https://cdn.iconscout.com/icon/free/png-256/free-bus-1782265-1512503.png',
+    termsAndConditions: [
+      'Valid on minimum booking value of ₹200.',
+      'Can be redeemed on all bus routes nationwide.',
+      'Valid for both online UPI/Card payments and Pay-on-Boarding COD.'
+    ],
+    howToUse: [
+      'Select bus seats and proceed to checkout.',
+      'Apply coupon WABUS50 before completing payment.'
+    ]
+  },
+  {
+    id: 'off-3',
+    code: 'FESTIVE150',
+    title: 'Festival Coach Special',
+    description: '₹150 off on Night Sleeper Luxury Coaches for holiday travel.',
+    discountType: 'FLAT',
+    discountValue: 150,
+    minBookingAmount: 500,
+    isLive: true,
+    validUntil: '2026-10-31',
+    badgeTag: 'FESTIVE ₹150 OFF',
+    savingsText: 'Save up to ₹150 on luxury coaches',
+    category: 'BUS',
+    imageUrl: 'https://cdn.iconscout.com/icon/free/png-256/free-bus-1782265-1512503.png',
+    termsAndConditions: [
+      'Valid on Night Coach sleeper bookings worth ₹500 or more.',
+      'Non-transferable and non-refundable upon ticket cancellation.'
+    ],
+    howToUse: [
+      'Select a Night Sleeper bus for your journey.',
+      'Enter FESTIVE150 at passenger payment step.'
+    ]
+  }
+];
+
+const serverGiftCards: any[] = [
+  {
+    id: 'gc-1',
+    code: 'WABUS500',
+    pin: '1234',
+    amount: 500,
+    recipientEmail: 'customer@gmail.com',
+    senderEmail: 'wonderlightadventure@gmail.com',
+    status: 'ACTIVE',
+    validUntil: '2030-12-31',
+    createdAt: '2026-01-01T10:00:00Z'
+  },
+  {
+    id: 'gc-2',
+    code: 'GIFT250',
+    pin: '5678',
+    amount: 250,
+    recipientEmail: 'customer@gmail.com',
+    senderEmail: 'wonderlightadventure@gmail.com',
+    status: 'ACTIVE',
+    validUntil: '2030-12-31',
+    createdAt: '2026-01-01T10:00:00Z'
+  }
+];
+
 const redisLocks = new Map<string, { sessionId: string; expiresAt: number }>();
 
 const otpStore = new Map<string, { hash: string; salt: string; expiresAt: number; resendAllowedAt: number }>();
@@ -1730,6 +1832,150 @@ app.post(['/api/bookings/checkout', '/bookings/checkout'], async (req, res) => {
     console.error('[Vercel Checkout Error]', err);
     return res.status(500).json({ error: err?.message || 'Checkout failed' });
   }
+});
+
+// ==========================================
+// OFFERS & PROMO COUPONS (Vercel Serverless)
+// ==========================================
+app.get(['/api/offers', '/offers'], (req, res) => {
+  res.json(serverOffers.filter((o: any) => o.isLive));
+});
+
+app.get(['/api/admin/offers', '/admin/offers'], (req, res) => {
+  res.json(serverOffers);
+});
+
+app.post(['/api/admin/offers', '/admin/offers'], (req, res) => {
+  const { code, title, description, discountType, discountValue, minBookingAmount, maxDiscountAmount, validUntil, badgeTag, savingsText, category, imageUrl, termsAndConditions, howToUse } = req.body || {};
+  
+  if (!code || !title || !discountValue) {
+    return res.status(400).json({ error: 'Code, Title, and Discount Value are required' });
+  }
+
+  const cleanCode = String(code).trim().toUpperCase();
+
+  const parseList = (val: any): string[] | undefined => {
+    if (Array.isArray(val)) return val.map((s: any) => String(s).trim()).filter(Boolean);
+    if (typeof val === 'string' && val.trim()) {
+      return val.split(/\r?\n/).map((s: any) => s.trim().replace(/^[-*•\d.]+\s*/, '')).filter(Boolean);
+    }
+    return undefined;
+  };
+
+  const newOffer = {
+    id: `off-${Date.now()}`,
+    code: cleanCode,
+    title: String(title).trim(),
+    description: description ? String(description).trim() : `Get ${discountType === 'PERCENTAGE' ? `${discountValue}%` : `₹${discountValue}`} discount`,
+    discountType: discountType || 'FLAT',
+    discountValue: Number(discountValue),
+    minBookingAmount: Number(minBookingAmount || 0),
+    maxDiscountAmount: maxDiscountAmount ? Number(maxDiscountAmount) : undefined,
+    isLive: true,
+    validUntil: validUntil || '2026-12-31',
+    badgeTag: badgeTag ? String(badgeTag).trim().toUpperCase() : `${discountType === 'PERCENTAGE' ? `${discountValue}% OFF` : `FLAT ₹${discountValue} OFF`}`,
+    savingsText: savingsText ? String(savingsText).trim() : undefined,
+    category: category || 'BUS',
+    imageUrl: imageUrl ? String(imageUrl).trim() : undefined,
+    termsAndConditions: parseList(termsAndConditions),
+    howToUse: parseList(howToUse),
+  };
+
+  serverOffers.unshift(newOffer);
+  console.log(`[Vercel Admin Offers] Published offer package ${newOffer.code} (${newOffer.title}) to website.`);
+  res.json({ success: true, offer: newOffer });
+});
+
+app.post(['/api/admin/offers/:id/toggle', '/admin/offers/:id/toggle'], (req, res) => {
+  const offer = serverOffers.find((o: any) => o.id === req.params.id || o.code === req.params.id);
+  if (!offer) return res.status(404).json({ error: 'Offer not found' });
+
+  offer.isLive = !offer.isLive;
+  res.json({ success: true, offer });
+});
+
+app.delete(['/api/admin/offers/:id', '/admin/offers/:id'], (req, res) => {
+  const index = serverOffers.findIndex((o: any) => o.id === req.params.id || o.code === req.params.id);
+  if (index !== -1) {
+    serverOffers.splice(index, 1);
+  }
+  res.json({ success: true });
+});
+
+app.post(['/api/coupons/validate', '/coupons/validate'], (req, res) => {
+  const { code, bookingAmount } = req.body || {};
+  if (!code) return res.status(400).json({ valid: false, error: 'Coupon code is required' });
+
+  const cleanCode = String(code).trim().toUpperCase();
+  const offer = serverOffers.find((o: any) => o.code === cleanCode && o.isLive);
+
+  if (!offer) {
+    return res.status(404).json({ 
+      valid: false, 
+      error: `Invalid or expired coupon code "${cleanCode}". Please check available offers.` 
+    });
+  }
+
+  const amount = Number(bookingAmount || 0);
+  if (amount < offer.minBookingAmount) {
+    return res.status(400).json({
+      valid: false,
+      error: `Coupon ${offer.code} requires a minimum booking amount of ₹${offer.minBookingAmount}.`
+    });
+  }
+
+  let discountAmount = 0;
+  if (offer.discountType === 'FLAT') {
+    discountAmount = offer.discountValue;
+  } else {
+    discountAmount = Math.round(amount * (offer.discountValue / 100));
+    if (offer.maxDiscountAmount && discountAmount > offer.maxDiscountAmount) {
+      discountAmount = offer.maxDiscountAmount;
+    }
+  }
+
+  res.json({
+    valid: true,
+    code: offer.code,
+    discountAmount,
+    offer,
+    message: `Coupon ${offer.code} applied! Instant savings of ₹${discountAmount}.`
+  });
+});
+
+// Gift Cards Management for Vercel
+app.get(['/api/admin/gift-cards', '/admin/gift-cards'], (req, res) => {
+  res.json(serverGiftCards);
+});
+
+app.post(['/api/gift-cards/redeem', '/gift-cards/redeem'], (req, res) => {
+  const { code, pin } = req.body || {};
+  if (!code || !pin) {
+    return res.status(400).json({ error: 'Gift card code and PIN are required' });
+  }
+
+  const cleanCode = String(code).trim().toUpperCase();
+  const cleanPin = String(pin).trim();
+
+  const card = serverGiftCards.find((c: any) => c.code === cleanCode && c.pin === cleanPin);
+  if (!card) {
+    return res.status(404).json({ error: 'Invalid Gift Card Code or PIN' });
+  }
+
+  if (card.status !== 'ACTIVE') {
+    return res.status(400).json({ error: `This gift card has already been redeemed or is inactive.` });
+  }
+
+  if (new Date(card.validUntil) < new Date()) {
+    return res.status(400).json({ error: 'This gift card has expired.' });
+  }
+
+  card.status = 'REDEEMED';
+  res.json({
+    success: true,
+    amount: card.amount,
+    message: `Gift card ${cleanCode} verified! ₹${card.amount} applied towards your booking.`
+  });
 });
 
 export default app;

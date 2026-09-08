@@ -1,5 +1,5 @@
 import { Trip, Booking, FeatureFlags, PayoutRecord, Route, ConductorProfile, OfferCoupon, UserAccount, OtpSessionResponse, VerifyOtpResponse, GiftCard, Bus, Seat, SeatLayoutTemplate, InventoryAuditLog, TeamMember } from '../types';
-import { INITIAL_TRIPS, MOCK_BUSES, MOCK_ROUTES, INITIAL_CONDUCTORS, INITIAL_BOOKINGS, MOCK_PAYOUTS, DEFAULT_FEATURE_FLAGS, INITIAL_TEAM_MEMBERS, generateSleeperSeats, generateSeaterSeats } from '../data/mockDatabase';
+import { INITIAL_TRIPS, MOCK_BUSES, MOCK_ROUTES, INITIAL_CONDUCTORS, INITIAL_BOOKINGS, MOCK_PAYOUTS, DEFAULT_FEATURE_FLAGS, INITIAL_TEAM_MEMBERS, generateSleeperSeats, generateSeaterSeats, INITIAL_OFFERS } from '../data/mockDatabase';
 
 
 async function safeParseJson(res: Response, defaultError: string): Promise<any> {
@@ -803,15 +803,25 @@ export const api = {
   },
 
   async getOffers(): Promise<OfferCoupon[]> {
-    const res = await fetch('/api/offers');
-    if (!res.ok) return [];
-    return res.json();
+    try {
+      const res = await fetch('/api/offers');
+      if (!res.ok) return INITIAL_OFFERS;
+      const data = await res.json();
+      return Array.isArray(data) && data.length > 0 ? data : INITIAL_OFFERS;
+    } catch {
+      return INITIAL_OFFERS;
+    }
   },
 
   async getAdminOffers(): Promise<OfferCoupon[]> {
-    const res = await fetch('/api/admin/offers');
-    if (!res.ok) return [];
-    return res.json();
+    try {
+      const res = await fetch('/api/admin/offers');
+      if (!res.ok) return INITIAL_OFFERS;
+      const data = await res.json();
+      return Array.isArray(data) && data.length > 0 ? data : INITIAL_OFFERS;
+    } catch {
+      return INITIAL_OFFERS;
+    }
   },
 
   async createOffer(payload: Partial<OfferCoupon>): Promise<{ success: boolean; offer: OfferCoupon }> {
@@ -845,14 +855,55 @@ export const api = {
     message?: string;
     error?: string;
   }> {
-    const res = await fetch('/api/coupons/validate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code, bookingAmount })
-    });
-    const data = await res.json();
-    if (!res.ok && !data.error) throw new Error('Failed to validate coupon code');
-    return data;
+    try {
+      const res = await fetch('/api/coupons/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, bookingAmount })
+      });
+      if (res.ok) {
+        return await res.json();
+      }
+      const data = await res.json().catch(() => null);
+      if (data && (data.error || typeof data.valid === 'boolean')) {
+        return data;
+      }
+    } catch {
+      // Fallback below to client validation
+    }
+
+    // Resilient fallback if backend is unreachable or during cold-start
+    const cleanCode = (code || '').trim().toUpperCase();
+    const offer = INITIAL_OFFERS.find(o => o.code === cleanCode && o.isLive);
+    if (!offer) {
+      return {
+        valid: false,
+        error: `Invalid or expired coupon code "${cleanCode}". Please check available offers.`
+      };
+    }
+    const amount = Number(bookingAmount || 0);
+    if (amount < offer.minBookingAmount) {
+      return {
+        valid: false,
+        error: `Coupon ${offer.code} requires a minimum booking amount of ₹${offer.minBookingAmount}.`
+      };
+    }
+    let discountAmount = 0;
+    if (offer.discountType === 'FLAT') {
+      discountAmount = offer.discountValue;
+    } else {
+      discountAmount = Math.round(amount * (offer.discountValue / 100));
+      if (offer.maxDiscountAmount && discountAmount > offer.maxDiscountAmount) {
+        discountAmount = offer.maxDiscountAmount;
+      }
+    }
+    return {
+      valid: true,
+      code: offer.code,
+      discountAmount,
+      offer,
+      message: `Coupon ${offer.code} applied! Instant savings of ₹${discountAmount}.`
+    };
   },
 
   async deleteTrip(id: string): Promise<{ success: boolean; removedCount?: number }> {

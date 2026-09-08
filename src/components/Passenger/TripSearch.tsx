@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Trip, TripCategory, CoachType, FeatureFlags, OfferCoupon } from '../../types';
 import { api } from '../../services/api';
+import { INITIAL_OFFERS } from '../../data/mockDatabase';
 import { 
   Search, 
   MapPin, 
@@ -74,14 +75,18 @@ export const TripSearch: React.FC<TripSearchProps> = ({
   const [busTypeFilter, setBusTypeFilter] = useState<'ALL' | CoachType>('ALL');
 
   // Live Offers from Admin (polls every 5s so new admin offers appear instantly)
-  const [liveOffers, setLiveOffers] = useState<OfferCoupon[]>([]);
+  const [liveOffers, setLiveOffers] = useState<OfferCoupon[]>(INITIAL_OFFERS);
   const [offerCopied, setOfferCopied] = useState<string | null>(null);
   const [offerTabFilter, setOfferTabFilter] = useState<string>('ALL');
   const [selectedOfferModal, setSelectedOfferModal] = useState<OfferCoupon | null>(null);
 
   useEffect(() => {
     const fetchOffers = () => {
-      api.getOffers().then(setLiveOffers).catch(() => {});
+      api.getOffers().then(offers => {
+        if (offers && offers.length > 0) {
+          setLiveOffers(offers);
+        }
+      }).catch(() => {});
     };
     fetchOffers();
     const pollInterval = setInterval(fetchOffers, 5000);
