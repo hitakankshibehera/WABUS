@@ -7,6 +7,7 @@ import {
 import { FeatureFlags, Booking } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { WalletModal, GiftCardModal, AboutModal, CancelTicketModal } from './Account/AccountModals';
+import { LiveBusTracker } from './Passenger/LiveBusTracker';
 
 export type ActiveTab = 'PASSENGER' | 'CONDUCTOR' | 'ADMIN' | 'ARCHITECTURE';
 
@@ -26,8 +27,9 @@ export const Header: React.FC<HeaderProps> = ({
   bookings = [],
   onOpenSupport,
 }) => {
-  const { currentUser, openAuthModal, openProfileModal, logout } = useAuth();
+  const { currentUser, openAuthModal, openProfileModal, logout, switchDemoRole } = useAuth();
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
+  const [isHeaderTrackerOpen, setIsHeaderTrackerOpen] = useState(false);
   const [quickSearch, setQuickSearch] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const accountMenuRef = useRef<HTMLDivElement>(null);
@@ -96,11 +98,100 @@ export const Header: React.FC<HeaderProps> = ({
           <span>⚠️ SYSTEM ALERT: Scheduled Maintenance Mode is currently active in Remote Config. New bookings may experience delay.</span>
         </div>
       )}
-      {featureFlags.emergencyAlertBanner && (
-        <div className="bg-[#B83E44] px-4 py-1.5 text-center text-xs font-semibold tracking-wide text-white">
-          📢 {featureFlags.emergencyAlertBanner}
+      {/* 1-Click Demo Persona Switcher Bar (Requirement 23) */}
+      <div className="bg-slate-950 border-b border-slate-800 text-white px-3 sm:px-6 py-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded bg-red-500/20 text-red-300 border border-red-500/30 font-extrabold flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
+            <span>DEMO PERSONAS</span>
+          </span>
+          <span className="text-slate-400 text-[11px] hidden sm:inline">
+            Active Persona: <strong className="text-white font-mono">{currentUser?.name || 'Rahul Sharma (Customer A)'}</strong>
+            <span className="text-[10px] ml-1.5 px-2 py-0.5 rounded bg-white/10 text-amber-300 font-mono font-bold">
+              {currentUser?.role === 'ADMIN' ? 'ROLE: MASTER ADMIN' : currentUser?.role === 'CONDUCTOR' ? 'ROLE: DRIVER' : currentUser?.id === 'usr-pass-102' ? 'PASSENGER B (MP-108)' : 'PASSENGER A (MP-204)'}
+            </span>
+          </span>
         </div>
-      )}
+
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {/* Customer A */}
+          <button
+            type="button"
+            onClick={() => {
+              switchDemoRole('PASSENGER');
+              setActiveTab('PASSENGER');
+            }}
+            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1 ${
+              (currentUser?.id === 'usr-pass-101' || (!currentUser && activeTab === 'PASSENGER'))
+                ? 'bg-[#D84E55] text-white shadow-xs'
+                : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+            }`}
+            title="Rahul Sharma - Booked on Bus MP-204 (Booking MP100284)"
+          >
+            <span>👤 Customer A (MP-204)</span>
+          </button>
+
+          {/* Customer B */}
+          <button
+            type="button"
+            onClick={() => {
+              switchDemoRole('PASSENGER_B' as any);
+              setActiveTab('PASSENGER');
+            }}
+            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1 ${
+              currentUser?.id === 'usr-pass-102'
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+            }`}
+            title="Ananya Pattnaik - Booked on Bus MP-108 (Booking BR899401)"
+          >
+            <span>👤 Customer B (MP-108)</span>
+          </button>
+
+          {/* Driver */}
+          <button
+            type="button"
+            onClick={() => {
+              switchDemoRole('CONDUCTOR');
+              setActiveTab('CONDUCTOR');
+            }}
+            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1 ${
+              currentUser?.role === 'CONDUCTOR' || activeTab === 'CONDUCTOR'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+            }`}
+            title="Bijay Nayak - Driver for Bus MP-204"
+          >
+            <span>🚍 Driver (MP-204)</span>
+          </button>
+
+          {/* Admin */}
+          <button
+            type="button"
+            onClick={() => {
+              switchDemoRole('ADMIN');
+              setActiveTab('ADMIN');
+            }}
+            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1 ${
+              currentUser?.role === 'ADMIN' || activeTab === 'ADMIN'
+                ? 'bg-purple-600 text-white shadow-xs'
+                : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+            }`}
+            title="Master Admin - Full Fleet Visibility & Management"
+          >
+            <span>⚡ Admin (Fleet)</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsHeaderTrackerOpen(true)}
+            className="ml-1 px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-xs font-bold transition cursor-pointer flex items-center gap-1"
+          >
+            <Radio className="w-3 h-3 text-emerald-400 animate-pulse" />
+            <span>Track ({currentUser?.id === 'usr-pass-102' ? 'BR899401' : 'MP100284'})</span>
+          </button>
+        </div>
+      </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-18">
@@ -638,6 +729,13 @@ export const Header: React.FC<HeaderProps> = ({
           onClose={() => setIsCancelTicketOpen(false)} 
           bookings={bookings}
         />
+        {/* Live Bus Tracker Modal triggered from Header */}
+        {isHeaderTrackerOpen && (
+          <LiveBusTracker
+            bookingId={currentUser?.id === 'usr-pass-102' ? 'BR899401' : 'MP100284'}
+            onClose={() => setIsHeaderTrackerOpen(false)}
+          />
+        )}
       </div>
     </header>
   );

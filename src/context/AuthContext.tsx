@@ -41,7 +41,7 @@ export interface AuthContextType {
   loginAdmin: (email: string, masterKey: string, twoFactorCode?: string) => Promise<UserAccount>;
   signupAdmin: (data: { name: string; email: string; phone: string; department?: string; adminDepartment?: string; masterKey?: string }) => Promise<UserAccount>;
   logout: () => Promise<void>;
-  switchDemoRole: (role: UserRole) => void;
+  switchDemoRole: (role: UserRole | DemoPersonaKey) => void;
   isAuthModalOpen: boolean;
   authModalInitialRole: UserRole;
   authModalInitialMode: 'SIGN_IN' | 'SIGN_UP';
@@ -52,15 +52,27 @@ export interface AuthContextType {
   closeProfileModal: () => void;
 }
 
-export const DEMO_USERS: Record<UserRole, UserAccount> = {
+export type DemoPersonaKey = 'PASSENGER' | 'PASSENGER_B' | 'CONDUCTOR' | 'ADMIN';
+
+export const DEMO_USERS: Record<DemoPersonaKey, UserAccount> = {
   PASSENGER: {
     id: 'usr-pass-101',
-    name: 'Rahul Sharma',
+    name: 'Rahul Sharma (Customer A)',
     email: 'rahul.sharma@gmail.com',
     phone: '+91 98765 43210',
     role: 'PASSENGER',
     createdAt: '2025-01-15T10:00:00Z',
     avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
+    authProvider: 'DEMO'
+  },
+  PASSENGER_B: {
+    id: 'usr-pass-102',
+    name: 'Ananya Pattnaik (Customer B)',
+    email: 'ananya.pattnaik@example.com',
+    phone: '+91 98610 99234',
+    role: 'PASSENGER',
+    createdAt: '2025-02-10T10:00:00Z',
+    avatarUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80',
     authProvider: 'DEMO'
   },
   CONDUCTOR: {
@@ -71,8 +83,8 @@ export const DEMO_USERS: Record<UserRole, UserAccount> = {
     role: 'CONDUCTOR',
     employeeId: 'COND-7890',
     badgeNumber: 'OSRTC-BBSR-04',
-    assignedOperator: 'OSRTC Volvo Premier',
-    assignedBusNumber: 'OD-02-AX-8910',
+    assignedOperator: 'MargPath Express (Volvo 9600)',
+    assignedBusNumber: 'OD-02-MP-0204',
     assignedRoute: 'Bhubaneswar ⇄ Puri Superfast Express',
     createdAt: '2024-06-10T08:30:00Z',
     avatarUrl: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150&auto=format&fit=crop&q=80',
@@ -526,8 +538,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setCurrentUser(null);
   };
 
-  const switchDemoRole = (role: UserRole) => {
-    setCurrentUser(DEMO_USERS[role]);
+  const switchDemoRole = (role: UserRole | DemoPersonaKey) => {
+    const targetUser = DEMO_USERS[role as DemoPersonaKey] || DEMO_USERS[role as UserRole];
+    if (targetUser) {
+      setCurrentUser(targetUser);
+      try {
+        localStorage.setItem('wabus_user_session', JSON.stringify(targetUser));
+      } catch {}
+    }
   };
 
   return (

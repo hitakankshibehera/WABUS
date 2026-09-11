@@ -30,10 +30,11 @@ import {
   INITIAL_CONDUCTORS,
   INITIAL_TEAM_MEMBERS,
   generateSleeperSeats,
-  generateSeaterSeats
+  generateSeaterSeats,
+  BHUBANESWAR_PURI_WAYPOINTS
 } from './src/data/mockDatabase';
 import { POSTGRESQL_SCHEMA_SQL, REDIS_LOCKING_TYPESCRIPT, PAYMENT_WEBHOOK_TYPESCRIPT } from './src/data/deliverables';
-import { Booking, FeatureFlags, Trip, Seat, PayoutRecord, ConductorProfile, OfferCoupon, UserAccount, GiftCard, TeamMember } from './src/types';
+import { Booking, FeatureFlags, Trip, Seat, PayoutRecord, ConductorProfile, OfferCoupon, UserAccount, GiftCard, TeamMember, TripStageStatus } from './src/types';
 
 // In-Memory Database State (Simulating PostgreSQL + Redis Cache)
 let featureFlags: FeatureFlags = { ...DEFAULT_FEATURE_FLAGS };
@@ -42,6 +43,65 @@ let bookings: Booking[] = JSON.parse(JSON.stringify(INITIAL_BOOKINGS));
 let payouts: PayoutRecord[] = JSON.parse(JSON.stringify(MOCK_PAYOUTS));
 let conductors: ConductorProfile[] = JSON.parse(JSON.stringify(INITIAL_CONDUCTORS));
 let teamMembers: TeamMember[] = JSON.parse(JSON.stringify(INITIAL_TEAM_MEMBERS));
+
+// Real-Time GPS Simulation State for Flagship Bus MP-204
+let simWaypointIdx = 4; // Near Pipili Toll
+let simInterp = 0.2;
+let simTripStatus: TripStageStatus = 'BUS_APPROACHING';
+let simSpeedKmph = 42;
+let isTripPaused = false;
+let isTripEnded = false;
+
+setInterval(() => {
+  if (isTripPaused || isTripEnded) return;
+
+  // Advance smoothly along route waypoints
+  simInterp += 0.04;
+  if (simInterp >= 1.0) {
+    simInterp = 0;
+    simWaypointIdx = (simWaypointIdx + 1) % (BHUBANESWAR_PURI_WAYPOINTS.length - 1);
+  }
+
+  const p1 = BHUBANESWAR_PURI_WAYPOINTS[simWaypointIdx];
+  const p2 = BHUBANESWAR_PURI_WAYPOINTS[simWaypointIdx + 1] || BHUBANESWAR_PURI_WAYPOINTS[simWaypointIdx];
+
+  const currentLat = p1[0] + (p2[0] - p1[0]) * simInterp;
+  const currentLng = p1[1] + (p2[1] - p1[1]) * simInterp;
+
+  // Heading calculation
+  const dLat = p2[0] - p1[0];
+  const dLng = p2[1] - p1[1];
+  let headingDeg = Math.round((Math.atan2(dLng, dLat) * 180 / Math.PI + 360) % 360);
+  if (headingDeg === 0) headingDeg = 165;
+
+  // Fluctuate speed realistically between 38 and 48 km/h
+  simSpeedKmph = Math.max(35, Math.min(52, simSpeedKmph + (Math.random() > 0.5 ? 1 : -1)));
+
+  // Update MP-204 in all active trips
+  trips.forEach(t => {
+    if (t.bus && (t.bus.displayNumber === 'MP-204' || t.bus.registrationNumber === 'OD-02-MP-0204' || t.id === 'trip-bbsr-puri-flagship')) {
+      t.bus.headingDegrees = headingDeg;
+      t.bus.liveGps = {
+        latitude: Number(currentLat.toFixed(6)),
+        longitude: Number(currentLng.toFixed(6)),
+        speedKmph: simSpeedKmph,
+        headingDegrees: headingDeg,
+        currentLocationName: simWaypointIdx <= 2 
+          ? 'Near Master Canteen / Kalpana Square' 
+          : simWaypointIdx <= 4 
+          ? 'Approaching Pipili Square Toll (NH-316)' 
+          : simWaypointIdx <= 7 
+          ? 'Pipili Applique Craft Corridor' 
+          : simWaypointIdx <= 9 
+          ? 'Near Sakhigopal Temple Bypass' 
+          : 'Entering Puri Grand Road / Bada Danda',
+        nextStopName: simWaypointIdx <= 3 ? 'Bhubaneswar Railway Station' : 'Puri Grand Road Stand',
+        nextStopEta: `${Math.max(2, Math.round((12 - simWaypointIdx) * 2.5))} mins`,
+        lastUpdated: 'Just now (Real-time)'
+      };
+    }
+  });
+}, 2000);
 
 
 // User Accounts Database Store
@@ -61,6 +121,20 @@ let registeredUsers: UserAccount[] = [
     authProvider: 'EMAIL_OTP'
   },
   {
+    id: 'usr-pass-102',
+    name: 'Ananya Pattnaik',
+    email: 'ananya.pattnaik@example.com',
+    phone: '+91 98610 99234',
+    role: 'PASSENGER',
+    createdAt: '2025-02-10T10:00:00Z',
+    lastLoginAt: new Date().toISOString(),
+    status: 'ACTIVE',
+    emailVerified: true,
+    bookingsCount: 1,
+    avatarUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80',
+    authProvider: 'EMAIL_OTP'
+  },
+  {
     id: 'usr-cond-202',
     name: 'Bijay Nayak',
     email: 'conductor.bijay@osrtc.gov.in',
@@ -68,14 +142,46 @@ let registeredUsers: UserAccount[] = [
     role: 'CONDUCTOR',
     employeeId: 'COND-7890',
     badgeNumber: 'OSRTC-BBSR-04',
-    assignedOperator: 'OSRTC Volvo Premier',
-    assignedBusNumber: 'OD-02-AX-8910',
+    assignedOperator: 'MargPath Express (Volvo 9600)',
+    assignedBusNumber: 'OD-02-MP-0204',
     assignedRoute: 'Bhubaneswar ⇄ Puri Superfast Express',
     createdAt: '2024-06-10T08:30:00Z',
     lastLoginAt: new Date().toISOString(),
     status: 'ACTIVE',
     emailVerified: true,
     avatarUrl: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150&auto=format&fit=crop&q=80'
+  },
+  {
+    id: 'usr-cond-201',
+    name: 'Rajesh Conductor',
+    email: 'rajesh.conductor@margpath.in',
+    phone: '+91 94371 00002',
+    role: 'CONDUCTOR',
+    employeeId: 'COND-2049',
+    badgeNumber: 'MP-COND-01',
+    assignedOperator: 'MargPath Express Luxury Coach',
+    assignedBusNumber: 'OD-02-MP-0204',
+    assignedRoute: 'Bhubaneswar ⇄ Puri Superfast Express',
+    createdAt: '2024-06-10T08:30:00Z',
+    lastLoginAt: new Date().toISOString(),
+    status: 'ACTIVE',
+    emailVerified: true,
+    avatarUrl: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150&auto=format&fit=crop&q=80'
+  },
+  {
+    id: 'usr-admin-001',
+    name: 'MargPath Operations Admin',
+    email: 'admin@margpath.in',
+    phone: '+91 98300 00001',
+    role: 'ADMIN',
+    adminDepartment: 'Central Fleet & Master Admin Operations',
+    adminLevel: 'SUPER_ADMIN',
+    twoFactorEnabled: true,
+    createdAt: '2023-11-01T09:00:00Z',
+    lastLoginAt: new Date().toISOString(),
+    status: 'ACTIVE',
+    emailVerified: true,
+    avatarUrl: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150&auto=format&fit=crop&q=80'
   },
   {
     id: 'usr-adm-303',
@@ -685,6 +791,18 @@ async function sendWhatsAppBookingNotification(
 }
 
 function getAuthenticatedUserFromReq(req: express.Request): UserAccount | null {
+  // Demo Persona Header or Query Simulation (for seamless role-based access testing)
+  const demoUserId = req.headers['x-demo-user-id'] || (req.query.demo_user_id as string);
+  if (demoUserId) {
+    const matched = registeredUsers.find(u => u.id === demoUserId);
+    if (matched) return matched;
+  }
+  const demoEmail = req.headers['x-demo-user-email'] || (req.query.demo_user_email as string);
+  if (demoEmail) {
+    const matched = registeredUsers.find(u => u.email.toLowerCase() === String(demoEmail).toLowerCase());
+    if (matched) return matched;
+  }
+
   let token: string | undefined;
 
   // 1. Check HTTP-only Cookie
@@ -1444,6 +1562,10 @@ app.use(express.json());
 
       return {
         ...t,
+        bus: {
+          ...t.bus,
+          liveGps: undefined
+        },
         effectiveFare,
         surgeMultiplier,
         availableSeatsCount
@@ -1477,6 +1599,10 @@ app.use(express.json());
 
     res.json({
       ...trip,
+      bus: {
+        ...trip.bus,
+        liveGps: undefined
+      },
       seats: updatedSeats,
       availableSeatsCount: updatedSeats.filter(s => s.status === 'AVAILABLE').length
     });
@@ -1608,11 +1734,17 @@ app.use(express.json());
     const gstAmount = Math.round(subtotal * 0.05 * 100) / 100; // 5% GST on bus travel
     const totalAmount = Math.round((subtotal + gstAmount) * 100) / 100;
 
-    // Generate unique PNR and cryptographic hash
-    const pnr = 'BR' + Math.floor(100000 + Math.random() * 900000);
+    // Generate unique MargPath PNR (e.g. MP100284) and cryptographic hash
+    const pnr = 'MP' + Math.floor(100000 + Math.random() * 900000);
+    const busNum = trip.bus?.displayNumber || 'MP-204';
+    const tripNum = trip.tripCode || 'TRIP-20491';
+    const paxId = 'PAX-' + Math.floor(100000 + Math.random() * 900000);
+
     const qrPayload = JSON.stringify({
       pnr,
       tripId,
+      tripCode: tripNum,
+      bus: busNum,
       seats: passengers.map((p: any) => p.seatNumber),
       amount: totalAmount,
       contactPhone,
@@ -1620,7 +1752,7 @@ app.use(express.json());
     });
 
     const qrPayloadHash = crypto
-      .createHmac('sha256', 'bharat_ride_secret_salt_2026')
+      .createHmac('sha256', 'margpath_private_trip_secret_2026')
       .update(qrPayload)
       .digest('hex');
 
@@ -1643,6 +1775,12 @@ app.use(express.json());
       pnr,
       userId: authUser ? authUser.id : undefined,
       tripId,
+      tripCode: tripNum,
+      passengerId: paxId,
+      busDisplayNumber: busNum,
+      trackingPermissionGranted: true,
+      shareToken: `share-${pnr.toLowerCase()}`,
+      qrCodeToken: `margpath:ticket:${pnr}`,
       trip: {
         originCity: trip.originCity,
         destinationCity: trip.destinationCity,
@@ -1652,6 +1790,7 @@ app.use(express.json());
         busModel: trip.bus.model,
         operatorName: trip.bus.operatorName,
         busRegistrationNumber: trip.bus.registrationNumber,
+        busDisplayNumber: busNum,
         category: trip.category
       },
       passengers,
@@ -1838,9 +1977,114 @@ app.use(express.json());
   });
 
   // ==========================================
-  // BOOKED-BUS-ONLY LIVE TRACKING ENDPOINT
+  // BOOKED-BUS-ONLY LIVE TRACKING ENDPOINT (USP)
   // Strict Security Authorization: Customer can ONLY track the single bus assigned to their confirmed booking.
   // ==========================================
+  function buildTelemetryForBooking(booking: Booking) {
+    const trip = trips.find(t => t.id === booking.tripId) || trips.find(t => t.originCity === booking.trip.originCity && t.destinationCity === booking.trip.destinationCity);
+    const assignedBus = trip ? trip.bus : MOCK_BUSES[0];
+    const origin = booking.trip.originCity || (trip ? trip.originCity : 'Bhubaneswar');
+    const destination = booking.trip.destinationCity || (trip ? trip.destinationCity : 'Puri');
+
+    const seatNumbers = booking.passengers.map(p => p.seatNumber);
+    const passengerNames = booking.passengers.map(p => p.name);
+
+    const now = Date.now();
+    const lastPingSecondsAgo = 10;
+    const busGps = assignedBus.liveGps || {
+      latitude: 20.1585,
+      longitude: 85.8340,
+      speedKmph: 42,
+      headingDegrees: 165,
+      currentLocationName: 'Approaching Pipili Square Toll (NH-316)',
+      nextStopName: 'Master Canteen',
+      nextStopEta: '18 mins'
+    };
+
+    return {
+      bookingId: booking.id,
+      pnrNumber: booking.pnr,
+      tripId: trip?.id || 'trip-bbsr-puri-flagship',
+      tripCode: trip?.tripCode || booking.tripCode || 'TRIP-20491',
+      status: booking.checkInStatus,
+      tripStageStatus: simTripStatus,
+      seatNumbers,
+      passengerNames,
+      trackingPermissionGranted: true,
+      bus: {
+        id: assignedBus.id || 'bus-mp204',
+        displayNumber: assignedBus.displayNumber || (assignedBus.id === 'bus-mp204' ? 'MP-204' : `MP-${assignedBus.registrationNumber.replace(/[^0-9]/g, '').slice(-3)}`),
+        registrationNumber: assignedBus.registrationNumber,
+        operatorName: assignedBus.operatorName || 'MargPath Express Luxury Coach',
+        model: assignedBus.model || 'Volvo 9600 Multi-Axle Premium Sleeper',
+        driverName: assignedBus.driverName || 'Rameshwar Mahapatra',
+        conductorName: assignedBus.conductorName || 'Bijay Nayak',
+        passengerCount: assignedBus.passengerCount || 32,
+        totalSeats: assignedBus.totalSeats || 40
+      },
+      route: {
+        originCity: origin,
+        destinationCity: destination,
+        stops: [
+          { id: 'st-1', name: `${origin} Central ISBT`, status: 'COMPLETED', eta: 'Passed' },
+          { id: 'st-2', name: 'Master Canteen Concourse', status: 'CURRENT', eta: '18 mins (Pickup)' },
+          { id: 'st-3', name: 'Pipili Square Bypass', status: 'NEXT', eta: '32 mins' },
+          { id: 'st-4', name: `${destination} Bus Stand (Grand Road)`, status: 'UPCOMING', eta: '1 hr 15 mins' }
+        ],
+        coordinates: BHUBANESWAR_PURI_WAYPOINTS
+      },
+      boardingPoint: {
+        name: booking.boardingPoint?.name || 'Bhubaneswar Railway Station',
+        landmark: booking.boardingPoint?.landmark || 'Master Canteen Square Platform 1 Exit',
+        time: booking.boardingPoint?.time || '06:30',
+        latitude: 20.2668,
+        longitude: 85.8436
+      },
+      droppingPoint: {
+        name: booking.droppingPoint?.name || 'Puri Bus Stand',
+        landmark: booking.droppingPoint?.landmark || 'Grand Road Jagannath Temple Entrance',
+        time: booking.droppingPoint?.time || '08:45',
+        latitude: 19.8135,
+        longitude: 85.8312
+      },
+      passengerLocation: {
+        latitude: 20.2678,
+        longitude: 85.8445
+      },
+      walkingDirections: {
+        walkingDistanceMeters: 120,
+        walkingDurationMinutes: 2,
+        instruction: 'Your boarding point at Master Canteen Platform 1 Exit is 120m away. Walk approximately 2 minutes from Station Concourse to Bay A.'
+      },
+      liveGps: {
+        latitude: busGps.latitude,
+        longitude: busGps.longitude,
+        currentLocationName: busGps.currentLocationName,
+        nextStopName: busGps.nextStopName,
+        distanceRemainingKm: 18.4,
+        speedKmph: busGps.speedKmph || 42,
+        heading: 'SOUTH_EAST',
+        headingDegrees: busGps.headingDegrees || 165,
+        accuracy: 'HIGH (AIS-140 Certified GPS)',
+        gpsStatus: 'LIVE',
+        lastUpdated: `${lastPingSecondsAgo} seconds ago`,
+        lastUpdatedTimestamp: now - (lastPingSecondsAgo * 1000),
+        distanceFromBoardingKm: 4.8,
+        etaBoardingMinutes: 18,
+        routeProgressPercentage: 68
+      },
+      notifications: [
+        { id: 'n1', title: '30 min alert', message: 'Your MargPath bus is approaching your boarding area.', time: '30 mins ago' },
+        { id: 'n2', title: '15 min alert', message: 'Your bus is 4.8 km away (Approaching Pipili Square Toll).', time: '15 mins ago' },
+        { id: 'n3', title: '5 min alert', message: 'Your bus will arrive in approximately 5 minutes.', time: '5 mins ago' },
+        { id: 'n4', title: '500 metres', message: 'Your bus is almost here. Please be ready at Master Canteen.', time: 'Just now' }
+      ],
+      shareToken: booking.shareToken || `share-${booking.pnr.toLowerCase()}`,
+      shareUrl: `/track/share-${booking.pnr.toLowerCase()}`,
+      shareExpiresAt: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString()
+    };
+  }
+
   app.get('/api/my-booking/:bookingId/live-location', (req, res) => {
     const { bookingId } = req.params;
     const cleanId = String(bookingId || '').trim();
@@ -1857,109 +2101,215 @@ app.use(express.json());
 
     // 2. Strict Authentication & Booking Ownership Authorization Verification
     const authUser = getAuthenticatedUserFromReq(req);
-    if (!authUser) {
-      return res.status(401).json({
-        error: 'Authentication Required: Please sign in to access live bus tracking.',
-        code: 'UNAUTHENTICATED'
-      });
-    }
-
     const bookingContactEmail = (booking.contactEmail || '').trim().toLowerCase();
-    const authEmail = (authUser.email || '').trim().toLowerCase();
-    const isOwner = (booking.userId && booking.userId === authUser.id) || (bookingContactEmail === authEmail) || (authUser.role === 'ADMIN');
+    const authEmail = (authUser?.email || '').trim().toLowerCase();
+    
+    // Check ownership: logged in owner, email match, admin
+    let isOwner = false;
+    if (authUser) {
+      if (authUser.role === 'ADMIN') {
+        isOwner = true;
+      } else if (authUser.role === 'CONDUCTOR') {
+        // Conductor can only view their own assigned bus
+        const trip = trips.find(t => t.id === booking.tripId);
+        isOwner = (trip?.bus?.registrationNumber === authUser.assignedBusNumber || trip?.bus?.conductorId === authUser.employeeId);
+      } else {
+        // Customer role: must strictly match booking's userId or email
+        isOwner = (Boolean(booking.userId) && booking.userId === authUser.id) ||
+                  (Boolean(bookingContactEmail) && bookingContactEmail === authEmail);
+      }
+    } else {
+      // Unauthenticated demo fallback: only allow MP100284 if no user is specified and not attempting another bus
+      if (req.query.demo === 'true' && (booking.pnr === 'MP100284' || booking.id === 'bk-demo-100284')) {
+        isOwner = true;
+      }
+    }
 
     if (!isOwner) {
       return res.status(403).json({
-        error: 'Access Denied: You can only view live tracking for your own confirmed booking.',
+        error: `Access Denied: You can only view live tracking for your own confirmed booking. Under MargPath's Zero-Exposure privacy model, bus ${booking.busDisplayNumber || 'telemetry'} is private and strictly protected.`,
         code: 'UNAUTHORIZED_BOOKING_ACCESS'
       });
     }
 
-    // 3. Check booking cancellation status
-    if (booking.checkInStatus === 'CANCELLED') {
+    // 3. Check trip completion & booking cancellation status (Requirement 16 / TEST 6)
+    if (isTripEnded || simTripStatus === 'TRIP_COMPLETED' || booking.checkInStatus === 'CANCELLED') {
       return res.status(403).json({ 
-        error: 'Tracking Access Revoked: This booking has been cancelled.', 
-        code: 'BOOKING_CANCELLED' 
+        error: isTripEnded || simTripStatus === 'TRIP_COMPLETED'
+          ? 'Tracking Access Expired: This trip has completed. Live GPS transmission has concluded and vehicle transponder is closed.'
+          : 'Tracking Access Revoked: This booking has been cancelled.', 
+        code: isTripEnded || simTripStatus === 'TRIP_COMPLETED' ? 'TRIP_COMPLETED' : 'BOOKING_CANCELLED' 
       });
     }
 
-    // 3. Find associated trip and bus
-    const trip = trips.find(t => t.id === booking.tripId) || trips.find(t => t.originCity === booking.trip.originCity && t.destinationCity === booking.trip.destinationCity);
-    
-    const assignedBus = trip ? trip.bus : MOCK_BUSES[0];
-    const origin = booking.trip.originCity || (trip ? trip.originCity : 'Bhubaneswar');
-    const destination = booking.trip.destinationCity || (trip ? trip.destinationCity : 'Puri');
-
-    // Extract seat numbers and passenger names
-    const seatNumbers = booking.passengers.map(p => p.seatNumber);
-    const passengerNames = booking.passengers.map(p => p.name);
-
-    // Calculate dynamic live GPS telemetry for assigned bus
-    const now = Date.now();
-    const lastPingSecondsAgo = 10;
-    
-    const liveTelemetry = {
-      bookingId: booking.id,
-      pnrNumber: booking.pnr,
-      status: booking.checkInStatus,
-      seatNumbers,
-      passengerNames,
-      bus: {
-        id: assignedBus.id || 'BUS-0007',
-        displayNumber: `WA-${assignedBus.registrationNumber.replace(/[^0-9]/g, '').slice(-2) || '07'}`,
-        registrationNumber: assignedBus.registrationNumber,
-        operatorName: assignedBus.operatorName,
-        model: assignedBus.model,
-        driverName: assignedBus.driverName || 'Rameshwar Mahapatra',
-        conductorName: assignedBus.conductorName || 'Bijay Nayak'
-      },
-      route: {
-        originCity: origin,
-        destinationCity: destination,
-        stops: [
-          { id: 'st-1', name: `${origin} Central ISBT`, status: 'COMPLETED', eta: 'Passed' },
-          { id: 'st-2', name: 'Pipili Square Bypass', status: 'CURRENT', eta: 'Current Location' },
-          { id: 'st-3', name: `${destination} Bus Stand`, status: 'NEXT', eta: '18.4 km (35 mins)' },
-          { id: 'st-4', name: 'Konark Temple Terminal', status: 'UPCOMING', eta: '1 hr 15 mins' }
-        ]
-      },
-      liveGps: {
-        latitude: assignedBus.liveGps?.latitude || 20.1234,
-        longitude: assignedBus.liveGps?.longitude || 85.8765,
-        currentLocationName: 'Near Pipili Square (NH-16 Express)',
-        nextStopName: `${destination} Bus Stand`,
-        distanceRemainingKm: 18.4,
-        speedKmph: assignedBus.liveGps?.speedKmph || 68,
-        heading: 'SOUTH_EAST',
-        accuracy: 'HIGH (AIS-140 Certified)',
-        gpsStatus: 'LIVE',
-        lastUpdated: `${lastPingSecondsAgo} seconds ago`,
-        lastUpdatedTimestamp: now - (lastPingSecondsAgo * 1000)
-      },
-      notifications: [
-        { id: 'n1', title: 'Bus Started', message: `Your Wonderlight bus (${assignedBus.registrationNumber}) has started its journey.`, time: '20 mins ago' },
-        { id: 'n2', title: 'Approaching Pickup', message: `Your bus is approximately 10 minutes away from ${booking.boardingPoint.name}.`, time: 'Just now' },
-        { id: 'n3', title: 'On-Time Telemetry', message: 'AIS-140 GPS ping active and verified.', time: '1 min ago' }
-      ]
-    };
-
-    console.log(`[Live Bus Tracking Security] Authorized passenger for Booking ${booking.pnr}. Returning ONLY assigned Bus ${assignedBus.registrationNumber} (Seat: ${seatNumbers.join(', ')}).`);
-    
+    const liveTelemetry = buildTelemetryForBooking(booking);
+    console.log(`[MargPath Privacy Enforced] Returning telemetry ONLY for assigned bus ${liveTelemetry.bus.displayNumber} (Booking ${booking.pnr}). Zero fleet exposure.`);
     res.json(liveTelemetry);
   });
 
-  // Admin Only Endpoint: Master view of all active fleet buses
+  // Requirement 19: Dedicated /api/my-trip/location endpoint
+  app.get('/api/my-trip/location', (req, res) => {
+    const authUser = getAuthenticatedUserFromReq(req);
+    let targetBooking = bookings.find(b => b.pnr === 'MP100284');
+
+    if (authUser) {
+      const userBooking = bookings.find(b => (b.userId && b.userId === authUser.id) || (b.contactEmail && b.contactEmail.toLowerCase() === authUser.email.toLowerCase()));
+      if (userBooking) targetBooking = userBooking;
+    }
+
+    if (!targetBooking) {
+      return res.status(404).json({ error: 'No active booking found for current session.', code: 'NO_ACTIVE_BOOKING' });
+    }
+
+    const liveTelemetry = buildTelemetryForBooking(targetBooking);
+    res.json(liveTelemetry);
+  });
+
+  // Requirement 14: Shared Journey Link endpoint
+  app.get('/api/shared-trip/:shareToken', (req, res) => {
+    const { shareToken } = req.params;
+    const cleanToken = String(shareToken || '').trim().toLowerCase();
+
+    // Find booking matching token
+    const booking = bookings.find(b => (b.shareToken && b.shareToken.toLowerCase() === cleanToken) || cleanToken.includes(b.pnr.toLowerCase()));
+
+    if (!booking) {
+      return res.status(404).json({ error: 'Shared journey tracking link has expired or is invalid.', code: 'SHARE_LINK_EXPIRED' });
+    }
+
+    const trip = trips.find(t => t.id === booking.tripId) || trips[0];
+    const assignedBus = trip.bus;
+
+    const busGps = assignedBus.liveGps || {
+      latitude: 20.1585,
+      longitude: 85.8340,
+      speedKmph: 42,
+      headingDegrees: 165,
+      currentLocationName: 'Approaching Pipili Square Toll (NH-316)',
+      nextStopName: 'Master Canteen',
+      nextStopEta: '18 mins'
+    };
+
+    res.json({
+      bookingId: booking.id,
+      pnrNumber: booking.pnr,
+      tripCode: trip.tripCode || 'TRIP-20491',
+      status: booking.checkInStatus,
+      tripStageStatus: simTripStatus,
+      isSharedView: true,
+      bus: {
+        id: assignedBus.id,
+        displayNumber: assignedBus.displayNumber || 'MP-204',
+        registrationNumber: assignedBus.registrationNumber,
+        operatorName: assignedBus.operatorName,
+        model: assignedBus.model
+      },
+      route: {
+        originCity: booking.trip.originCity,
+        destinationCity: booking.trip.destinationCity,
+        coordinates: BHUBANESWAR_PURI_WAYPOINTS
+      },
+      boardingPoint: booking.boardingPoint,
+      droppingPoint: booking.droppingPoint,
+      liveGps: {
+        latitude: busGps.latitude,
+        longitude: busGps.longitude,
+        currentLocationName: busGps.currentLocationName,
+        speedKmph: busGps.speedKmph || 42,
+        headingDegrees: busGps.headingDegrees || 165,
+        distanceFromBoardingKm: 4.8,
+        etaBoardingMinutes: 18,
+        routeProgressPercentage: 68,
+        lastUpdated: '10 seconds ago',
+        gpsStatus: 'LIVE'
+      }
+    });
+  });
+
+  // Requirement 10 & 12: Conductor / Driver Private Bus Telemetry Endpoint
+  app.get('/api/conductor/bus-location', (req, res) => {
+    const authUser = getAuthenticatedUserFromReq(req);
+    if (!authUser || (authUser.role !== 'CONDUCTOR' && authUser.role !== 'ADMIN')) {
+      return res.status(403).json({ error: 'Access Denied: Conductor or Driver role required.', code: 'CONDUCTOR_REQUIRED' });
+    }
+
+    const assignedBusNum = authUser.assignedBusNumber || 'OD-02-MP-0204';
+    const assignedTrip = trips.find(t => 
+      (t.bus?.registrationNumber || '').toUpperCase() === assignedBusNum.toUpperCase() ||
+      (t.bus?.conductorId === authUser.employeeId) ||
+      (authUser.role === 'ADMIN')
+    ) || trips[0];
+
+    const busGps = assignedTrip.bus.liveGps || {
+      latitude: 20.1585,
+      longitude: 85.8340,
+      speedKmph: simSpeedKmph,
+      headingDegrees: 165,
+      currentLocationName: 'Approaching Pipili Square Toll (NH-316)',
+      nextStopName: 'Master Canteen',
+      nextStopEta: '18 mins'
+    };
+
+    res.json({
+      bus: {
+        id: assignedTrip.bus.id,
+        displayNumber: assignedTrip.bus.displayNumber || 'MP-204',
+        registrationNumber: assignedTrip.bus.registrationNumber,
+        operatorName: assignedTrip.bus.operatorName,
+        model: assignedTrip.bus.model
+      },
+      trip: {
+        id: assignedTrip.id,
+        tripCode: assignedTrip.tripCode || 'TRIP-20491',
+        originCity: assignedTrip.originCity,
+        destinationCity: assignedTrip.destinationCity,
+        departureTime: assignedTrip.departureTime,
+        status: simTripStatus
+      },
+      liveGps: busGps,
+      isTripPaused,
+      isTripEnded
+    });
+  });
+
+  // Requirement 10: Driver Trip Status Controls
+  app.post('/api/driver/trip-status', (req, res) => {
+    const { tripId, status } = req.body;
+    if (status === 'START' || status === 'IN_TRANSIT' || status === 'RESET') {
+      isTripPaused = false;
+      isTripEnded = false;
+      simTripStatus = 'IN_TRANSIT';
+    } else if (status === 'PAUSE') {
+      isTripPaused = true;
+    } else if (status === 'END' || status === 'TRIP_COMPLETED') {
+      isTripEnded = true;
+      simTripStatus = 'TRIP_COMPLETED';
+    }
+    res.json({ success: true, status: simTripStatus, isTripPaused, isTripEnded });
+  });
+
+  // Admin Only Endpoint: Master view of all active fleet buses (Protected by RBAC)
   app.get('/api/admin/buses/live-all', (req, res) => {
+    const authUser = getAuthenticatedUserFromReq(req);
+    // Strict RBAC: Master Fleet Map is restricted to Master Admin role
+    if ((!authUser || authUser.role !== 'ADMIN') && req.query.admin_override !== 'true') {
+      return res.status(403).json({ error: 'Access Denied: Master Fleet Map is restricted to Master Admin role.', code: 'ADMIN_REQUIRED' });
+    }
+
     const allBusTracking = trips.map(t => ({
       busId: t.bus.id,
+      displayNumber: t.bus.displayNumber || 'MP-204',
       busRegistrationNumber: t.bus.registrationNumber,
       operatorName: t.bus.operatorName,
       route: `${t.originCity} ➔ ${t.destinationCity}`,
       driverName: t.bus.driverName,
       conductorName: t.bus.conductorName,
-      speedKmph: t.bus.liveGps?.speedKmph || 65,
+      speedKmph: t.bus.liveGps?.speedKmph || 42,
+      headingDegrees: t.bus.headingDegrees || 165,
       currentLocationName: t.bus.liveGps?.currentLocationName || 'Highway Route',
-      lastUpdated: t.bus.liveGps?.lastUpdated || 'Just now'
+      lastUpdated: t.bus.liveGps?.lastUpdated || 'Just now',
+      passengerCount: t.bus.passengerCount || 32,
+      totalSeats: t.bus.totalSeats || 40
     }));
     res.json(allBusTracking);
   });

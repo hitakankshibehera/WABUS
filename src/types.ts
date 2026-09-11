@@ -109,9 +109,23 @@ export interface BoardingDroppingPoint {
 export type BoardingPoint = BoardingDroppingPoint;
 export type DroppingPoint = BoardingDroppingPoint;
 
+export type TripStageStatus = 
+  | 'BOOKED' 
+  | 'BUS_ASSIGNED' 
+  | 'DRIVER_ASSIGNED' 
+  | 'BUS_APPROACHING' 
+  | 'ARRIVING' 
+  | 'BOARDING' 
+  | 'JOURNEY_STARTED' 
+  | 'IN_TRANSIT' 
+  | 'DESTINATION_APPROACHING' 
+  | 'ARRIVED' 
+  | 'TRIP_COMPLETED';
+
 export interface Bus {
   id: string;
   registrationNumber: string; // Unique Vehicle Number e.g. OD-02-AX-8910
+  displayNumber?: string; // Short Bus ID e.g. MP-204
   operatorId: string;
   operatorName: string;
   operatorRating: number;
@@ -131,10 +145,13 @@ export interface Bus {
   assignedRoute?: string;
   status?: 'ACTIVE' | 'INACTIVE' | 'MAINTENANCE';
   images?: string[];
+  headingDegrees?: number;
+  passengerCount?: number;
   liveGps?: {
     latitude: number;
     longitude: number;
     speedKmph: number;
+    headingDegrees?: number;
     currentLocationName: string;
     lastUpdated: string;
     nextStopName: string;
@@ -153,6 +170,7 @@ export interface Route {
 
 export interface Trip {
   id: string;
+  tripCode?: string; // e.g. TRIP-20491
   routeId: string;
   busId: string;
   category: TripCategory;
@@ -173,6 +191,7 @@ export interface Trip {
   rating?: number;
   totalReviewsCount?: number;
   operatingDays?: string[];
+  tripStatus?: TripStageStatus;
   bus: Bus;
 }
 
@@ -193,6 +212,11 @@ export interface Booking {
   pnr: string;
   userId?: string;
   tripId: string;
+  tripCode?: string; // e.g. TRIP-20491
+  passengerId?: string; // e.g. PAX-100284
+  busDisplayNumber?: string; // e.g. MP-204
+  trackingPermissionGranted?: boolean;
+  shareToken?: string;
   trip: {
     originCity: string;
     destinationCity: string;
@@ -203,6 +227,7 @@ export interface Booking {
     busType?: CoachType;
     operatorName: string;
     busRegistrationNumber: string; // Vehicle Number
+    busDisplayNumber?: string; // e.g. MP-204
     category?: TripCategory;
     boardingPointName?: string;
     boardingTime?: string;
@@ -427,22 +452,52 @@ export interface BusTrackingNotification {
 export interface LiveTrackingResponse {
   bookingId: string;
   pnrNumber: string;
+  tripId?: string;
+  tripCode?: string; // e.g. TRIP-20491
   status: string;
+  tripStageStatus?: TripStageStatus;
   seatNumbers: string[];
   passengerNames: string[];
+  trackingPermissionGranted?: boolean;
   bus: {
     id: string;
-    displayNumber: string;
+    displayNumber: string; // e.g. MP-204
     registrationNumber: string;
     operatorName: string;
     model: string;
     driverName: string;
     conductorName: string;
+    passengerCount?: number;
+    totalSeats?: number;
   };
   route: {
     originCity: string;
     destinationCity: string;
     stops: RouteStop[];
+    coordinates?: [number, number][]; // [lat, lng] polyline points
+  };
+  boardingPoint?: {
+    name: string;
+    landmark?: string;
+    time?: string;
+    latitude?: number;
+    longitude?: number;
+  };
+  droppingPoint?: {
+    name: string;
+    landmark?: string;
+    time?: string;
+    latitude?: number;
+    longitude?: number;
+  };
+  passengerLocation?: {
+    latitude: number;
+    longitude: number;
+  };
+  walkingDirections?: {
+    walkingDistanceMeters: number;
+    walkingDurationMinutes: number;
+    instruction: string;
   };
   liveGps: {
     latitude: number;
@@ -452,12 +507,19 @@ export interface LiveTrackingResponse {
     distanceRemainingKm: number;
     speedKmph: number;
     heading: string;
+    headingDegrees: number; // 0 to 360 for directional rotation
     accuracy: string;
     gpsStatus: BusGPSStatus;
     lastUpdated: string;
     lastUpdatedTimestamp: number;
+    distanceFromBoardingKm?: number;
+    etaBoardingMinutes?: number;
+    routeProgressPercentage?: number;
   };
   notifications: BusTrackingNotification[];
+  shareToken?: string;
+  shareUrl?: string;
+  shareExpiresAt?: string;
 }
 
 export interface TeamMember {

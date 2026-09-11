@@ -12,10 +12,12 @@ import { DeliverablesViewer } from './components/Architecture/DeliverablesViewer
 import { AuthModal } from './components/Auth/AuthModal';
 import { PassengerProfileModal } from './components/Auth/PassengerProfileModal';
 import { CustomerSupportModal } from './components/Support/CustomerSupportModal';
+import { LiveBusTracker } from './components/Passenger/LiveBusTracker';
+import { useAuth } from './context/AuthContext';
 import { api } from './services/api';
 import { Trip, Seat, FeatureFlags, Booking, PaymentMethod, BoardingPoint, DroppingPoint, PassengerDetails } from './types';
 import { DEFAULT_FEATURE_FLAGS } from './data/mockDatabase';
-import { ArrowLeft, Bus, AlertCircle, CheckCircle2, ShieldCheck, Zap, Sparkles, ChevronRight, HelpCircle } from 'lucide-react';
+import { ArrowLeft, Bus, AlertCircle, CheckCircle2, ShieldCheck, Zap, Sparkles, ChevronRight, HelpCircle, Home, Ticket, Radio, User } from 'lucide-react';
 
 const getInitialTab = (): ActiveTab => {
   if (typeof window === 'undefined') return 'PASSENGER';
@@ -59,6 +61,9 @@ export default function App() {
   const [confirmedBooking, setConfirmedBooking] = useState<Booking | null>(null);
   const [statusNotification, setStatusNotification] = useState<string | null>(null);
   const [isSupportOpen, setIsSupportOpen] = useState(false);
+  const [isMobileTrackerOpen, setIsMobileTrackerOpen] = useState(false);
+
+  const { currentUser, openProfileModal } = useAuth();
 
   // Client Session ID for Redis Distributed Lock
   const [sessionId] = useState<string>(() => 'sess-' + Math.random().toString(36).substring(2, 11));
@@ -349,6 +354,7 @@ export default function App() {
                     lockExpiresAt={lockExpiresAt}
                     featureFlags={featureFlags}
                     sessionId={sessionId}
+                    onProceedToPassengerDetails={() => setBookingStep('FORM')}
                   />
 
                   {/* Mobile Sticky Bottom Floating Action Bar */}
@@ -480,7 +486,7 @@ export default function App() {
       <CustomerSupportModal isOpen={isSupportOpen} onClose={() => setIsSupportOpen(false)} />
 
       {/* MargPath Authentic Footer */}
-      <footer className="border-t border-gray-200 bg-white py-8 text-xs text-gray-500 mt-auto">
+      <footer className="border-t border-gray-200 bg-white py-8 pb-20 sm:pb-8 text-xs text-gray-500 mt-auto">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
             <div>
@@ -540,6 +546,63 @@ export default function App() {
           </div>
         </div>
       </footer>
+
+      {/* Mobile Bottom Navigation Bar (Requirement 22) */}
+      <nav className="sm:hidden fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur-md border-t border-slate-200 z-30 px-3 py-1.5 flex items-center justify-around shadow-2xl">
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab('PASSENGER');
+            setBookingStep('SEARCH');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          className={`flex flex-col items-center gap-0.5 text-[10px] font-bold transition cursor-pointer py-1 ${
+            activeTab === 'PASSENGER' && bookingStep === 'SEARCH'
+              ? 'text-[#D84E55]'
+              : 'text-slate-500 hover:text-slate-900'
+          }`}
+        >
+          <Home className="w-4 h-4" />
+          <span>Home</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => openProfileModal()}
+          className="flex flex-col items-center gap-0.5 text-[10px] font-bold text-slate-500 hover:text-slate-900 transition cursor-pointer py-1"
+        >
+          <Ticket className="w-4 h-4" />
+          <span>Bookings</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setIsMobileTrackerOpen(true)}
+          className="flex flex-col items-center gap-0.5 text-[10px] font-bold text-emerald-600 hover:text-emerald-700 transition cursor-pointer relative py-1"
+        >
+          <div className="w-7 h-7 -mt-2 rounded-full bg-emerald-600 text-white flex items-center justify-center shadow-md shadow-emerald-600/30">
+            <Radio className="w-3.5 h-3.5 animate-pulse text-white" />
+          </div>
+          <span className="font-extrabold text-emerald-700">Track</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => openProfileModal()}
+          className="flex flex-col items-center gap-0.5 text-[10px] font-bold text-slate-500 hover:text-slate-900 transition cursor-pointer py-1"
+        >
+          <User className="w-4 h-4" />
+          <span>Profile</span>
+        </button>
+      </nav>
+
+      {/* Standalone Mobile Live Bus Tracker Modal */}
+      {isMobileTrackerOpen && (
+        <LiveBusTracker
+          bookingId={currentUser?.id === 'usr-pass-102' ? 'BR899401' : 'MP100284'}
+          onClose={() => setIsMobileTrackerOpen(false)}
+        />
+      )}
     </div>
   );
 }

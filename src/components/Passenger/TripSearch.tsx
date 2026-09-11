@@ -28,14 +28,24 @@ import {
   Building2,
   Navigation,
   X,
+  Users,
+  Lock,
+  Shield,
+  Quote,
+  ChevronDown,
+  ChevronUp,
+  Bell,
+  ArrowRight,
   Bus as BusIcon
 } from 'lucide-react';
+import { LiveBusTracker } from './LiveBusTracker';
 
 interface TripSearchProps {
   trips: Trip[];
   onSelectTrip: (trip: Trip) => void;
   selectedTripId: string | null;
   featureFlags: FeatureFlags;
+  onOpenTracker?: () => void;
 }
 
 interface BusStopOption {
@@ -64,6 +74,7 @@ export const TripSearch: React.FC<TripSearchProps> = ({
   onSelectTrip,
   selectedTripId,
   featureFlags,
+  onOpenTracker,
 }) => {
   const [origin, setOrigin] = useState('Bhubaneswar');
   const [destination, setDestination] = useState('Puri');
@@ -71,6 +82,10 @@ export const TripSearch: React.FC<TripSearchProps> = ({
     const today = new Date();
     return today.toISOString().split('T')[0];
   });
+  const [passengerCount, setPassengerCount] = useState(2);
+  const [sortOption, setSortOption] = useState<'CHEAPEST' | 'FASTEST' | 'EARLIEST' | 'BEST_RATED'>('CHEAPEST');
+  const [isTrackerOpen, setIsTrackerOpen] = useState(false);
+  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<'ALL' | TripCategory>('ALL');
   const [busTypeFilter, setBusTypeFilter] = useState<'ALL' | CoachType>('ALL');
 
@@ -198,6 +213,16 @@ export const TripSearch: React.FC<TripSearchProps> = ({
     const matchCat = categoryFilter === 'ALL' || t.category === categoryFilter;
     const matchType = busTypeFilter === 'ALL' || (t.bus && t.bus.busType === busTypeFilter);
     return matchOrigin && matchDest && matchCat && matchType;
+  }).sort((a, b) => {
+    if (sortOption === 'CHEAPEST') return a.effectiveFare - b.effectiveFare;
+    if (sortOption === 'BEST_RATED') return (b.bus?.operatorRating || 4.5) - (a.bus?.operatorRating || 4.5);
+    if (sortOption === 'EARLIEST') return a.departureTime.localeCompare(b.departureTime);
+    if (sortOption === 'FASTEST') {
+      const durA = a.category === 'DAY_COACH' ? 90 : 105;
+      const durB = b.category === 'DAY_COACH' ? 90 : 105;
+      return durA - durB;
+    }
+    return 0;
   });
 
   // Calendar Helpers
@@ -258,17 +283,44 @@ export const TripSearch: React.FC<TripSearchProps> = ({
 
         <div className="relative z-10 max-w-5xl mx-auto space-y-5">
           {/* Header text */}
-          <div className="text-center space-y-2">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/15 text-xs font-semibold text-red-50 border border-white/10">
+          <div className="text-center space-y-3">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/20 text-xs font-bold text-red-50 border border-white/15 backdrop-blur-xs">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-300" />
-              <span>India&apos;s Leading Bus Ticketing Platform</span>
+              <span>MargPath &bull; Privacy-First Transportation Technology</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-white">
-              Online Bus Ticket Booking
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight text-white drop-shadow-sm">
+              Book. Track. Arrive.
             </h1>
-            <p className="text-xs sm:text-sm text-red-100/90 font-normal max-w-2xl mx-auto">
-              Real-time Redis seat reservation &bull; Instant WhatsApp e-Ticket &bull; AIS-140 GPS Live Tracking
+            <p className="text-sm sm:text-base text-red-100 font-medium max-w-2xl mx-auto">
+              Your journey, tracked privately in real time.
             </p>
+
+            {/* Primary & Secondary Hero CTAs */}
+            <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const searchEl = document.getElementById('bus-search-bar');
+                  if (searchEl) searchEl.scrollIntoView({ behavior: 'smooth' });
+                }}
+                className="px-6 py-3 rounded-2xl bg-white hover:bg-slate-50 text-[#D84E55] font-black text-xs uppercase tracking-wider shadow-lg hover:shadow-xl transition transform active:scale-95 cursor-pointer flex items-center gap-2"
+              >
+                <BusIcon className="w-4 h-4 text-[#D84E55]" />
+                <span>Book Your Bus</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (onOpenTracker) onOpenTracker();
+                  else setIsTrackerOpen(true);
+                }}
+                className="px-6 py-3 rounded-2xl bg-black/30 hover:bg-black/40 text-white font-black text-xs uppercase tracking-wider border border-white/25 backdrop-blur-xs shadow-md transition transform active:scale-95 cursor-pointer flex items-center gap-2"
+              >
+                <Radio className="w-4 h-4 text-emerald-400 animate-pulse" />
+                <span>Track My Journey</span>
+              </button>
+            </div>
           </div>
 
           {/* DUAL COACH OPTIONS: Day Coach vs Night Coach */}
@@ -349,7 +401,7 @@ export const TripSearch: React.FC<TripSearchProps> = ({
           </div>
 
           {/* Connected Floating Search Bar */}
-          <div className="bg-white rounded-xl sm:rounded-2xl p-3 sm:p-4 shadow-xl text-slate-900 border border-slate-100 relative z-30">
+          <div id="bus-search-bar" className="bg-white rounded-xl sm:rounded-2xl p-3 sm:p-4 shadow-xl text-slate-900 border border-slate-100 relative z-30">
             <div className="grid grid-cols-1 md:grid-cols-12 gap-2.5 sm:gap-3 items-center">
               {/* Origin Bus Stop Selector */}
               <div 
@@ -682,7 +734,7 @@ export const TripSearch: React.FC<TripSearchProps> = ({
               {/* Date of Journey Selector */}
               <div 
                 ref={calendarRef}
-                className="md:col-span-3 bg-slate-50 hover:bg-slate-100/80 p-3 rounded-xl border border-slate-200 hover:border-slate-300 transition relative cursor-pointer"
+                className="md:col-span-2 bg-slate-50 hover:bg-slate-100/80 p-3 rounded-xl border border-slate-200 hover:border-slate-300 transition relative cursor-pointer"
                 onClick={() => {
                   setIsCalendarOpen(!isCalendarOpen);
                   setIsOriginOpen(false);
@@ -866,6 +918,46 @@ export const TripSearch: React.FC<TripSearchProps> = ({
                 )}
               </div>
 
+              {/* Passenger Count Selector (Requirement 2) */}
+              <div className="md:col-span-2 bg-slate-50 hover:bg-slate-100/80 p-3 rounded-xl border border-slate-200 transition">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    PASSENGERS
+                  </span>
+                  <span className="text-[9px] font-semibold text-slate-600 bg-slate-200/70 px-1.5 py-0.2 rounded">
+                    Max 6
+                  </span>
+                </div>
+                <div className="flex items-center justify-between mt-1">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-7 h-7 rounded-md bg-slate-200/80 text-slate-700 flex items-center justify-center shrink-0">
+                      <Users className="w-4 h-4" />
+                    </div>
+                    <span className="text-sm font-bold text-slate-900">
+                      {passengerCount} {passengerCount === 1 ? 'Pax' : 'Pax'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setPassengerCount(Math.max(1, passengerCount - 1))}
+                      className="w-6 h-6 rounded-md bg-white hover:bg-slate-200 border border-slate-300 text-xs font-bold text-slate-700 flex items-center justify-center transition cursor-pointer"
+                      title="Decrease passengers"
+                    >
+                      -
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPassengerCount(Math.min(6, passengerCount + 1))}
+                      className="w-6 h-6 rounded-md bg-white hover:bg-slate-200 border border-slate-300 text-xs font-bold text-slate-700 flex items-center justify-center transition cursor-pointer"
+                      title="Increase passengers"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+              </div>
+
               {/* Search Action Button */}
               <div className="md:col-span-2">
                 <button
@@ -881,6 +973,29 @@ export const TripSearch: React.FC<TripSearchProps> = ({
                   <span>SEARCH BUSES</span>
                 </button>
               </div>
+            </div>
+
+            {/* Quick Example Route Banner (Requirement 2) */}
+            <div className="mt-2.5 px-1 flex flex-wrap items-center justify-between gap-2 text-xs">
+              <div className="flex items-center gap-2 text-slate-600">
+                <span className="font-bold text-slate-700">Example Route:</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOrigin('Bhubaneswar');
+                    setDestination('Puri');
+                    setSelectedDate('2026-09-10');
+                    setPassengerCount(2);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-red-50 hover:bg-red-100 text-[#D84E55] font-bold text-xs border border-red-200 transition cursor-pointer shadow-2xs"
+                >
+                  <span>Bhubaneswar → Puri &bull; 10 September 2026 &bull; 2 passengers</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <span className="text-[11px] text-slate-400 hidden sm:inline">
+                Click example to auto-fill search
+              </span>
             </div>
 
             {/* Quick Offers Bar – dynamic from admin */}
@@ -1232,6 +1347,63 @@ export const TripSearch: React.FC<TripSearchProps> = ({
         </div>
       </div>
 
+      {/* Sorting Options Bar (Requirement 2) */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-3 sm:p-3.5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs">
+        <div className="flex items-center gap-2">
+          <span className="font-extrabold text-slate-800 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+            <span>Sort Buses By:</span>
+          </span>
+          <span className="text-[11px] text-slate-400 hidden sm:inline">&bull;</span>
+          <span className="text-[11px] text-slate-500 hidden sm:inline">Choose your preferred priority</span>
+        </div>
+        <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setSortOption('CHEAPEST')}
+            className={`px-3.5 py-1.5 rounded-xl font-bold text-xs transition cursor-pointer flex items-center justify-center gap-1.5 ${
+              sortOption === 'CHEAPEST'
+                ? 'bg-[#D84E55] text-white shadow-xs'
+                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+            }`}
+          >
+            <span>🏷️ Cheapest</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setSortOption('FASTEST')}
+            className={`px-3.5 py-1.5 rounded-xl font-bold text-xs transition cursor-pointer flex items-center justify-center gap-1.5 ${
+              sortOption === 'FASTEST'
+                ? 'bg-[#D84E55] text-white shadow-xs'
+                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+            }`}
+          >
+            <span>⚡ Fastest</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setSortOption('EARLIEST')}
+            className={`px-3.5 py-1.5 rounded-xl font-bold text-xs transition cursor-pointer flex items-center justify-center gap-1.5 ${
+              sortOption === 'EARLIEST'
+                ? 'bg-[#D84E55] text-white shadow-xs'
+                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+            }`}
+          >
+            <span>🌅 Earliest</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setSortOption('BEST_RATED')}
+            className={`px-3.5 py-1.5 rounded-xl font-bold text-xs transition cursor-pointer flex items-center justify-center gap-1.5 ${
+              sortOption === 'BEST_RATED'
+                ? 'bg-[#D84E55] text-white shadow-xs'
+                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+            }`}
+          >
+            <span>⭐ Best rated</span>
+          </button>
+        </div>
+      </div>
+
       {/* Results Header Count */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-1">
         <div className="flex items-center gap-2 flex-wrap">
@@ -1452,14 +1624,14 @@ export const TripSearch: React.FC<TripSearchProps> = ({
                     </div>
 
                     <button
-                      onClick={() => onSelectTrip(trip)}
-                      className={`w-full sm:w-auto px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer ${
+                      onClick={() => onSelectTrip(isSelected ? null : trip)}
+                      className={`w-full sm:w-auto px-4 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-xs ${
                         isSelected
                           ? 'bg-slate-900 text-white hover:bg-slate-800'
                           : 'bg-[#D84E55] hover:bg-[#C33E44] text-white hover:shadow-md'
                       }`}
                     >
-                      <span>{isSelected ? 'Viewing Seats' : 'SELECT SEATS'}</span>
+                      <span>{isSelected ? 'Viewing Seats' : 'View Seats'}</span>
                       <ChevronRight className="w-4 h-4" />
                     </button>
                   </div>
@@ -1469,6 +1641,581 @@ export const TripSearch: React.FC<TripSearchProps> = ({
           })
         )}
       </div>
+
+      {/* ========================================================================= */}
+      {/* SECTION 1: HOW MARGPATH WORKS                                             */}
+      {/* ========================================================================= */}
+      <section className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-10 space-y-8 shadow-xs">
+        <div className="text-center max-w-2xl mx-auto space-y-2">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-50 text-[#D84E55] text-xs font-black uppercase tracking-wider border border-red-200">
+            <Sparkles className="w-3.5 h-3.5 text-[#D84E55]" />
+            <span>Four Simple Steps</span>
+          </div>
+          <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+            How MargPath Works
+          </h2>
+          <p className="text-xs sm:text-sm text-slate-500 font-medium">
+            Next-generation privacy-first travel technology. Know exactly when your bus is arriving without exposing your personal coordinates.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          {/* Step 1 */}
+          <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-3 relative group hover:border-[#D84E55] transition hover:shadow-md">
+            <div className="w-10 h-10 rounded-xl bg-[#D84E55] text-white flex items-center justify-center font-black text-sm shadow-sm">
+              1
+            </div>
+            <h3 className="text-base font-extrabold text-slate-900">Search &amp; Book</h3>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Choose your route, travel date, and preferred seat from an interactive 2D layout with real-time Redis atomic lock protection.
+            </p>
+            <div className="text-[11px] font-bold text-[#D84E55] flex items-center gap-1 pt-1">
+              <span>Instant Confirmation</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </div>
+          </div>
+
+          {/* Step 2 */}
+          <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-3 relative group hover:border-[#D84E55] transition hover:shadow-md">
+            <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center font-black text-sm shadow-sm">
+              2
+            </div>
+            <h3 className="text-base font-extrabold text-slate-900">Get Private Trip Pass</h3>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Receive your official digital ticket with verified QR code, assigned Bus ID (e.g. MP-204), and cryptographic tracking token.
+            </p>
+            <div className="text-[11px] font-bold text-slate-900 flex items-center gap-1 pt-1">
+              <span>Zero Fleet Exposure</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </div>
+          </div>
+
+          {/* Step 3 */}
+          <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-3 relative group hover:border-[#D84E55] transition hover:shadow-md">
+            <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-black text-sm shadow-sm">
+              3
+            </div>
+            <h3 className="text-base font-extrabold text-slate-900">Track ONLY Your Bus</h3>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Launch the live interactive map. Track only your booked vehicle in real time with rotating directional heading arrows and smart ETA.
+            </p>
+            <div className="text-[11px] font-bold text-emerald-700 flex items-center gap-1 pt-1">
+              <span>AIS-140 GPS Telemetry</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </div>
+          </div>
+
+          {/* Step 4 */}
+          <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-3 relative group hover:border-[#D84E55] transition hover:shadow-md">
+            <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-black text-sm shadow-sm">
+              4
+            </div>
+            <h3 className="text-base font-extrabold text-slate-900">Smart Alerts &amp; Board</h3>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Receive proactive milestone alerts (30m, 15m, 5m, 500m) and turn-by-turn walking instructions to your boarding bay.
+            </p>
+            <div className="text-[11px] font-bold text-blue-700 flex items-center gap-1 pt-1">
+              <span>Arrive Confidently</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ========================================================================= */}
+      {/* SECTION 2: PRIVATE LIVE TRACKING — CORE USP SPOTLIGHT                     */}
+      {/* ========================================================================= */}
+      <section className="bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white rounded-3xl p-6 sm:p-10 border border-slate-800 shadow-xl overflow-hidden relative">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-red-500/10 rounded-full blur-3xl pointer-events-none" />
+        
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center relative z-10">
+          <div className="lg:col-span-7 space-y-4">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-mono font-bold border border-emerald-500/30">
+              <Lock className="w-3.5 h-3.5 text-emerald-400" />
+              <span>CORE ARCHITECTURAL USP</span>
+            </div>
+            
+            <h2 className="text-2xl sm:text-4xl font-black tracking-tight leading-tight">
+              &quot;Book your seat &rarr; get your private trip &rarr; track ONLY your booked bus live on the map.&quot;
+            </h2>
+
+            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-normal">
+              Unlike legacy platforms that leak entire fleet movements or require customers to install invasive background location spyware, MargPath is built from the database layer up with strict cryptographic isolation.
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+              <div className="p-3.5 rounded-2xl bg-slate-800/80 border border-slate-700 space-y-1">
+                <div className="flex items-center gap-2 text-emerald-400 font-bold text-xs">
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Customer Sees</span>
+                </div>
+                <p className="text-[11px] text-slate-300">
+                  ONLY their assigned bus, boarding point, destination, live distance, and rotating directional compass arrow.
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-slate-800/80 border border-slate-700 space-y-1">
+                <div className="flex items-center gap-2 text-red-400 font-bold text-xs">
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>Server-Enforced Block</span>
+                </div>
+                <p className="text-[11px] text-slate-300">
+                  Zero visibility into other buses, other passengers, fleet-wide coordinates, or unauthorized trip channels.
+                </p>
+              </div>
+            </div>
+
+            <div className="pt-2 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  if (onOpenTracker) onOpenTracker();
+                  else setIsTrackerOpen(true);
+                }}
+                className="px-6 py-3 rounded-2xl bg-[#D84E55] hover:bg-[#C33E44] text-white font-black text-xs uppercase tracking-wider shadow-lg transition transform active:scale-95 cursor-pointer flex items-center gap-2"
+              >
+                <Radio className="w-4 h-4 text-white animate-pulse" />
+                <span>Launch Private Map Demo (MP-204)</span>
+              </button>
+
+              <span className="text-xs text-slate-400 font-mono">
+                Booking: MP100284 &bull; Trip: TRIP-20491
+              </span>
+            </div>
+          </div>
+
+          {/* Interactive Map Visual Mockup */}
+          <div className="lg:col-span-5 bg-slate-900/90 border border-slate-700 rounded-2xl p-5 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3 text-xs font-mono">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
+                <span className="text-emerald-400 font-bold">BUS MP-204 LIVE</span>
+              </div>
+              <span className="text-slate-400 text-[11px]">Speed: 42 km/h</span>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Current Distance:</span>
+                <span className="font-mono font-black text-white text-sm">4.8 km away</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Smart ETA at Boarding:</span>
+                <span className="font-mono font-black text-amber-300 text-sm">18 minutes</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Route Progress:</span>
+                <span className="font-mono font-black text-emerald-400">68% completed</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Trip Status:</span>
+                <span className="px-2 py-0.5 rounded bg-amber-400/20 text-amber-300 font-bold text-[10px]">
+                  Approaching your boarding point
+                </span>
+              </div>
+            </div>
+
+            <div className="p-3 bg-black/40 rounded-xl border border-slate-800 text-[11px] text-slate-400 flex items-center justify-between">
+              <span>Directional Marker:</span>
+              <span className="font-mono text-white flex items-center gap-1">
+                🚌 ─────────&rarr; Heading 178&deg;
+              </span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ========================================================================= */}
+      {/* SECTION 3: SMART ARRIVAL ALERTS TIMELINE                                  */}
+      {/* ========================================================================= */}
+      <section className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-10 space-y-6 shadow-xs">
+        <div className="text-center max-w-2xl mx-auto space-y-2">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-black uppercase tracking-wider border border-blue-200">
+            <Bell className="w-3.5 h-3.5 text-blue-600" />
+            <span>Automated Passenger Notifications</span>
+          </div>
+          <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+            Smart Arrival Alerts
+          </h2>
+          <p className="text-xs sm:text-sm text-slate-500 font-medium">
+            Know when your bus is coming, before it arrives. Multi-stage notifications keep you perfectly synchronized.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 pt-2">
+          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-black font-mono text-[#D84E55] uppercase">30 MINUTES BEFORE</span>
+              <span className="text-xs">🔔</span>
+            </div>
+            <p className="text-xs font-bold text-slate-900">&quot;Your MargPath bus is approaching your boarding area.&quot;</p>
+            <span className="text-[10px] text-slate-500 block">Bus departs terminal sector toward city arterial bay.</span>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-black font-mono text-amber-600 uppercase">15 MINUTES BEFORE</span>
+              <span className="text-xs">📍</span>
+            </div>
+            <p className="text-xs font-bold text-slate-900">&quot;Your bus is 3.2 km away.&quot;</p>
+            <span className="text-[10px] text-slate-500 block">Real-time GPS calculates traffic corridor flow.</span>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-black font-mono text-orange-600 uppercase">5 MINUTES BEFORE</span>
+              <span className="text-xs">⚡</span>
+            </div>
+            <p className="text-xs font-bold text-slate-900">&quot;Your bus will arrive in approximately 5 minutes.&quot;</p>
+            <span className="text-[10px] text-slate-500 block">High priority prompt to proceed to designated platform.</span>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-black font-mono text-red-600 uppercase">500 METRES AWAY</span>
+              <span className="text-xs">🏃</span>
+            </div>
+            <p className="text-xs font-bold text-slate-900">&quot;Your bus is almost here. Please be ready.&quot;</p>
+            <span className="text-[10px] text-slate-500 block">Bus enters station approach lane. Keep ticket QR ready.</span>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-black font-mono text-emerald-800 uppercase">AT BOARDING POINT</span>
+              <span className="text-xs">✅</span>
+            </div>
+            <p className="text-xs font-bold text-emerald-950">&quot;Your bus has arrived.&quot;</p>
+            <span className="text-[10px] text-emerald-700 block">Vehicle parked at Bay 4. Conductor ready for scanning.</span>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-blue-50 border border-blue-200 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-black font-mono text-blue-800 uppercase">AFTER DEPARTURE</span>
+              <span className="text-xs">🚀</span>
+            </div>
+            <p className="text-xs font-bold text-blue-950">&quot;Your journey has started.&quot;</p>
+            <span className="text-[10px] text-blue-700 block">In-transit telemetry active. Share tracking link with family.</span>
+          </div>
+        </div>
+      </section>
+
+      {/* ========================================================================= */}
+      {/* SECTION 4: WHY MARGPATH                                                   */}
+      {/* ========================================================================= */}
+      <section className="bg-slate-50 border border-slate-200 rounded-3xl p-6 sm:p-10 space-y-8">
+        <div className="text-center max-w-2xl mx-auto space-y-2">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-200 text-slate-800 text-xs font-black uppercase tracking-wider">
+            <ShieldCheck className="w-3.5 h-3.5 text-[#D84E55]" />
+            <span>Built for Modern Mobility</span>
+          </div>
+          <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+            Why MargPath?
+          </h2>
+          <p className="text-xs sm:text-sm text-slate-500 font-medium">
+            A privacy-first transport experience engineered with state-of-the-art cloud architecture.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-2.5">
+            <div className="w-9 h-9 rounded-xl bg-red-50 text-[#D84E55] flex items-center justify-center font-bold">
+              🔒
+            </div>
+            <h3 className="text-base font-extrabold text-slate-900">Zero Fleet Exposure</h3>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Customers never see other buses or passengers. Strict role-based backend authorization protects every single GPS coordinate request.
+            </p>
+          </div>
+
+          <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-2.5">
+            <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+              ⚡
+            </div>
+            <h3 className="text-base font-extrabold text-slate-900">Redis Distributed Seat Lock</h3>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Instant atomic seat reservation prevents double-booking disputes. Selected seats are held exclusively for your session for 10 minutes.
+            </p>
+          </div>
+
+          <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-2.5">
+            <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+              🧭
+            </div>
+            <h3 className="text-base font-extrabold text-slate-900">Rotating Directional Marker</h3>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              The live bus marker displays real compass bearing and directional travel arrows so you immediately understand which way your bus is moving.
+            </p>
+          </div>
+
+          <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-2.5">
+            <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+              🚶
+            </div>
+            <h3 className="text-base font-extrabold text-slate-900">Boarding Point Navigation</h3>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Get turn-by-turn walking distance and estimated arrival time directly from your terminal exit to the assigned bus parking bay.
+            </p>
+          </div>
+
+          <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-2.5">
+            <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
+              🔗
+            </div>
+            <h3 className="text-base font-extrabold text-slate-900">Expiring Share Links</h3>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Share your trip tracking with family and friends securely. Links expire automatically once the bus completes the trip.
+            </p>
+          </div>
+
+          <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-2.5">
+            <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
+              📱
+            </div>
+            <h3 className="text-base font-extrabold text-slate-900">Mobile-First Vector Map</h3>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Fast, smooth vector map rendering optimized for high battery efficiency and low data consumption on any smartphone screen.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* ========================================================================= */}
+      {/* SECTION 5: SAFETY & PRIVACY                                               */}
+      {/* ========================================================================= */}
+      <section className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-10 space-y-6 shadow-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-5">
+          <div className="space-y-1">
+            <span className="text-[11px] font-black text-emerald-700 uppercase tracking-wider font-mono">
+              SECURITY &bull; CONFIDENTIALITY &bull; AIS-140
+            </span>
+            <h2 className="text-2xl font-black text-slate-900">
+              Safety &amp; Privacy Architecture
+            </h2>
+          </div>
+          <span className="px-3.5 py-1.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-extrabold self-start sm:self-auto">
+            🔒 End-to-End Cryptographic Isolation
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+            <h4 className="font-extrabold text-slate-900 text-sm flex items-center gap-1.5">
+              <Lock className="w-4 h-4 text-[#D84E55]" />
+              <span>Server-Side Authorization</span>
+            </h4>
+            <p className="text-slate-600 leading-relaxed text-[11px]">
+              The backend verifies user identity, active booking status, and assigned vehicle ID before returning even a single latitude/longitude coordinate.
+            </p>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+            <h4 className="font-extrabold text-slate-900 text-sm flex items-center gap-1.5">
+              <Shield className="w-4 h-4 text-blue-600" />
+              <span>No Customer-to-Customer Leaks</span>
+            </h4>
+            <p className="text-slate-600 leading-relaxed text-[11px]">
+              Passengers cannot view other bookings or query bus coordinates that belong to other routes. API tamper attempts return HTTP 403 Forbidden.
+            </p>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+            <h4 className="font-extrabold text-slate-900 text-sm flex items-center gap-1.5">
+              <ShieldCheck className="w-4 h-4 text-emerald-600" />
+              <span>Automated Link Expiry</span>
+            </h4>
+            <p className="text-slate-600 leading-relaxed text-[11px]">
+              Shared tracking links automatically invalidate once the vehicle reaches the destination terminal, keeping all historical telemetry private.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* ========================================================================= */}
+      {/* SECTION 6: CUSTOMER REVIEWS                                               */}
+      {/* ========================================================================= */}
+      <section className="bg-slate-50 border border-slate-200 rounded-3xl p-6 sm:p-10 space-y-6">
+        <div className="text-center max-w-2xl mx-auto space-y-2">
+          <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black uppercase">
+            <Star className="w-3 h-3 fill-emerald-700 text-emerald-700" />
+            <span>4.9 / 5 Rating from Verified Riders</span>
+          </div>
+          <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+            Loved by Thousands of Travelers
+          </h2>
+          <p className="text-xs sm:text-sm text-slate-500 font-medium">
+            Hear from passengers who experienced the tranquility of private live bus tracking.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+          <div className="p-5 bg-white border border-slate-200 rounded-2xl shadow-xs space-y-3">
+            <div className="flex items-center gap-1 text-amber-400">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Star key={i} className="w-4 h-4 fill-amber-400" />
+              ))}
+            </div>
+            <p className="text-xs text-slate-700 leading-relaxed italic">
+              &quot;The private live map was game-changing. Seeing the exact bus marker with the direction arrow meant I didn&apos;t have to wait out in the heat at Baramunda.&quot;
+            </p>
+            <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+              <span className="font-bold text-slate-900">Pooja Mohanty</span>
+              <span className="text-[10px] text-slate-400 font-mono">Bhubaneswar &rarr; Puri</span>
+            </div>
+          </div>
+
+          <div className="p-5 bg-white border border-slate-200 rounded-2xl shadow-xs space-y-3">
+            <div className="flex items-center gap-1 text-amber-400">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Star key={i} className="w-4 h-4 fill-amber-400" />
+              ))}
+            </div>
+            <p className="text-xs text-slate-700 leading-relaxed italic">
+              &quot;I loved the privacy guarantee. Only my bus was visible, and sharing the live tracking link with my parents gave them total peace of mind throughout the trip.&quot;
+            </p>
+            <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+              <span className="font-bold text-slate-900">Ankit Senapati</span>
+              <span className="text-[10px] text-slate-400 font-mono">Rourkela &rarr; Cuttack</span>
+            </div>
+          </div>
+
+          <div className="p-5 bg-white border border-slate-200 rounded-2xl shadow-xs space-y-3">
+            <div className="flex items-center gap-1 text-amber-400">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Star key={i} className="w-4 h-4 fill-amber-400" />
+              ))}
+            </div>
+            <p className="text-xs text-slate-700 leading-relaxed italic">
+              &quot;The arrival alerts at 15m and 500m were spot on. The bus arrived at Bay 4 at the exact minute estimated by the smart ETA model.&quot;
+            </p>
+            <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+              <span className="font-bold text-slate-900">Debashish Nayak</span>
+              <span className="text-[10px] text-slate-400 font-mono">Bhubaneswar &rarr; Berhampur</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ========================================================================= */}
+      {/* SECTION 7: FREQUENTLY ASKED QUESTIONS (FAQ)                               */}
+      {/* ========================================================================= */}
+      <section className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-10 space-y-6 shadow-xs">
+        <div className="text-center max-w-2xl mx-auto space-y-2">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-black uppercase">
+            <span>Got Questions?</span>
+          </div>
+          <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+            Frequently Asked Questions
+          </h2>
+          <p className="text-xs sm:text-sm text-slate-500 font-medium">
+            Everything you need to know about MargPath&apos;s privacy-first tracking platform.
+          </p>
+        </div>
+
+        <div className="max-w-3xl mx-auto space-y-3">
+          {[
+            {
+              q: 'Can other passengers or buses see my live location?',
+              a: 'No. MargPath strictly enforces zero customer-to-customer tracking. You only receive the vehicle GPS of the bus assigned to your booking. Your personal phone coordinates are never transmitted or shared.'
+            },
+            {
+              q: 'How does the private live bus map work?',
+              a: 'Each booking receives a cryptographically authenticated session. The server queries the AIS-140 GPS transponder of your specific vehicle and updates its latitude, longitude, speed, and heading angle every 3 seconds.'
+            },
+            {
+              q: 'What if someone tries to tamper with the booking ID or URL?',
+              a: 'All tracking requests are validated server-side against authorized bookings. If a customer attempts to query Bus B while booked on Bus A, the server immediately returns an HTTP 403 Access Denied response.'
+            },
+            {
+              q: 'Can I share my journey tracking with friends or family?',
+              a: 'Yes! After booking, click "Share My Journey" to generate an isolated, secure tracking link. The link only exposes your specific bus and automatically expires when the journey ends.'
+            },
+            {
+              q: 'How does turn-by-turn boarding point navigation work?',
+              a: 'After confirmation, your digital ticket displays the exact distance (e.g. 120m away) and estimated walking time to your boarding platform with step-by-step pedestrian guidance.'
+            }
+          ].map((faq, idx) => {
+            const isOpen = openFaqIndex === idx;
+            return (
+              <div 
+                key={idx}
+                className="border border-slate-200 rounded-2xl overflow-hidden transition"
+              >
+                <button
+                  type="button"
+                  onClick={() => setOpenFaqIndex(isOpen ? null : idx)}
+                  className="w-full p-4 text-left flex items-center justify-between gap-3 bg-slate-50/70 hover:bg-slate-100/80 transition cursor-pointer"
+                >
+                  <span className="text-xs sm:text-sm font-extrabold text-slate-900">{faq.q}</span>
+                  {isOpen ? (
+                    <ChevronUp className="w-4 h-4 text-slate-500 shrink-0" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4 text-slate-500 shrink-0" />
+                  )}
+                </button>
+                {isOpen && (
+                  <div className="p-4 bg-white text-xs text-slate-600 leading-relaxed border-t border-slate-100 animate-in fade-in">
+                    {faq.a}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* ========================================================================= */}
+      {/* SECTION 8: FINAL CALL TO ACTION (CTA)                                     */}
+      {/* ========================================================================= */}
+      <section className="bg-gradient-to-r from-[#D84E55] via-[#C93F46] to-[#B83238] text-white rounded-3xl p-8 sm:p-12 text-center space-y-5 shadow-xl relative overflow-hidden">
+        <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:20px_20px] pointer-events-none" />
+        
+        <div className="relative z-10 max-w-2xl mx-auto space-y-3">
+          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-white/20 text-xs font-black uppercase tracking-wider text-white">
+            MargPath &bull; India in Every Journey
+          </span>
+          <h2 className="text-3xl sm:text-4xl font-black tracking-tight">
+            Ready to Travel Privately?
+          </h2>
+          <p className="text-xs sm:text-sm text-red-100 font-medium">
+            Book your seat now, receive your digital QR pass, and track only your bus in real time.
+          </p>
+
+          <div className="flex flex-wrap items-center justify-center gap-3 pt-3">
+            <button
+              type="button"
+              onClick={() => {
+                const searchEl = document.getElementById('bus-search-bar');
+                if (searchEl) searchEl.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="px-6 py-3 rounded-2xl bg-white hover:bg-slate-50 text-[#D84E55] font-black text-xs uppercase tracking-wider shadow-lg transition transform active:scale-95 cursor-pointer flex items-center gap-2"
+            >
+              <BusIcon className="w-4 h-4 text-[#D84E55]" />
+              <span>Book Your Bus</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                if (onOpenTracker) onOpenTracker();
+                else setIsTrackerOpen(true);
+              }}
+              className="px-6 py-3 rounded-2xl bg-black/30 hover:bg-black/40 text-white font-black text-xs uppercase tracking-wider border border-white/20 transition transform active:scale-95 cursor-pointer flex items-center gap-2"
+            >
+              <Radio className="w-4 h-4 text-emerald-400 animate-pulse" />
+              <span>Track My Journey</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* Standalone Live Bus Tracker Modal when triggered from homepage */}
+      {isTrackerOpen && (
+        <LiveBusTracker
+          bookingId="MP100284"
+          onClose={() => setIsTrackerOpen(false)}
+        />
+      )}
+
     </div>
   );
 };

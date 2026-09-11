@@ -162,7 +162,42 @@ export const INITIAL_CONDUCTORS: ConductorProfile[] = [
 
 export const MOCK_BUSES: Bus[] = [
   {
+    id: 'bus-mp204',
+    displayNumber: 'MP-204',
+    registrationNumber: 'OD-02-MP-0204',
+    operatorId: 'op-margpath',
+    operatorName: 'MargPath Express Luxury Coach',
+    operatorRating: 4.9,
+    model: 'Volvo 9600 Multi-Axle Premium Sleeper',
+    busType: 'AC_SLEEPER_2_1',
+    totalSeats: 40,
+    hasLowerDeck: true,
+    hasUpperDeck: true,
+    layoutId: 'layout-2x1-sleeper',
+    layoutCode: 'LAYOUT-2X1-SLEEPER',
+    amenities: ['AC', 'WiFi 5G', 'AIS-140 GPS Private Tracking', 'USB Fast Charger', 'Personal LED Screen', 'Plush Blanket & Water', 'First Aid Kit'],
+    driverName: 'Rameshwar Mahapatra',
+    driverPhone: '+91 98610 24819',
+    conductorId: 'COND-7890',
+    conductorName: 'Bijay Nayak',
+    conductorPhone: '+91 94371 00001',
+    assignedRoute: 'Bhubaneswar ⇄ Puri',
+    headingDegrees: 165,
+    passengerCount: 32,
+    liveGps: {
+      latitude: 20.1585,
+      longitude: 85.8340,
+      speedKmph: 42,
+      headingDegrees: 165,
+      currentLocationName: 'Approaching Pipili Square Toll (NH-316)',
+      lastUpdated: '10 seconds ago',
+      nextStopName: 'Master Canteen',
+      nextStopEta: '18 mins'
+    }
+  },
+  {
     id: 'bus-1',
+    displayNumber: 'MP-108',
     registrationNumber: 'OD-02-AX-8910',
     operatorId: 'op-1',
     operatorName: 'OSRTC Volvo Premier',
@@ -285,11 +320,11 @@ export const MOCK_CONDUCTORS: ConductorProfile[] = [
     phone: '+91 94371 00001',
     email: 'conductor.bijay@osrtc.gov.in',
     pin: '7890',
-    assignedBusNumber: 'OD-02-AX-8910',
-    assignedBusId: 'bus-1',
-    assignedOperator: 'OSRTC Volvo Premier',
-    assignedRoute: 'Bhubaneswar ⇄ Puri Superfast Express',
-    activeTripId: 'trip-bbsr-puri-night',
+    assignedBusNumber: 'OD-02-MP-0204',
+    assignedBusId: 'bus-mp204',
+    assignedOperator: 'MargPath Express Luxury Coach',
+    assignedRoute: 'Bhubaneswar ⇄ Puri',
+    activeTripId: 'trip-bbsr-puri-flagship',
     avatarUrl: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150&auto=format&fit=crop&q=80'
   },
   {
@@ -478,37 +513,59 @@ export function generateSleeperSeats(basePrice: number): Seat[] {
   return seats;
 }
 
-// Helper to generate 2+2 Semi-Sleeper Seater seats (36 seats)
-export function generateSeaterSeats(basePrice: number): Seat[] {
+// Realistic GPS route polyline coordinates along NH-316 (Bhubaneswar to Puri)
+export const BHUBANESWAR_PURI_WAYPOINTS: [number, number][] = [
+  [20.2668, 85.8436], // Master Canteen / Railway Station (Boarding Point)
+  [20.2520, 85.8385], // Kalpana Square / Lingaraj Junction
+  [20.2180, 85.8450], // Ravi Talkies / Samantarapur
+  [20.2014, 85.8488], // Uttara Square
+  [20.1585, 85.8340], // Near Pipili Toll Gate (Current Bus Position Demo)
+  [20.1172, 85.8315], // Khordha Bypass Junction
+  [20.0889, 85.8284], // Pipili Applique Town
+  [20.0152, 85.8310], // Dandamukundapur Market
+  [19.9540, 85.8295], // Sakhigopal Temple Bypass
+  [19.8920, 85.8300], // Biragobindapur
+  [19.8520, 85.8310], // Malatipatpur Bus Terminal
+  [19.8250, 85.8315], // Atharnala Historic Bridge
+  [19.8135, 85.8312], // Puri Bus Stand (Bada Danda / Destination)
+];
+
+// Helper to generate standard MargPath seat layout: A1 A2 B1 B2, A3 A4 B3 B4 ... A11 A12 B11 B12
+export function generateMargPathSeats(basePrice: number): Seat[] {
   const seats: Seat[] = [];
-  for (let r = 1; r <= 9; r++) {
-    // Left pair: col 0 (Window), col 1 (Aisle)
+  for (let r = 1; r <= 10; r++) {
+    const leftSeat1Num = `A${(r - 1) * 2 + 1}`;
+    const leftSeat2Num = `A${(r - 1) * 2 + 2}`;
+    const rightSeat1Num = `B${(r - 1) * 2 + 1}`;
+    const rightSeat2Num = `B${(r - 1) * 2 + 2}`;
+
+    // Aisle-left window & aisle
     seats.push({
-      id: `S${r}-W1`,
-      number: `${r}A`,
+      id: `seat-${leftSeat1Num.toLowerCase()}`,
+      number: leftSeat1Num,
       deck: 'LOWER',
       row: r,
       col: 0,
       isSleeper: false,
-      basePrice: basePrice + 40,
+      basePrice: basePrice + 30,
       status: 'AVAILABLE',
-      genderRestriction: 'ANY',
+      genderRestriction: r === 1 ? 'FEMALE_ONLY' : 'ANY',
     });
     seats.push({
-      id: `S${r}-A1`,
-      number: `${r}B`,
+      id: `seat-${leftSeat2Num.toLowerCase()}`,
+      number: leftSeat2Num,
       deck: 'LOWER',
       row: r,
       col: 1,
       isSleeper: false,
       basePrice: basePrice,
       status: 'AVAILABLE',
-      genderRestriction: 'ANY',
+      genderRestriction: r === 1 ? 'FEMALE_ONLY' : 'ANY',
     });
-    // Right pair: col 2 (Aisle), col 3 (Window)
+    // Aisle-right aisle & window
     seats.push({
-      id: `S${r}-A2`,
-      number: `${r}C`,
+      id: `seat-${rightSeat1Num.toLowerCase()}`,
+      number: rightSeat1Num,
       deck: 'LOWER',
       row: r,
       col: 2,
@@ -518,13 +575,13 @@ export function generateSeaterSeats(basePrice: number): Seat[] {
       genderRestriction: 'ANY',
     });
     seats.push({
-      id: `S${r}-W2`,
-      number: `${r}D`,
+      id: `seat-${rightSeat2Num.toLowerCase()}`,
+      number: rightSeat2Num,
       deck: 'LOWER',
       row: r,
       col: 3,
       isSleeper: false,
-      basePrice: basePrice + 40,
+      basePrice: basePrice + 30,
       status: 'AVAILABLE',
       genderRestriction: 'ANY',
     });
@@ -532,9 +589,65 @@ export function generateSeaterSeats(basePrice: number): Seat[] {
   return seats;
 }
 
+export function generateSeaterSeats(basePrice: number): Seat[] {
+  return generateMargPathSeats(basePrice);
+}
+
 export const INITIAL_TRIPS: Trip[] = [
   {
+    id: 'trip-bbsr-puri-flagship',
+    tripCode: 'TRIP-20491',
+    routeId: 'route-bbsr-puri',
+    busId: 'bus-mp204',
+    category: 'DAY_COACH',
+    departureDate: new Date().toISOString().split('T')[0],
+    departureTime: '06:30',
+    arrivalTime: '08:45',
+    durationText: '2h 15m',
+    originCity: 'Bhubaneswar',
+    destinationCity: 'Puri',
+    baseFare: 380,
+    surgeMultiplier: 1.0,
+    effectiveFare: 380,
+    rating: 4.9,
+    totalReviewsCount: 384,
+    bus: MOCK_BUSES[0],
+    boardingPoints: [
+      { id: 'bp-bbsr-railway', name: 'Bhubaneswar Railway Station', landmark: 'Master Canteen Square Platform 1 Exit', time: '06:30', contactPhone: '+91 94371 00001' },
+      { id: 'bp-1', name: 'Baramunda ISBT', landmark: 'Platform 2 Overbridge', time: '06:15', contactPhone: '+91 98610 24819' },
+      { id: 'bp-2', name: 'Kalpana Square', landmark: 'Near State Museum', time: '06:45', contactPhone: '+91 94371 00001' }
+    ],
+    droppingPoints: [
+      { id: 'dp-puri-grandroad', name: 'Puri Bus Stand', landmark: 'Grand Road Jagannath Temple Entrance', time: '08:45', contactPhone: '+91 94371 00001' },
+      { id: 'dp-2', name: 'Swargadwar Beach', landmark: 'Sea Beach Circle', time: '09:00', contactPhone: '+91 94371 00001' }
+    ],
+    seats: (() => {
+      const s = generateMargPathSeats(380);
+      // Pre-seed demo booking for seat A12
+      const a12 = s.find(seat => seat.number === 'A12');
+      if (a12) {
+        a12.status = 'BOOKED';
+        a12.bookedGender = 'MALE';
+        a12.passengerName = 'Rahul Sharma';
+        a12.bookingPnr = 'MP100284';
+      }
+      // Seed a few other occupied seats for realistic 32/40 passenger count
+      ['A1', 'A2', 'B1', 'B2', 'A3', 'B3', 'A4', 'B4', 'A5', 'B5', 'A6', 'B6', 'A7', 'B7', 'A8', 'B8', 'A9', 'B9', 'A10', 'B10'].forEach(num => {
+        const found = s.find(seat => seat.number === num);
+        if (found) {
+          found.status = 'BOOKED';
+          found.bookedGender = 'MALE';
+        }
+      });
+      return s;
+    })(),
+    availableSeatsCount: 19,
+    totalSeatsCount: 40,
+    tripStatus: 'BUS_APPROACHING'
+  },
+  {
     id: 'trip-bbsr-puri-night',
+    tripCode: 'TRIP-20492',
     routeId: 'route-bbsr-puri',
     busId: 'bus-1',
     category: 'NIGHT_COACH',
@@ -546,7 +659,7 @@ export const INITIAL_TRIPS: Trip[] = [
     baseFare: 450,
     surgeMultiplier: 1.2,
     effectiveFare: 540,
-    bus: MOCK_BUSES[0],
+    bus: MOCK_BUSES[1],
     boardingPoints: [
       { id: 'bp-1', name: 'Baramunda ISBT (Bay 4)', landmark: 'Near Overbridge', time: '22:30', contactPhone: '+91 98610 24819' },
       { id: 'bp-2', name: 'Jaydev Vihar Overbridge', landmark: 'Opposite Fortune Hotel', time: '22:45', contactPhone: '+91 98610 24819' },
@@ -689,9 +802,73 @@ export const INITIAL_TRIPS: Trip[] = [
 
 export const INITIAL_BOOKINGS: Booking[] = [
   {
+    id: 'bk-demo-100284',
+    pnr: 'MP100284',
+    userId: 'usr-pass-101', // Rahul Sharma
+    tripId: 'trip-bbsr-puri-flagship',
+    tripCode: 'TRIP-20491',
+    busDisplayNumber: 'MP-204',
+    passengerId: 'PAX-100284',
+    trackingPermissionGranted: true,
+    shareToken: 'share-mp100284-demo',
+    trip: {
+      originCity: 'Bhubaneswar',
+      destinationCity: 'Puri',
+      departureDate: new Date().toISOString().split('T')[0],
+      departureTime: '06:30',
+      arrivalTime: '08:45',
+      busModel: 'Volvo 9600 Multi-Axle Premium Sleeper',
+      operatorName: 'MargPath Express Luxury Coach',
+      busRegistrationNumber: 'OD-02-MP-0204',
+      busDisplayNumber: 'MP-204',
+      category: 'DAY_COACH',
+      boardingPointName: 'Bhubaneswar Railway Station',
+      boardingTime: '06:30',
+      droppingPointName: 'Puri Bus Stand',
+      droppingTime: '08:45',
+      travelDate: new Date().toISOString().split('T')[0]
+    },
+    passengers: [
+      { name: 'Rahul Sharma', age: 29, gender: 'MALE', seatNumber: 'A12', seatId: 'seat-a12', fare: 380, isPrimaryContact: true }
+    ],
+    contactEmail: 'rahul.sharma@gmail.com',
+    contactPhone: '9876543210',
+    boardingPoint: {
+      id: 'bp-bbsr-railway',
+      name: 'Bhubaneswar Railway Station',
+      landmark: 'Master Canteen Square Platform 1 Exit',
+      time: '06:30',
+      contactPhone: '+91 94371 00001'
+    },
+    droppingPoint: {
+      id: 'dp-puri-grandroad',
+      name: 'Puri Bus Stand',
+      landmark: 'Grand Road Jagannath Temple Entrance',
+      time: '08:45',
+      contactPhone: '+91 94371 00001'
+    },
+    baseAmount: 380,
+    surgeAmount: 0,
+    gstAmount: 19,
+    discountAmount: 0,
+    totalAmount: 399,
+    paymentMethod: 'UPI',
+    paymentStatus: 'PAID',
+    checkInStatus: 'CONFIRMED',
+    qrPayloadHash: 'hash_mp100284_pnr_sec_v1',
+    qrPayloadData: JSON.stringify({ pnr: 'MP100284', trip: 'TRIP-20491', vehicle: 'MP-204', seats: ['A12'], passenger: 'Rahul Sharma', status: 'PAID' }),
+    qrCodeToken: 'margpath:ticket:MP100284',
+    bookedAt: new Date().toISOString()
+  },
+  {
     id: 'bk-1001',
     pnr: 'BR899401',
+    userId: 'usr-pass-102', // Customer B: Ananya Pattnaik
     tripId: 'trip-bbsr-puri-night',
+    tripCode: 'TRIP-10802',
+    busDisplayNumber: 'MP-108',
+    passengerId: 'PAX-899401',
+    trackingPermissionGranted: true,
     trip: {
       originCity: 'Bhubaneswar',
       destinationCity: 'Puri',

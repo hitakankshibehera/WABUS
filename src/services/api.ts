@@ -365,15 +365,25 @@ export const api = {
     } catch {
       // Local fallback booking generation
       const trip = INITIAL_TRIPS.find(t => t.id === payload.tripId) || INITIAL_TRIPS[0];
-      const pnr = `WB${Math.floor(100000 + Math.random() * 900000)}`;
+      const pnr = `MP${Math.floor(100000 + Math.random() * 900000)}`;
+      const busNum = trip.bus?.displayNumber || 'MP-204';
+      const tripNum = trip.tripCode || 'TRIP-20491';
+      const paxId = `PAX-${Math.floor(100000 + Math.random() * 900000)}`;
+
       const booking: Booking = {
         id: `bk-${Date.now()}`,
         pnr,
         tripId: trip.id,
+        tripCode: tripNum,
+        passengerId: paxId,
+        busDisplayNumber: busNum,
+        trackingPermissionGranted: true,
+        shareToken: `share-${pnr.toLowerCase()}`,
         trip: {
-          busRegistrationNumber: trip.bus?.registrationNumber,
-          operatorName: trip.bus?.operatorName,
-          busModel: trip.bus?.model,
+          busRegistrationNumber: trip.bus?.registrationNumber || 'OD-02-MP-0204',
+          busDisplayNumber: busNum,
+          operatorName: trip.bus?.operatorName || 'MargPath Express Luxury Coach',
+          busModel: trip.bus?.model || 'Volvo 9600 Multi-Axle Premium Sleeper',
           busType: trip.bus?.busType,
           originCity: trip.originCity,
           destinationCity: trip.destinationCity,
@@ -390,24 +400,24 @@ export const api = {
         contactPhone: payload.contactPhone,
         boardingPoint: {
           id: payload.boardingPointId || 'bp-1',
-          name: trip.boardingPoints[0]?.name || `${trip.originCity} ISBT`,
-          landmark: trip.boardingPoints[0]?.landmark || 'Main Bus Terminal',
+          name: trip.boardingPoints[0]?.name || `${trip.originCity} Railway Station`,
+          landmark: trip.boardingPoints[0]?.landmark || 'Platform 1 Exit',
           time: trip.departureTime,
-          contactPhone: '+91 94383 18821'
+          contactPhone: '+91 94371 00001'
         },
         droppingPoint: {
           id: payload.droppingPointId || 'dp-1',
           name: trip.droppingPoints[0]?.name || `${trip.destinationCity} Bus Stand`,
-          landmark: trip.droppingPoints[0]?.landmark || 'Central Bus Terminal',
+          landmark: trip.droppingPoints[0]?.landmark || 'Grand Road Terminal',
           time: trip.arrivalTime,
-          contactPhone: '+91 94383 18821'
+          contactPhone: '+91 94371 00001'
         },
         totalAmount: payload.passengers.length * trip.baseFare - (payload.discountAmount || 0),
         bookingDate: new Date().toISOString(),
         paymentStatus: payload.paymentMethod === 'PAY_ON_BOARDING' ? 'PENDING' : 'COMPLETED',
         paymentMethod: payload.paymentMethod as any,
         checkInStatus: 'CONFIRMED',
-        qrCodeToken: `wabus:ticket:${pnr}`,
+        qrCodeToken: `margpath:ticket:${pnr}`,
         whatsappDelivered: true
       };
       bookingResult = {
@@ -759,7 +769,18 @@ export const api = {
   },
 
   async getBookingLiveLocation(bookingId: string): Promise<any> {
+    const headers: Record<string, string> = {};
+    try {
+      const savedUser = localStorage.getItem('wabus_user_session');
+      if (savedUser) {
+        const u = JSON.parse(savedUser);
+        if (u.id) headers['x-demo-user-id'] = u.id;
+        if (u.email) headers['x-demo-user-email'] = u.email;
+      }
+    } catch {}
+
     const res = await fetch(`/api/my-booking/${encodeURIComponent(bookingId)}/live-location`, {
+      headers,
       credentials: 'include'
     });
     const data = await res.json();
@@ -767,6 +788,46 @@ export const api = {
       throw new Error(data.error || 'Failed to fetch live location');
     }
     return data;
+  },
+
+  async getMyTripLiveLocation(): Promise<any> {
+    const headers: Record<string, string> = {};
+    try {
+      const savedUser = localStorage.getItem('wabus_user_session');
+      if (savedUser) {
+        const u = JSON.parse(savedUser);
+        if (u.id) headers['x-demo-user-id'] = u.id;
+        if (u.email) headers['x-demo-user-email'] = u.email;
+      }
+    } catch {}
+
+    const res = await fetch('/api/my-trip/location', {
+      headers,
+      credentials: 'include'
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || 'Failed to fetch your private trip location');
+    }
+    return data;
+  },
+
+  async getSharedTripLocation(shareToken: string): Promise<any> {
+    const res = await fetch(`/api/shared-trip/${encodeURIComponent(shareToken)}`);
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || 'Shared journey has expired or is invalid');
+    }
+    return data;
+  },
+
+  async updateDriverTripStatus(tripId: string, status: 'START' | 'PAUSE' | 'END'): Promise<any> {
+    const res = await fetch('/api/driver/trip-status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tripId, status })
+    });
+    return res.json();
   },
 
   async getConductors(): Promise<ConductorProfile[]> {
