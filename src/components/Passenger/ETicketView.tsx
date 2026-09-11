@@ -23,9 +23,20 @@ import {
   MapPin,
   ExternalLink,
   Lock,
-  Sparkles
+  Sparkles,
+  Bot,
+  Hotel,
+  Car,
+  Compass,
+  Utensils,
+  Star,
+  Plus
 } from 'lucide-react';
 import { LiveBusTracker } from './LiveBusTracker';
+import { MargPathAIAssistant } from './MargPathAIAssistant';
+import { JourneySafetyModal } from './JourneySafetyModal';
+import { JourneyRatingModal } from './JourneyRatingModal';
+import { CompleteMyTripOption } from '../../types';
 
 interface ETicketViewProps {
   booking: Booking;
@@ -42,10 +53,58 @@ export const ETicketView: React.FC<ETicketViewProps> = ({
 }) => {
   const { openProfileModal } = useAuth();
   const [showLiveTracker, setShowLiveTracker] = useState(false);
+  const [showAIAssistant, setShowAIAssistant] = useState(false);
+  const [showSafetyModal, setShowSafetyModal] = useState(false);
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const [selectedAddons, setSelectedAddons] = useState<string[]>([]);
+  const [addonConfirmed, setAddonConfirmed] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [isShareLinkCopied, setIsShareLinkCopied] = useState(false);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [emailSentStatus, setEmailSentStatus] = useState<string | null>(null);
+
+  const completeTripOptions: CompleteMyTripOption[] = [
+    {
+      id: 'hotel-puri-1',
+      category: 'HOTEL',
+      title: 'Mayfair Heritage Beach Resort',
+      subtitle: 'Beachfront luxury • Complimentary breakfast • 2km from Grand Road',
+      price: 1450,
+      badge: 'MargPath Partner Deal',
+      rating: 4.9,
+      imageUrl: '🏨'
+    },
+    {
+      id: 'taxi-station-1',
+      category: 'TAXI',
+      title: 'Verified Station Pickup Sedan',
+      subtitle: 'Chauffeur waits at terminal exit bay with name placard • AC Sedan',
+      price: 220,
+      badge: 'Zero Surge Guaranteed',
+      rating: 4.8,
+      imageUrl: '🚕'
+    },
+    {
+      id: 'darshan-pass-1',
+      category: 'ACTIVITY',
+      title: 'VIP Jagannath Darshan & Chilika Tour',
+      subtitle: 'Official authorized queue coordinator + Sunset lagoon boating pass',
+      price: 350,
+      badge: 'Bestseller',
+      rating: 4.9,
+      imageUrl: '🎟️'
+    },
+    {
+      id: 'meal-box-1',
+      category: 'FOOD',
+      title: 'Odia Royal Dalma & Khichdi Thali',
+      subtitle: 'Fresh hot meal delivered directly to your seat at Pipili Toll stop',
+      price: 140,
+      badge: 'Fresh & Hygienic',
+      rating: 4.7,
+      imageUrl: '🍽️'
+    }
+  ];
   
   const vehicleNumber = booking.trip.busRegistrationNumber || (trip && trip.bus ? trip.bus.registrationNumber : 'OD-02-MP-0204');
   const busDisplay = booking.busDisplayNumber || (vehicleNumber.includes('0204') ? 'MP-204' : `MP-${vehicleNumber.replace(/[^0-9]/g, '').slice(-3) || '204'}`);
@@ -419,6 +478,103 @@ export const ETicketView: React.FC<ETicketViewProps> = ({
           </div>
         </div>
 
+        {/* Complete My Trip - Optional Unobtrusive Travel Add-ons (Requirement 27) */}
+        <div className="p-5 sm:p-6 bg-gradient-to-br from-amber-50/40 via-white to-orange-50/30 border-t border-slate-200">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="p-1.5 rounded-lg bg-amber-500/10 text-amber-600">
+                  <Compass className="w-4 h-4" />
+                </span>
+                <h4 className="text-sm font-black text-slate-900 tracking-tight">Complete My Trip</h4>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 uppercase tracking-wider">
+                  Optional Bundle
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-1">
+                Curated zero-surge partner services ready at your destination.
+              </p>
+            </div>
+            
+            {selectedAddons.length > 0 && (
+              <div className="flex items-center gap-3">
+                <div className="text-right">
+                  <span className="text-[11px] text-slate-500 font-medium block">Total Add-on</span>
+                  <span className="text-sm font-black text-slate-900 font-mono">
+                    +₹{selectedAddons.reduce((sum, id) => sum + (completeTripOptions.find(o => o.id === id)?.price || 0), 0)}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAddonConfirmed(true)}
+                  disabled={addonConfirmed}
+                  className={`px-4 py-2 rounded-xl text-xs font-black shadow-xs transition ${
+                    addonConfirmed 
+                      ? 'bg-emerald-600 text-white cursor-default' 
+                      : 'bg-amber-600 hover:bg-amber-700 text-white cursor-pointer active:scale-98'
+                  }`}
+                >
+                  {addonConfirmed ? '✓ Added to Journey' : 'Add to Journey'}
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {completeTripOptions.map((opt) => {
+              const isSelected = selectedAddons.includes(opt.id);
+              return (
+                <div
+                  key={opt.id}
+                  onClick={() => {
+                    if (addonConfirmed) return;
+                    setSelectedAddons(prev => 
+                      prev.includes(opt.id) ? prev.filter(id => id !== opt.id) : [...prev, opt.id]
+                    );
+                  }}
+                  className={`p-3.5 rounded-2xl border transition-all cursor-pointer select-none flex flex-col justify-between ${
+                    isSelected 
+                      ? 'bg-amber-500/5 border-amber-500 shadow-sm ring-2 ring-amber-500/20' 
+                      : 'bg-white border-slate-200/80 hover:border-slate-300 hover:shadow-xs'
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <span className="text-2xl">{opt.imageUrl}</span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                        isSelected ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-700'
+                      }`}>
+                        {opt.badge}
+                      </span>
+                    </div>
+                    <div className="text-xs font-black text-slate-900 line-clamp-1">{opt.title}</div>
+                    <p className="text-[11px] text-slate-500 mt-1 line-clamp-2 leading-relaxed">
+                      {opt.subtitle}
+                    </p>
+                  </div>
+
+                  <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center gap-1 text-[11px] text-amber-500 font-bold">
+                        <Star className="w-3 h-3 fill-current" />
+                        <span>{opt.rating}</span>
+                      </div>
+                      <div className="text-xs font-black text-slate-900 font-mono mt-0.5">
+                        ₹{opt.price}
+                      </div>
+                    </div>
+                    <div className={`w-6 h-6 rounded-lg flex items-center justify-center transition ${
+                      isSelected ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-400'
+                    }`}>
+                      {isSelected ? <Check className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
         {/* Perforated Divider Bar */}
         <div className="relative border-t border-dashed border-slate-200 my-0.5">
           <div className="absolute -top-3 -left-3 w-6 h-6 bg-[#F8FAFC] rounded-full border-r border-slate-200"></div>
@@ -437,6 +593,39 @@ export const ETicketView: React.FC<ETicketViewProps> = ({
               <span>Track My Bus</span>
             </button>
 
+            {/* AI Assistant Quick Trigger */}
+            <button
+              type="button"
+              onClick={() => setShowAIAssistant(true)}
+              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-xs shadow-xs transition cursor-pointer"
+              title="Ask AI Trip Assistant anything about your journey"
+            >
+              <Bot className="w-3.5 h-3.5" />
+              <span>AI Assistant</span>
+            </button>
+
+            {/* Safety Score Quick Trigger */}
+            <button
+              type="button"
+              onClick={() => setShowSafetyModal(true)}
+              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs shadow-xs transition cursor-pointer"
+              title="View Journey Safety Score & Driver Verifications"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-300" />
+              <span>Safety 94/100</span>
+            </button>
+
+            {/* Rate Trip Trigger */}
+            <button
+              type="button"
+              onClick={() => setShowRatingModal(true)}
+              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-xs transition cursor-pointer"
+              title="Rate your journey & earn 50 MargPoints"
+            >
+              <Star className="w-3.5 h-3.5" />
+              <span>Rate Trip (+50 pts)</span>
+            </button>
+
             {/* Share My Journey Button (Requirement 14) */}
             <button
               type="button"
@@ -445,7 +634,7 @@ export const ETicketView: React.FC<ETicketViewProps> = ({
               title="Generate temporary secure tracking link for friends/family"
             >
               {isShareLinkCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Share2 className="w-3.5 h-3.5" />}
-              <span>{isShareLinkCopied ? 'Link Copied!' : 'Share My Journey'}</span>
+              <span>{isShareLinkCopied ? 'Link Copied!' : 'Share Journey'}</span>
             </button>
 
             <button
@@ -492,6 +681,38 @@ export const ETicketView: React.FC<ETicketViewProps> = ({
           bookingId={bookingPnr}
           trip={booking.trip}
           onClose={() => setShowLiveTracker(false)}
+        />
+      )}
+
+      {/* AI Trip Assistant Modal */}
+      {showAIAssistant && (
+        <MargPathAIAssistant
+          bookingId={bookingPnr}
+          tripCode={tripCode}
+          busDisplay={busDisplay}
+          seatNumber={seatsDisplay}
+          boardingPoint={boardingPointName}
+          destinationPoint={droppingPointName}
+          onClose={() => setShowAIAssistant(false)}
+        />
+      )}
+
+      {/* Journey Safety Modal */}
+      {showSafetyModal && (
+        <JourneySafetyModal
+          bookingId={bookingPnr}
+          onClose={() => setShowSafetyModal(false)}
+        />
+      )}
+
+      {/* Journey Rating Modal */}
+      {showRatingModal && (
+        <JourneyRatingModal
+          bookingId={bookingPnr}
+          tripId={tripCode}
+          busNumber={busDisplay}
+          onClose={() => setShowRatingModal(false)}
+          onSubmitted={() => setShowRatingModal(false)}
         />
       )}
     </div>

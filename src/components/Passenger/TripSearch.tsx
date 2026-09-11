@@ -83,7 +83,7 @@ export const TripSearch: React.FC<TripSearchProps> = ({
     return today.toISOString().split('T')[0];
   });
   const [passengerCount, setPassengerCount] = useState(2);
-  const [sortOption, setSortOption] = useState<'CHEAPEST' | 'FASTEST' | 'EARLIEST' | 'BEST_RATED'>('CHEAPEST');
+  const [sortOption, setSortOption] = useState<'RECOMMENDED' | 'CHEAPEST' | 'FASTEST' | 'EARLIEST' | 'BEST_RATED'>('RECOMMENDED');
   const [isTrackerOpen, setIsTrackerOpen] = useState(false);
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<'ALL' | TripCategory>('ALL');
@@ -214,6 +214,11 @@ export const TripSearch: React.FC<TripSearchProps> = ({
     const matchType = busTypeFilter === 'ALL' || (t.bus && t.bus.busType === busTypeFilter);
     return matchOrigin && matchDest && matchCat && matchType;
   }).sort((a, b) => {
+    if (sortOption === 'RECOMMENDED') {
+      const scoreA = (a.bus?.displayNumber === 'MP-204' ? 100 : 0) + (a.bus?.operatorRating || 4.5) * 10 - a.effectiveFare * 0.05;
+      const scoreB = (b.bus?.displayNumber === 'MP-204' ? 100 : 0) + (b.bus?.operatorRating || 4.5) * 10 - b.effectiveFare * 0.05;
+      return scoreB - scoreA;
+    }
     if (sortOption === 'CHEAPEST') return a.effectiveFare - b.effectiveFare;
     if (sortOption === 'BEST_RATED') return (b.bus?.operatorRating || 4.5) - (a.bus?.operatorRating || 4.5);
     if (sortOption === 'EARLIEST') return a.departureTime.localeCompare(b.departureTime);
@@ -224,6 +229,9 @@ export const TripSearch: React.FC<TripSearchProps> = ({
     }
     return 0;
   });
+
+  // Section 2: AI Best Match recommendation winner
+  const bestMatchTrip = filteredTrips.find(t => t.bus?.displayNumber === 'MP-204') || filteredTrips[0];
 
   // Calendar Helpers
   const todayStr = new Date().toISOString().split('T')[0];
@@ -1359,6 +1367,17 @@ export const TripSearch: React.FC<TripSearchProps> = ({
         <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2">
           <button
             type="button"
+            onClick={() => setSortOption('RECOMMENDED')}
+            className={`px-3.5 py-1.5 rounded-xl font-bold text-xs transition cursor-pointer flex items-center justify-center gap-1.5 ${
+              sortOption === 'RECOMMENDED'
+                ? 'bg-[#D84E55] text-white shadow-xs'
+                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+            }`}
+          >
+            <span>⭐ Recommended</span>
+          </button>
+          <button
+            type="button"
             onClick={() => setSortOption('CHEAPEST')}
             className={`px-3.5 py-1.5 rounded-xl font-bold text-xs transition cursor-pointer flex items-center justify-center gap-1.5 ${
               sortOption === 'CHEAPEST'
@@ -1435,6 +1454,64 @@ export const TripSearch: React.FC<TripSearchProps> = ({
           </button>
         )}
       </div>
+
+      {/* Section 2: AI BEST MATCH Recommendation Banner */}
+      {bestMatchTrip && (
+        <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border-2 border-amber-400/90 rounded-3xl p-5 sm:p-6 text-white shadow-xl relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-60 h-60 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+          
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3.5">
+            <div className="flex items-center gap-2.5">
+              <span className="px-3 py-1 rounded-full bg-amber-400 text-slate-950 font-black text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-md">
+                <Star className="w-3.5 h-3.5 fill-slate-950" />
+                <span>⭐ BEST MATCH</span>
+              </span>
+              <span className="text-xs text-amber-300 font-bold">AI Recommendation Engine Winner</span>
+            </div>
+            <div className="flex items-center gap-3 text-xs">
+              <span className="text-slate-400 font-medium">Considered: Price &bull; Speed &bull; 98.4% Punctuality &bull; 4.8★ Rating</span>
+            </div>
+          </div>
+
+          <div className="mt-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-mono font-black text-lg text-amber-400">BUS {bestMatchTrip.bus?.displayNumber || 'MP-204'}</span>
+                <span className="text-slate-500">&bull;</span>
+                <span className="font-bold text-white text-base">{bestMatchTrip.bus?.operatorName || 'MargPath Express Luxury Coach'}</span>
+                <span className="px-2 py-0.5 rounded-md bg-[#388E3C] text-white text-xs font-bold flex items-center gap-1">
+                  <Star className="w-3 h-3 fill-white" />
+                  <span>4.8</span>
+                </span>
+                <span className="text-[11px] px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold">
+                  🟢 32% Occupancy (Plenty of Seats)
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-3 text-xs text-slate-300">
+                <span className="font-bold text-emerald-400">⚡ 20 minutes faster</span>
+                <span>&bull;</span>
+                <span className="text-slate-200">Window seats available</span>
+                <span>&bull;</span>
+                <span className="text-slate-300">{bestMatchTrip.originCity} ({bestMatchTrip.departureTime}) ➔ {bestMatchTrip.destinationCity} ({bestMatchTrip.arrivalTime})</span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                <span className="text-2xl sm:text-3xl font-black text-white">₹{bestMatchTrip.effectiveFare}</span>
+                <span className="text-[11px] text-slate-400 block font-medium">per seat &bull; all taxes incl.</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => onSelectTrip(selectedTripId === bestMatchTrip.id ? null : bestMatchTrip)}
+                className="py-3 px-5 rounded-2xl bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-300 hover:to-orange-400 text-slate-950 font-black text-xs uppercase tracking-wider transition shadow-lg shadow-amber-500/20 cursor-pointer shrink-0"
+              >
+                <span>{selectedTripId === bestMatchTrip.id ? 'Viewing Seats' : 'Book This Bus'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Realistic Bus Cards List */}
       <div className="space-y-3.5">
@@ -1555,6 +1632,26 @@ export const TripSearch: React.FC<TripSearchProps> = ({
                           <Sun className="w-3 h-3" /> Day Express
                         </span>
                       )}
+
+                      {/* Section 26: Bus Occupancy Intelligence */}
+                      {(() => {
+                        const total = trip.bus?.totalSeats || 40;
+                        const avail = trip.availableSeatsCount;
+                        const occPct = Math.round(((total - avail) / total) * 100);
+                        return occPct >= 80 ? (
+                          <span className="text-[11px] px-2 py-0.5 rounded-md bg-rose-50 text-rose-800 border border-rose-200 font-bold">
+                            🔴 High ({occPct}% booked)
+                          </span>
+                        ) : occPct >= 50 ? (
+                          <span className="text-[11px] px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 font-bold">
+                            🟡 Moderate ({occPct}% booked)
+                          </span>
+                        ) : (
+                          <span className="text-[11px] px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold">
+                            🟢 Low ({occPct}% booked)
+                          </span>
+                        );
+                      })()}
                     </div>
 
                     {/* Schedule Timings: Start Time & Reach Time */}

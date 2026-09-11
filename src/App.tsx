@@ -13,11 +13,13 @@ import { AuthModal } from './components/Auth/AuthModal';
 import { PassengerProfileModal } from './components/Auth/PassengerProfileModal';
 import { CustomerSupportModal } from './components/Support/CustomerSupportModal';
 import { LiveBusTracker } from './components/Passenger/LiveBusTracker';
+import { MargPointsModal } from './components/Passenger/MargPointsModal';
+import { MargPathAIAssistant } from './components/Passenger/MargPathAIAssistant';
 import { useAuth } from './context/AuthContext';
 import { api } from './services/api';
 import { Trip, Seat, FeatureFlags, Booking, PaymentMethod, BoardingPoint, DroppingPoint, PassengerDetails } from './types';
 import { DEFAULT_FEATURE_FLAGS } from './data/mockDatabase';
-import { ArrowLeft, Bus, AlertCircle, CheckCircle2, ShieldCheck, Zap, Sparkles, ChevronRight, HelpCircle, Home, Ticket, Radio, User } from 'lucide-react';
+import { ArrowLeft, Bus, AlertCircle, CheckCircle2, ShieldCheck, Zap, Sparkles, ChevronRight, HelpCircle, Home, Ticket, Radio, User, Bot, Gift } from 'lucide-react';
 
 const getInitialTab = (): ActiveTab => {
   if (typeof window === 'undefined') return 'PASSENGER';
@@ -62,6 +64,8 @@ export default function App() {
   const [statusNotification, setStatusNotification] = useState<string | null>(null);
   const [isSupportOpen, setIsSupportOpen] = useState(false);
   const [isMobileTrackerOpen, setIsMobileTrackerOpen] = useState(false);
+  const [isRewardsOpen, setIsRewardsOpen] = useState(false);
+  const [isAIAssistantOpen, setIsAIAssistantOpen] = useState(false);
 
   const { currentUser, openProfileModal } = useAuth();
 
@@ -547,7 +551,7 @@ export default function App() {
         </div>
       </footer>
 
-      {/* Mobile Bottom Navigation Bar (Requirement 22) */}
+      {/* Mobile Bottom Navigation Bar (Requirement 30: Home, Bookings, Track, Rewards, Profile) */}
       <nav className="sm:hidden fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur-md border-t border-slate-200 z-30 px-3 py-1.5 flex items-center justify-around shadow-2xl">
         <button
           type="button"
@@ -588,6 +592,15 @@ export default function App() {
 
         <button
           type="button"
+          onClick={() => setIsRewardsOpen(true)}
+          className="flex flex-col items-center gap-0.5 text-[10px] font-bold text-amber-600 hover:text-amber-700 transition cursor-pointer py-1"
+        >
+          <Sparkles className="w-4 h-4 text-amber-500" />
+          <span>Rewards</span>
+        </button>
+
+        <button
+          type="button"
           onClick={() => openProfileModal()}
           className="flex flex-col items-center gap-0.5 text-[10px] font-bold text-slate-500 hover:text-slate-900 transition cursor-pointer py-1"
         >
@@ -596,12 +609,39 @@ export default function App() {
         </button>
       </nav>
 
+      {/* Floating AI Trip Assistant Launcher (Requirement 14) */}
+      <button
+        type="button"
+        onClick={() => setIsAIAssistantOpen(true)}
+        className="fixed bottom-20 sm:bottom-6 right-5 z-40 p-3.5 sm:px-4 sm:py-3 rounded-full bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white shadow-xl hover:shadow-2xl hover:scale-105 active:scale-95 transition-all flex items-center gap-2 cursor-pointer border-2 border-white/40"
+        title="Ask MargPath AI Trip Assistant"
+      >
+        <span className="relative flex h-2.5 w-2.5">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+        </span>
+        <Bot className="w-5 h-5 text-white" />
+        <span className="hidden sm:inline font-extrabold text-xs tracking-wide">
+          Ask MargPath AI
+        </span>
+      </button>
+
       {/* Standalone Mobile Live Bus Tracker Modal */}
       {isMobileTrackerOpen && (
         <LiveBusTracker
           bookingId={currentUser?.id === 'usr-pass-102' ? 'BR899401' : 'MP100284'}
           onClose={() => setIsMobileTrackerOpen(false)}
         />
+      )}
+
+      {/* MargPoints Loyalty Modal */}
+      {isRewardsOpen && (
+        <MargPointsModal onClose={() => setIsRewardsOpen(false)} />
+      )}
+
+      {/* MargPath AI Assistant Modal */}
+      {isAIAssistantOpen && (
+        <MargPathAIAssistant onClose={() => setIsAIAssistantOpen(false)} />
       )}
     </div>
   );

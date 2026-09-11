@@ -2,12 +2,17 @@ import React, { useState, useRef, useEffect } from 'react';
 import { 
   Bus, Smartphone, ShieldCheck, Database, Zap, Sparkles, HelpCircle, 
   PhoneCall, Radio, User, LogIn, UserPlus, LogOut, ChevronDown, BadgeCheck, 
-  Search, ArrowRight, X, Ticket, Wallet, Gift, Tag, Info, List, ChevronRight 
+  Search, ArrowRight, X, Ticket, Wallet, Gift, Tag, Info, List, ChevronRight,
+  Bot, Star
 } from 'lucide-react';
 import { FeatureFlags, Booking } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { WalletModal, GiftCardModal, AboutModal, CancelTicketModal } from './Account/AccountModals';
 import { LiveBusTracker } from './Passenger/LiveBusTracker';
+import { MargPointsModal } from './Passenger/MargPointsModal';
+import { CustomerDashboardModal } from './Passenger/CustomerDashboardModal';
+import { MargPathAIAssistant } from './Passenger/MargPathAIAssistant';
+import { JourneySafetyModal } from './Passenger/JourneySafetyModal';
 
 export type ActiveTab = 'PASSENGER' | 'CONDUCTOR' | 'ADMIN' | 'ARCHITECTURE';
 
@@ -35,11 +40,15 @@ export const Header: React.FC<HeaderProps> = ({
   const accountMenuRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Modals triggered from Account Menu
+  // Modals triggered from Account Menu & Header
   const [isWalletOpen, setIsWalletOpen] = useState(false);
   const [isGiftCardOpen, setIsGiftCardOpen] = useState(false);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [isCancelTicketOpen, setIsCancelTicketOpen] = useState(false);
+  const [isMargPointsOpen, setIsMargPointsOpen] = useState(false);
+  const [isAIAssistantOpen, setIsAIAssistantOpen] = useState(false);
+  const [isSafetyModalOpen, setIsSafetyModalOpen] = useState(false);
+  const [isDashboardOpen, setIsDashboardOpen] = useState(false);
 
   const totalTicketsCount = bookings.reduce((sum, b) => sum + b.passengers.length, 0);
 
@@ -261,6 +270,42 @@ export const Header: React.FC<HeaderProps> = ({
             >
               <Bus className={`w-4 h-4 ${activeTab === 'PASSENGER' ? 'text-[#D84E55]' : 'text-gray-500'}`} />
               <span>Bus Tickets</span>
+            </button>
+
+            {/* MargPoints Loyalty Button */}
+            <button
+              type="button"
+              onClick={() => setIsMargPointsOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 shadow-2xs transition cursor-pointer"
+              title="MargPoints Loyalty Rewards & Referral Code"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+              <span>MargPoints</span>
+              <span className="px-1.5 py-0.5 rounded-full bg-amber-200 text-amber-900 text-[10px] font-extrabold font-mono">
+                450 pts
+              </span>
+            </button>
+
+            {/* Customer Dashboard Button */}
+            <button
+              type="button"
+              onClick={() => setIsDashboardOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white shadow-xs transition cursor-pointer"
+              title="My Journey Dashboard & Live Telemetry"
+            >
+              <User className="w-3.5 h-3.5 text-amber-300" />
+              <span>Dashboard</span>
+            </button>
+
+            {/* AI Assistant Button */}
+            <button
+              type="button"
+              onClick={() => setIsAIAssistantOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-xs transition cursor-pointer"
+              title="Ask AI Trip Assistant"
+            >
+              <Bot className="w-3.5 h-3.5" />
+              <span>AI Copilot</span>
             </button>
 
             {/* Conductor App tab is ONLY visible when on /conductor or activeTab is CONDUCTOR */}
@@ -515,6 +560,34 @@ export const Header: React.FC<HeaderProps> = ({
                         </div>
                         <ChevronRight className="w-4 h-4 text-slate-400" />
                       </button>
+
+                      <button
+                        onClick={() => {
+                          setIsAccountMenuOpen(false);
+                          setIsMargPointsOpen(true);
+                        }}
+                        className="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-amber-50/70 text-amber-900 transition cursor-pointer text-xs font-bold"
+                      >
+                        <div className="flex items-center gap-3">
+                          <Sparkles className="w-4 h-4 text-amber-500 shrink-0" />
+                          <span>MargPoints Loyalty (450 pts)</span>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-amber-500" />
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setIsAccountMenuOpen(false);
+                          setIsSafetyModalOpen(true);
+                        }}
+                        className="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-emerald-50/70 text-emerald-900 transition cursor-pointer text-xs font-bold"
+                      >
+                        <div className="flex items-center gap-3">
+                          <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span>Journey Safety Index (94/100)</span>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-emerald-600" />
+                      </button>
                     </div>
                   </div>
 
@@ -735,6 +808,26 @@ export const Header: React.FC<HeaderProps> = ({
             bookingId={currentUser?.id === 'usr-pass-102' ? 'BR899401' : 'MP100284'}
             onClose={() => setIsHeaderTrackerOpen(false)}
           />
+        )}
+
+        {/* MargPoints Modal */}
+        {isMargPointsOpen && (
+          <MargPointsModal onClose={() => setIsMargPointsOpen(false)} />
+        )}
+
+        {/* Customer Dashboard Modal */}
+        {isDashboardOpen && (
+          <CustomerDashboardModal onClose={() => setIsDashboardOpen(false)} />
+        )}
+
+        {/* MargPath AI Assistant Modal */}
+        {isAIAssistantOpen && (
+          <MargPathAIAssistant onClose={() => setIsAIAssistantOpen(false)} />
+        )}
+
+        {/* Journey Safety Modal */}
+        {isSafetyModalOpen && (
+          <JourneySafetyModal onClose={() => setIsSafetyModalOpen(false)} />
         )}
       </div>
     </header>

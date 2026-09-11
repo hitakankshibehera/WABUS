@@ -534,3 +534,110 @@ export interface TeamMember {
   createdAt?: string;
 }
 
+export interface MargPointsTransaction {
+  id: string;
+  title: string;
+  subtext: string;
+  points: number; // positive for earned, negative for redeemed
+  type: 'BOOKING' | 'REFERRAL' | 'REVIEW' | 'REDEMPTION';
+  date: string;
+}
+
+export interface MargPointsWallet {
+  balance: number;
+  lifetimeEarned: number;
+  nextMilestonePoints: number;
+  discountAvailable: number; // e.g. ₹100
+  history: MargPointsTransaction[];
+}
+
+export interface ReferralProfile {
+  code: string;
+  referralLink: string;
+  rewardPerReferral: number;
+  friendsJoinedCount: number;
+  totalEarnings: number;
+}
+
+export interface AIAssistantMessage {
+  id: string;
+  sender: 'user' | 'assistant';
+  text: string;
+  timestamp: string;
+  quickReplies?: string[];
+  contextTelemetry?: {
+    busNumber?: string;
+    distanceKm?: number;
+    etaMinutes?: number;
+    boardingPointName?: string;
+    seatNumber?: string;
+  };
+}
+
+export interface TripSafetyScore {
+  overallScore: number; // e.g. 94
+  statusText: string; // e.g. "EXCELLENT"
+  driverVerified: boolean;
+  driverName: string;
+  driverLicenseNumber: string;
+  driverExperienceYears: number;
+  driverAlcoholTestPassed: boolean;
+  gpsTransponderType: string; // "AIS-140 Certified"
+  sosPanicButtonFitted: boolean;
+  cctvMonitoringActive: boolean;
+  routeSafetyRating: number; // 4.9
+  emergencyPhone: string;
+  operatorHelpline: string;
+}
+
+export interface TripReview {
+  id?: string;
+  bookingId: string;
+  tripId: string;
+  overallRating: number;
+  driverBehavior: number;
+  safety: number;
+  cleanliness: number;
+  comfort: number;
+  punctuality: number;
+  feedbackText?: string;
+  createdAt?: string;
+}
+
+export interface AdminDemandInsight {
+  id: string;
+  route: string;
+  corridor: string;
+  demandPercentageChange: number; // e.g. +28%
+  urgency: 'HIGH' | 'MEDIUM' | 'NORMAL';
+  headline: string;
+  recommendation: string;
+  peakHours: string;
+  historicalPunctuality: number;
+}
+
+export interface VehicleHealthReport {
+  busId: string;
+  displayNumber: string;
+  registrationNumber: string;
+  overallScore: number; // e.g. 92
+  engineStatus: 'HEALTHY' | 'ATTENTION' | 'CRITICAL';
+  brakesStatus: 'HEALTHY' | 'ATTENTION' | 'CRITICAL';
+  tyresStatus: 'HEALTHY' | 'ATTENTION' | 'CRITICAL';
+  tyreTreadMm: number;
+  batteryHealthPercentage: number;
+  serviceDueInKm: number;
+  lastInspectionDate: string;
+}
+
+export interface CompleteMyTripOption {
+  id: string;
+  category: 'HOTEL' | 'TAXI' | 'ACTIVITY' | 'FOOD';
+  title: string;
+  subtitle: string;
+  price: number;
+  badge: string;
+  rating: number;
+  imageUrl: string;
+}
+

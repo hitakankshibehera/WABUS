@@ -15,7 +15,10 @@ import {
   Bus as BusIcon,
   Check,
   Zap,
-  MapPin
+  MapPin,
+  Sparkles,
+  Star,
+  Filter
 } from 'lucide-react';
 
 interface SeatMatrixProps {
@@ -40,6 +43,7 @@ export const SeatMatrix: React.FC<SeatMatrixProps> = ({
   const [activeDeck, setActiveDeck] = useState<'LOWER' | 'UPPER'>('LOWER');
   const [timeRemainingSeconds, setTimeRemainingSeconds] = useState<number | null>(null);
   const [liveSeats, setLiveSeats] = useState<Seat[]>(trip.seats);
+  const [seatPreference, setSeatPreference] = useState<'ALL' | 'WINDOW' | 'AISLE' | 'FRONT' | 'BACK' | 'LEGROOM'>('ALL');
 
   useEffect(() => {
     setLiveSeats(trip.seats);
@@ -96,6 +100,10 @@ export const SeatMatrix: React.FC<SeatMatrixProps> = ({
   const upperDeckSeats = normalizedSeats.filter(s => s.deck === 'UPPER');
   const hasUpperDeck = upperDeckSeats.length > 0;
   const currentDeckSeats = activeDeck === 'LOWER' ? lowerDeckSeats : (upperDeckSeats.length > 0 ? upperDeckSeats : lowerDeckSeats);
+
+  // Section 3: AI Seat Recommendation
+  const recommendedSeat = normalizedSeats.find(s => s.number === 'A12' && s.status === 'AVAILABLE') ||
+                          normalizedSeats.find(s => s.status === 'AVAILABLE' && (s.isWindow || s.number.endsWith('1') || s.number.endsWith('2')));
 
   const formatTimer = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -278,6 +286,56 @@ export const SeatMatrix: React.FC<SeatMatrixProps> = ({
               </button>
             </div>
           )}
+        </div>
+
+        {/* AI Recommended Seat Banner (Section 3) */}
+        {recommendedSeat && (
+          <div className="bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/10 border border-amber-300/80 rounded-2xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center font-black shrink-0 shadow-xs">
+                <Star className="w-5 h-5 fill-slate-950" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-extrabold text-xs sm:text-sm text-slate-900">⭐ Recommended Seat {recommendedSeat.number}</span>
+                  <span className="px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 text-[10px] font-black uppercase tracking-wider">
+                    AI BEST FIT
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-600 font-medium">Window seat + low cabin vibration + closer to front exit.</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => handleSeatClick(recommendedSeat)}
+              className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition cursor-pointer shrink-0 shadow-xs flex items-center justify-center gap-1.5"
+            >
+              <span>{selectedSeats.some(s => s.id === recommendedSeat.id) ? 'Selected' : `Select Seat ${recommendedSeat.number}`}</span>
+              <Check className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+
+        {/* Seat Preference Filters (Section 3) */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+          <span className="text-[11px] text-slate-400 font-bold flex items-center gap-1 shrink-0 mr-1">
+            <Filter className="w-3.5 h-3.5 text-slate-500" />
+            <span>Preferences:</span>
+          </span>
+          {(['ALL', 'WINDOW', 'AISLE', 'FRONT', 'BACK', 'LEGROOM'] as const).map(pref => (
+            <button
+              key={pref}
+              type="button"
+              onClick={() => setSeatPreference(pref)}
+              className={`px-3 py-1 rounded-xl text-xs font-bold transition cursor-pointer shrink-0 ${
+                seatPreference === pref
+                  ? 'bg-slate-900 text-white shadow-2xs'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              {pref === 'ALL' ? 'All Seats' : pref.charAt(0) + pref.slice(1).toLowerCase()}
+            </button>
+          ))}
         </div>
 
         {/* Redis Lock TTL Active Alert */}

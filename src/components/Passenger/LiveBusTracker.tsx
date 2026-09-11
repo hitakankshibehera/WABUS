@@ -14,7 +14,10 @@ import {
   ChevronRight,
   ExternalLink,
   Share2,
-  Navigation
+  Navigation,
+  User,
+  Bot,
+  CloudRain
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { LiveTrackingResponse, BusGPSStatus, TripStageStatus } from '../../types';
@@ -31,6 +34,8 @@ interface LiveBusTrackerProps {
     busRegistrationNumber: string;
   };
   onClose: () => void;
+  onOpenAIAssistant?: () => void;
+  onOpenSafetyHub?: () => void;
 }
 
 const TRIP_STAGES: { key: TripStageStatus; label: string }[] = [
@@ -47,7 +52,13 @@ const TRIP_STAGES: { key: TripStageStatus; label: string }[] = [
   { key: 'TRIP_COMPLETED', label: 'Completed' },
 ];
 
-export const LiveBusTracker: React.FC<LiveBusTrackerProps> = ({ bookingId: initialBookingId, trip, onClose }) => {
+export const LiveBusTracker: React.FC<LiveBusTrackerProps> = ({ 
+  bookingId: initialBookingId, 
+  trip, 
+  onClose,
+  onOpenAIAssistant,
+  onOpenSafetyHub
+}) => {
   const { currentUser, switchDemoRole } = useAuth();
   const [activeBookingId, setActiveBookingId] = useState<string>(initialBookingId || 'MP100284');
   const [inputBookingId, setInputBookingId] = useState<string>(initialBookingId || 'MP100284');
@@ -340,6 +351,56 @@ export const LiveBusTracker: React.FC<LiveBusTrackerProps> = ({ bookingId: initi
                       );
                     })}
                   </div>
+                </div>
+              </div>
+
+              {/* Section 10 & 25: Weather & Traffic Aware Smart ETA */}
+              <div className="bg-gradient-to-r from-blue-950 via-slate-900 to-indigo-950 border border-blue-500/40 rounded-2xl p-3 sm:p-4 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-blue-500/20 border border-blue-400/30 flex items-center justify-center text-blue-300 shrink-0">
+                    <CloudRain className="w-5 h-5 text-blue-300" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-extrabold text-xs text-blue-200">🌧️ Traffic + Coastal Rain Detected Ahead</span>
+                      <span className="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 text-[10px] font-mono font-bold border border-blue-400/20">
+                        ETA Factored (+9 min)
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-300 mt-0.5">
+                      Heavy traffic and wet pavement near Pipili NH-316 Toll Plaza. Estimated arrival updated dynamically from 18 min to 27 min.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Quick Action Triggers */}
+                <div className="flex items-center gap-2 shrink-0">
+                  {onOpenAIAssistant && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        onOpenAIAssistant();
+                      }}
+                      className="px-3 py-2 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                    >
+                      <Bot className="w-4 h-4 text-cyan-400" />
+                      <span>Ask AI Copilot</span>
+                    </button>
+                  )}
+                  {onOpenSafetyHub && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        onOpenSafetyHub();
+                      }}
+                      className="px-3 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                    >
+                      <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                      <span>Safety &amp; SOS</span>
+                    </button>
+                  )}
                 </div>
               </div>
 

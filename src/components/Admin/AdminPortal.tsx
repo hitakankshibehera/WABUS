@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FeatureFlags, PayoutRecord, Trip, Route, Bus, OfferCoupon, CoachType, Booking, SeatLayoutTemplate, InventoryAuditLog, TeamMember } from '../../types';
+import { FeatureFlags, PayoutRecord, Trip, Route, Bus, OfferCoupon, CoachType, Booking, SeatLayoutTemplate, InventoryAuditLog, TeamMember, AdminDemandInsight, VehicleHealthReport } from '../../types';
 import { api } from '../../services/api';
 
 import { useAuth } from '../../context/AuthContext';
@@ -34,7 +34,11 @@ import {
   Tag,
   Trash2,
   Radio,
-  X
+  X,
+  Bot,
+  Activity,
+  Cpu,
+  Wrench
 } from 'lucide-react';
 
 interface AdminPortalProps {
@@ -51,8 +55,30 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   onRefreshTrips,
 }) => {
   const { currentUser, loginAdmin, signupAdmin, switchDemoRole, logout } = useAuth();
-  const [activeAdminTab, setActiveAdminTab] = useState<'FLEET_MAP' | 'FEATURE_FLAGS' | 'BOOKINGS' | 'SCHEDULES' | 'OFFERS' | 'PAYOUTS' | 'ANALYTICS' | 'CUSTOMERS' | 'SEAT_LAYOUT' | 'BUS_MANAGEMENT' | 'LIVE_INVENTORY' | 'AUDIT_LOGS' | 'TEAM_MANAGEMENT'>('FLEET_MAP');
+  const [activeAdminTab, setActiveAdminTab] = useState<'FLEET_MAP' | 'FEATURE_FLAGS' | 'BOOKINGS' | 'SCHEDULES' | 'OFFERS' | 'PAYOUTS' | 'ANALYTICS' | 'CUSTOMERS' | 'SEAT_LAYOUT' | 'BUS_MANAGEMENT' | 'LIVE_INVENTORY' | 'AUDIT_LOGS' | 'TEAM_MANAGEMENT' | 'AI_INTELLIGENCE'>('FLEET_MAP');
+  const [demandInsights, setDemandInsights] = useState<AdminDemandInsight[]>([]);
+  const [vehicleHealthReports, setVehicleHealthReports] = useState<VehicleHealthReport[]>([]);
+  const [isLoadingIntelligence, setIsLoadingIntelligence] = useState(false);
   const [payouts, setPayouts] = useState<PayoutRecord[]>([]);
+
+  const fetchIntelligence = async () => {
+    setIsLoadingIntelligence(true);
+    try {
+      const data = await api.getAdminIntelligence();
+      setDemandInsights(data.insights || []);
+      setVehicleHealthReports(data.vehicleHealth || []);
+    } catch (err) {
+      console.warn('Failed to load admin intelligence:', err);
+    } finally {
+      setIsLoadingIntelligence(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeAdminTab === 'AI_INTELLIGENCE') {
+      fetchIntelligence();
+    }
+  }, [activeAdminTab]);
 
   const [isCronRunning, setIsCronRunning] = useState(false);
   const [cronMessage, setCronMessage] = useState<string | null>(null);
@@ -891,6 +917,15 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
             >
               <Radio className="w-3.5 h-3.5 animate-pulse text-emerald-400" />
               <span>Fleet Live Map</span>
+            </button>
+            <button
+              onClick={() => setActiveAdminTab('AI_INTELLIGENCE')}
+              className={`px-3.5 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1.5 ${
+                activeAdminTab === 'AI_INTELLIGENCE' ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-xs' : 'text-purple-700 bg-purple-50 hover:bg-purple-100'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+              <span>AI Intelligence & Health</span>
             </button>
             <button
               onClick={() => setActiveAdminTab('FEATURE_FLAGS')}
@@ -4032,6 +4067,242 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                   Done &amp; Close
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================
+         TAB 13: MARGPATH AI INTELLIGENCE & VEHICLE HEALTH (Requirements 22 & 24)
+         ========================================================= */}
+      {activeAdminTab === 'AI_INTELLIGENCE' && (
+        <div className="space-y-6 animate-in fade-in duration-200">
+          {/* Top Intelligence Hero Banner */}
+          <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950 text-white rounded-3xl p-6 sm:p-8 border border-indigo-900/40 shadow-xl relative overflow-hidden">
+            <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div>
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-xs font-mono font-bold mb-3">
+                  <Bot className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>MARGPATH INTELLIGENCE ENGINE v2.4</span>
+                </div>
+                <h3 className="text-xl sm:text-2xl font-black tracking-tight">
+                  Autonomous Fleet Intelligence &amp; Predictive Maintenance
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-300 mt-2 max-w-2xl leading-relaxed">
+                  Real-time corridor surge predictions, dynamic route optimization, and vehicle subsystem diagnostics based on AIS-140 transponders and passenger booking volume.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3 shrink-0">
+                <button
+                  type="button"
+                  onClick={fetchIntelligence}
+                  disabled={isLoadingIntelligence}
+                  className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs transition flex items-center gap-2 cursor-pointer shadow-md"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isLoadingIntelligence ? 'animate-spin' : ''}`} />
+                  <span>Refresh Predictions</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Quick KPI Bar */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 pt-6 border-t border-slate-800">
+              <div className="p-3 bg-white/5 rounded-2xl border border-white/10">
+                <span className="text-[11px] text-slate-400 font-bold block">Predictive Accuracy</span>
+                <span className="text-lg font-black text-emerald-400 font-mono">98.4%</span>
+              </div>
+              <div className="p-3 bg-white/5 rounded-2xl border border-white/10">
+                <span className="text-[11px] text-slate-400 font-bold block">Active Fleet Monitored</span>
+                <span className="text-lg font-black text-indigo-300 font-mono">3 Coaches</span>
+              </div>
+              <div className="p-3 bg-white/5 rounded-2xl border border-white/10">
+                <span className="text-[11px] text-slate-400 font-bold block">Demand Surge Corridors</span>
+                <span className="text-lg font-black text-amber-400 font-mono">1 High Alert</span>
+              </div>
+              <div className="p-3 bg-white/5 rounded-2xl border border-white/10">
+                <span className="text-[11px] text-slate-400 font-bold block">Fleet Health Index</span>
+                <span className="text-lg font-black text-emerald-400 font-mono">92/100 Avg</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Section 1: AI Demand Surge Insights (Requirement 22) */}
+          <div className="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm space-y-5">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <h4 className="text-base font-black text-gray-900 flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5 text-indigo-600" />
+                  <span>Corridor Demand Insights &amp; AI Deployment Advice</span>
+                </h4>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Algorithmic booking surge detection across Odisha express routes.
+                </p>
+              </div>
+              <span className="px-3 py-1 rounded-full text-xs font-extrabold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                Live Analysis
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {demandInsights.map((insight) => (
+                <div
+                  key={insight.id}
+                  className="p-5 rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50/40 via-white to-purple-50/20 shadow-xs flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="flex items-start justify-between gap-3 mb-3">
+                      <div>
+                        <span className="text-xs font-black text-indigo-950 uppercase tracking-wider block">
+                          {insight.corridor}
+                        </span>
+                        <h5 className="text-sm font-black text-gray-900 mt-0.5">
+                          {insight.route}
+                        </h5>
+                      </div>
+                      <span className={`px-2.5 py-1 rounded-lg text-xs font-black font-mono ${
+                        insight.urgency === 'HIGH' 
+                          ? 'bg-rose-100 text-rose-800 border border-rose-200' 
+                          : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                      }`}>
+                        +{insight.demandPercentageChange}% Surge
+                      </span>
+                    </div>
+
+                    <div className="p-3 bg-white rounded-xl border border-indigo-100/80 mb-3 space-y-1">
+                      <div className="flex items-center gap-1.5 text-xs font-extrabold text-indigo-900">
+                        <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                        <span>Today&apos;s Recommendation:</span>
+                      </div>
+                      <p className="text-xs font-semibold text-gray-700 leading-relaxed">
+                        {insight.recommendation}
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-[11px] text-gray-500 font-medium">
+                      <div>
+                        <span className="block text-[10px] text-gray-400 uppercase font-bold">Peak Window</span>
+                        <span className="font-bold text-gray-800">{insight.peakHours}</span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] text-gray-400 uppercase font-bold">Punctuality Score</span>
+                        <span className="font-bold text-emerald-600 font-mono">{insight.historicalPunctuality}% On-Time</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between">
+                    <span className="text-[10px] text-gray-400 font-mono">ID: {insight.id}</span>
+                    <button
+                      type="button"
+                      onClick={() => alert(`AI Action Executed: Capacity increase request forwarded for ${insight.route}`)}
+                      className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition cursor-pointer shadow-xs"
+                    >
+                      Deploy Extra Bus Capacity
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Section 2: Vehicle Health Score & Predictive Maintenance (Requirement 24) */}
+          <div className="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm space-y-5">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <h4 className="text-base font-black text-gray-900 flex items-center gap-2">
+                  <Wrench className="w-5 h-5 text-emerald-600" />
+                  <span>Vehicle Health Scores &amp; Predictive Maintenance Reminders</span>
+                </h4>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Subsystem diagnostic telemetry from AIS-140 on-board ECU units.
+                </p>
+              </div>
+              <span className="px-3 py-1 rounded-full text-xs font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                ECU Connected
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {vehicleHealthReports.map((report) => (
+                <div
+                  key={report.busId}
+                  className="p-5 rounded-2xl border border-gray-200 bg-slate-50/50 hover:bg-slate-50 transition space-y-4"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <BusIcon className="w-4 h-4 text-[#D84E55]" />
+                        <span className="text-sm font-black text-gray-900">{report.displayNumber}</span>
+                      </div>
+                      <span className="text-[11px] text-gray-500 font-mono">{report.registrationNumber}</span>
+                    </div>
+
+                    <div className="text-right">
+                      <div className="text-lg font-black text-emerald-600 font-mono">
+                        {report.overallScore}/100
+                      </div>
+                      <span className="text-[10px] font-extrabold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md">
+                        HEALTHY
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Subsystems matrix */}
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="p-2.5 bg-white rounded-xl border border-gray-200/80 flex items-center justify-between">
+                      <span className="text-gray-600 font-medium">Engine</span>
+                      <span className="flex items-center gap-1 font-bold text-emerald-700">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                        {report.engineStatus}
+                      </span>
+                    </div>
+
+                    <div className="p-2.5 bg-white rounded-xl border border-gray-200/80 flex items-center justify-between">
+                      <span className="text-gray-600 font-medium">Brakes</span>
+                      <span className="flex items-center gap-1 font-bold text-emerald-700">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                        {report.brakesStatus}
+                      </span>
+                    </div>
+
+                    <div className="p-2.5 bg-white rounded-xl border border-gray-200/80 flex items-center justify-between">
+                      <span className="text-gray-600 font-medium">Tyres</span>
+                      <span className={`flex items-center gap-1 font-bold ${
+                        report.tyresStatus === 'ATTENTION' ? 'text-amber-600' : 'text-emerald-700'
+                      }`}>
+                        <span className={`w-2 h-2 rounded-full ${
+                          report.tyresStatus === 'ATTENTION' ? 'bg-amber-500' : 'bg-emerald-500'
+                        }`}></span>
+                        {report.tyreTreadMm}mm
+                      </span>
+                    </div>
+
+                    <div className="p-2.5 bg-white rounded-xl border border-gray-200/80 flex items-center justify-between">
+                      <span className="text-gray-600 font-medium">Battery</span>
+                      <span className="flex items-center gap-1 font-bold text-emerald-700 font-mono">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                        {report.batteryHealthPercentage}%
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Service Due & Reminders */}
+                  <div className="p-3 bg-white rounded-xl border border-gray-200 text-xs flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] text-gray-400 uppercase font-bold block">Service Due In</span>
+                      <span className="font-extrabold text-gray-900 font-mono">{report.serviceDueInKm} km</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => alert(`Service inspection scheduled for Bus ${report.displayNumber}`)}
+                      className="px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xs transition cursor-pointer"
+                    >
+                      Schedule
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>

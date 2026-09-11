@@ -1,4 +1,4 @@
-import { Trip, Booking, FeatureFlags, PayoutRecord, Route, ConductorProfile, OfferCoupon, UserAccount, OtpSessionResponse, VerifyOtpResponse, GiftCard, Bus, Seat, SeatLayoutTemplate, InventoryAuditLog, TeamMember } from '../types';
+import { Trip, Booking, FeatureFlags, PayoutRecord, Route, ConductorProfile, OfferCoupon, UserAccount, OtpSessionResponse, VerifyOtpResponse, GiftCard, Bus, Seat, SeatLayoutTemplate, InventoryAuditLog, TeamMember, MargPointsWallet, ReferralProfile, TripReview, AdminDemandInsight, VehicleHealthReport } from '../types';
 import { INITIAL_TRIPS, MOCK_BUSES, MOCK_ROUTES, INITIAL_CONDUCTORS, INITIAL_BOOKINGS, MOCK_PAYOUTS, DEFAULT_FEATURE_FLAGS, INITIAL_TEAM_MEMBERS, generateSleeperSeats, generateSeaterSeats, INITIAL_OFFERS } from '../data/mockDatabase';
 
 
@@ -23,6 +23,21 @@ async function safeParseJson(res: Response, defaultError: string): Promise<any> 
     throw new Error(`${defaultError} (Server status ${res.status}). Ensure API server is running.`);
   }
   throw new Error(`Invalid response format from server.`);
+}
+
+function getDemoAuthHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {};
+  if (typeof window !== 'undefined') {
+    try {
+      const authUserRaw = localStorage.getItem('wabus_auth_user');
+      if (authUserRaw) {
+        const u = JSON.parse(authUserRaw);
+        if (u?.id) headers['x-user-id'] = u.id;
+        if (u?.role) headers['x-user-role'] = u.role;
+      }
+    } catch {}
+  }
+  return headers;
 }
 
 /**
@@ -1335,6 +1350,63 @@ export const api = {
     localStorage.setItem('wabus_team_members', JSON.stringify(updated));
     window.dispatchEvent(new Event('wabus_team_updated'));
     return { success: true, message: 'Team member removed successfully.' };
+  },
+
+  async askAITripAssistant(query: string, bookingId?: string): Promise<{ reply: string; suggestions?: string[]; contextTelemetry?: any }> {
+    const authHeaders = getDemoAuthHeaders();
+    const res = await fetch('/api/ai/trip-assistant', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...authHeaders
+      },
+      body: JSON.stringify({ query, bookingId })
+    });
+    return await safeParseJson(res, 'AI Trip Assistant is temporarily unavailable');
+  },
+
+  async getMargPoints(): Promise<MargPointsWallet> {
+    const authHeaders = getDemoAuthHeaders();
+    const res = await fetch('/api/margpoints/me', { headers: authHeaders });
+    return await safeParseJson(res, 'Failed to fetch MargPoints');
+  },
+
+  async redeemMargPoints(pointsToRedeem: number): Promise<{ success: boolean; voucherCode: string; discountAmount: number; newBalance: number; message: string }> {
+    const authHeaders = getDemoAuthHeaders();
+    const res = await fetch('/api/margpoints/redeem', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...authHeaders
+      },
+      body: JSON.stringify({ pointsToRedeem })
+    });
+    return await safeParseJson(res, 'Failed to redeem MargPoints');
+  },
+
+  async getReferralProfile(): Promise<ReferralProfile> {
+    const authHeaders = getDemoAuthHeaders();
+    const res = await fetch('/api/referrals/me', { headers: authHeaders });
+    return await safeParseJson(res, 'Failed to load referral profile');
+  },
+
+  async submitTripReview(review: TripReview): Promise<{ success: boolean; review: TripReview; pointsEarned: number; newBalance: number; message: string }> {
+    const authHeaders = getDemoAuthHeaders();
+    const res = await fetch('/api/trip/rate', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...authHeaders
+      },
+      body: JSON.stringify(review)
+    });
+    return await safeParseJson(res, 'Failed to submit journey review');
+  },
+
+  async getAdminIntelligence(): Promise<{ insights: AdminDemandInsight[]; vehicleHealth: VehicleHealthReport[]; fleetOccupancyAverage: number; onTimePunctuality: number }> {
+    const authHeaders = getDemoAuthHeaders();
+    const res = await fetch('/api/admin/intelligence', { headers: authHeaders });
+    return await safeParseJson(res, 'Failed to load admin intelligence');
   }
 };
 

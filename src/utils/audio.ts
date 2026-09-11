@@ -150,6 +150,20 @@ class SoundEngine {
       // Ignore
     }
   }
+
+  play(type: 'click' | 'success' | 'alert' | 'cash' | 'error' | string = 'click') {
+    if (type === 'success' || type === 'confirm') {
+      this.playSuccess();
+    } else if (type === 'error' || type === 'blocked') {
+      this.playError();
+    } else if (type === 'alert') {
+      this.playAlert();
+    } else if (type === 'cash') {
+      this.playCashChime();
+    } else {
+      this.playLockTick();
+    }
+  }
 }
 
 export const soundEngine = new SoundEngine();
