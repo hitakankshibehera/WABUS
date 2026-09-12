@@ -57,7 +57,7 @@ export type DemoPersonaKey = 'PASSENGER' | 'PASSENGER_B' | 'CONDUCTOR' | 'ADMIN'
 export const DEMO_USERS: Record<DemoPersonaKey, UserAccount> = {
   PASSENGER: {
     id: 'usr-pass-101',
-    name: 'Rahul Sharma (Customer A)',
+    name: 'Rahul Sharma',
     email: 'rahul.sharma@gmail.com',
     phone: '+91 98765 43210',
     role: 'PASSENGER',
@@ -67,7 +67,7 @@ export const DEMO_USERS: Record<DemoPersonaKey, UserAccount> = {
   },
   PASSENGER_B: {
     id: 'usr-pass-102',
-    name: 'Ananya Pattnaik (Customer B)',
+    name: 'Ananya Pattnaik',
     email: 'ananya.pattnaik@example.com',
     phone: '+91 98610 99234',
     role: 'PASSENGER',

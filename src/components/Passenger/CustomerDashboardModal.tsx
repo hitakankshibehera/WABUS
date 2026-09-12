@@ -76,9 +76,9 @@ export const CustomerDashboardModal: React.FC<CustomerDashboardModalProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-extrabold text-base text-white tracking-tight">Passenger Journey Dashboard</span>
+                <span className="font-extrabold text-base text-white tracking-tight">Your Journey &amp; Bookings</span>
                 <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-mono font-bold border border-emerald-500/30">
-                  ACTIVE
+                  CONFIRMED
                 </span>
               </div>
               <p className="text-xs text-slate-400">{currentUser?.name || 'Rahul Sharma'} • {currentUser?.phone || '+91 98765 43210'}</p>

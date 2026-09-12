@@ -1,8 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Trip, TripCategory, CoachType, FeatureFlags, OfferCoupon } from '../../types';
+import { Trip, TripCategory, CoachType, FeatureFlags, OfferCoupon, Booking } from '../../types';
 import { api } from '../../services/api';
 import { INITIAL_OFFERS } from '../../data/mockDatabase';
+import { useAuth } from '../../context/AuthContext';
+import { PersonalizedCustomerSection } from './PersonalizedCustomerSection';
 import { 
   Search, 
   MapPin, 
@@ -42,10 +44,14 @@ import { LiveBusTracker } from './LiveBusTracker';
 
 interface TripSearchProps {
   trips: Trip[];
+  bookings?: Booking[];
   onSelectTrip: (trip: Trip) => void;
   selectedTripId: string | null;
   featureFlags: FeatureFlags;
-  onOpenTracker?: () => void;
+  onOpenTracker?: (pnr?: string) => void;
+  onOpenETicket?: (booking: Booking) => void;
+  onOpenProfile?: () => void;
+  onOpenMargPoints?: (tab?: 'POINTS' | 'REFERRAL') => void;
 }
 
 interface BusStopOption {
@@ -71,11 +77,16 @@ const BUS_STOP_LOCATIONS: BusStopOption[] = [
 
 export const TripSearch: React.FC<TripSearchProps> = ({
   trips,
+  bookings = [],
   onSelectTrip,
   selectedTripId,
   featureFlags,
   onOpenTracker,
+  onOpenETicket,
+  onOpenProfile,
+  onOpenMargPoints,
 }) => {
+  const { currentUser } = useAuth();
   const [origin, setOrigin] = useState('Bhubaneswar');
   const [destination, setDestination] = useState('Puri');
   const [selectedDate, setSelectedDate] = useState(() => {
@@ -285,6 +296,28 @@ export const TripSearch: React.FC<TripSearchProps> = ({
 
   return (
     <div className="space-y-6">
+      {/* Personalized Customer Experience Section (When Logged In) */}
+      {currentUser && (
+        <PersonalizedCustomerSection
+          bookings={bookings}
+          onOpenTracker={(pnr) => {
+            if (onOpenTracker) onOpenTracker(pnr);
+            else setIsTrackerOpen(true);
+          }}
+          onOpenETicket={onOpenETicket}
+          onOpenProfile={() => onOpenProfile?.()}
+          onOpenMargPoints={() => onOpenMargPoints?.()}
+          onOpenOffers={() => {
+            const offersEl = document.getElementById('offers-section');
+            if (offersEl) offersEl.scrollIntoView({ behavior: 'smooth' });
+          }}
+          onScrollToSearch={() => {
+            const searchEl = document.getElementById('bus-search-bar');
+            if (searchEl) searchEl.scrollIntoView({ behavior: 'smooth' });
+          }}
+        />
+      )}
+
       {/* Realistic Hero Banner */}
       <div className="relative rounded-2xl sm:rounded-3xl overflow-hidden shadow-md bg-gradient-to-b from-[#D84E55] via-[#C93F46] to-[#B83238] text-white p-5 sm:p-8 lg:p-10">
         <div className="absolute inset-0 opacity-5 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:20px_20px] pointer-events-none" />
@@ -297,10 +330,10 @@ export const TripSearch: React.FC<TripSearchProps> = ({
               <span>MargPath &bull; Privacy-First Transportation Technology</span>
             </div>
             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight text-white drop-shadow-sm">
-              Book. Track. Arrive.
+              {currentUser ? `Welcome back, ${currentUser.name.split(' ')[0]} 👋` : 'Book. Track. Arrive.'}
             </h1>
             <p className="text-sm sm:text-base text-red-100 font-medium max-w-2xl mx-auto">
-              Your journey, tracked privately in real time.
+              {currentUser ? 'Your booked bus is monitored in real-time with zero-exposure privacy.' : 'Your journey, tracked privately in real time.'}
             </p>
 
             {/* Primary & Secondary Hero CTAs */}

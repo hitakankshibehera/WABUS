@@ -1475,15 +1475,47 @@ app.use(express.json());
     res.json({ user });
   });
 
-  app.get('/api/user/bookings', (req, res) => {
+  // Requirement 14: Secure Customer Endpoints
+  // GET /api/my-bookings - Returns only the authenticated user's bookings
+  app.get(['/api/my-bookings', '/api/user/bookings'], (req, res) => {
     const user = getAuthenticatedUserFromReq(req);
     if (!user) {
-      return res.status(401).json({ error: 'Authentication required.' });
+      return res.status(401).json({ error: 'Authentication required to view your bookings.' });
     }
+    const cleanEmail = (user.email || '').trim().toLowerCase();
     const myBookings = bookings.filter(
-      b => b.contactEmail.toLowerCase() === user.email.toLowerCase() || b.userId === user.id
+      b => (b.contactEmail && b.contactEmail.trim().toLowerCase() === cleanEmail) || 
+           (b.userId && b.userId === user.id)
     );
     res.json(myBookings);
+  });
+
+  // GET /api/my-trip - Returns only that user's active trip
+  app.get('/api/my-trip', (req, res) => {
+    const user = getAuthenticatedUserFromReq(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Authentication required to view your trip.' });
+    }
+    const cleanEmail = (user.email || '').trim().toLowerCase();
+    const userBooking = bookings.find(
+      b => ((b.contactEmail && b.contactEmail.trim().toLowerCase() === cleanEmail) || 
+            (b.userId && b.userId === user.id)) &&
+           b.checkInStatus !== 'CANCELLED'
+    );
+    if (!userBooking) {
+      return res.status(404).json({ error: 'No active upcoming trip found for your account.' });
+    }
+    const trip = trips.find(t => t.id === userBooking.tripId) || trips[0];
+    res.json({
+      booking: userBooking,
+      trip: {
+        ...trip,
+        bus: {
+          ...trip.bus,
+          liveGps: undefined // Public trip info without private telemetry
+        }
+      }
+    });
   });
 
   app.get('/api/admin/customers', (req, res) => {

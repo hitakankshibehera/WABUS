@@ -161,8 +161,7 @@ export const PassengerProfileModal: React.FC<{
     return (
       (contactEmailClean === currentEmailClean && currentEmailClean !== '') ||
       (currentUserId && b.userId === currentUserId) ||
-      (contactPhoneClean === currentPhoneClean && currentPhoneClean !== '' && currentPhoneClean.length >= 10) ||
-      userBookings.length <= 3
+      (contactPhoneClean === currentPhoneClean && currentPhoneClean !== '' && currentPhoneClean.length >= 10)
     );
   });
 

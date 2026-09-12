@@ -65,6 +65,7 @@ export default function App() {
   const [isSupportOpen, setIsSupportOpen] = useState(false);
   const [isMobileTrackerOpen, setIsMobileTrackerOpen] = useState(false);
   const [isRewardsOpen, setIsRewardsOpen] = useState(false);
+  const [rewardsInitialTab, setRewardsInitialTab] = useState<'POINTS' | 'REFERRAL'>('POINTS');
   const [isAIAssistantOpen, setIsAIAssistantOpen] = useState(false);
 
   const { currentUser, openProfileModal } = useAuth();
@@ -294,9 +295,22 @@ export default function App() {
               {bookingStep === 'SEARCH' && (
                 <TripSearch
                   trips={trips}
+                  bookings={bookings}
                   onSelectTrip={handleSelectTrip}
                   selectedTripId={selectedTrip?.id || null}
                   featureFlags={featureFlags}
+                  onOpenTracker={(pnr) => {
+                    setIsMobileTrackerOpen(true);
+                  }}
+                  onOpenETicket={(booking) => {
+                    setConfirmedBooking(booking);
+                    setBookingStep('ETICKET');
+                  }}
+                  onOpenProfile={() => openProfileModal()}
+                  onOpenMargPoints={(tab) => {
+                    setRewardsInitialTab(tab || 'POINTS');
+                    setIsRewardsOpen(true);
+                  }}
                 />
               )}
 
@@ -576,7 +590,7 @@ export default function App() {
           className="flex flex-col items-center gap-0.5 text-[10px] font-bold text-slate-500 hover:text-slate-900 transition cursor-pointer py-1"
         >
           <Ticket className="w-4 h-4" />
-          <span>Bookings</span>
+          <span>My Trips</span>
         </button>
 
         <button
@@ -636,7 +650,10 @@ export default function App() {
 
       {/* MargPoints Loyalty Modal */}
       {isRewardsOpen && (
-        <MargPointsModal onClose={() => setIsRewardsOpen(false)} />
+        <MargPointsModal 
+          initialTab={rewardsInitialTab}
+          onClose={() => setIsRewardsOpen(false)} 
+        />
       )}
 
       {/* MargPath AI Assistant Modal */}

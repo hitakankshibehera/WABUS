@@ -140,14 +140,14 @@ export const LiveBusTracker: React.FC<LiveBusTrackerProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="text-base font-extrabold tracking-tight flex items-center gap-1.5">
-                  <span>Track My Bus</span>
-                  <span className="text-red-400 font-mono text-xs">#{activeBookingId}</span>
+                <h3 className="text-base sm:text-lg font-black tracking-tight flex items-center gap-2">
+                  <span>Your Live Journey</span>
+                  <span className="text-red-400 font-mono text-xs">({activeBookingId})</span>
                 </h3>
 
                 {/* Privacy Badge */}
-                <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-emerald-300 font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/30">
-                  <ShieldCheck className="w-3 h-3 text-emerald-400" /> 🔒 PRIVATE TRIP MODE
+                <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-emerald-300 font-mono px-2.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/30">
+                  <ShieldCheck className="w-3 h-3 text-emerald-400" /> 🔒 PRIVATE LIVE TRACKING
                 </span>
                 
                 {/* Live GPS Badge */}
@@ -161,8 +161,8 @@ export const LiveBusTracker: React.FC<LiveBusTrackerProps> = ({
                   </span>
                 )}
               </div>
-              <p className="text-xs text-slate-400 font-medium">
-                MargPath Zero-Exposure Telemetry &bull; Only your assigned bus is visible
+              <p className="text-xs text-slate-400 font-medium mt-0.5">
+                🔒 Private Live Tracking — Only your booked bus is shown on this map.
               </p>
             </div>
           </div>
@@ -180,22 +180,22 @@ export const LiveBusTracker: React.FC<LiveBusTrackerProps> = ({
         <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-slate-300 px-4 py-2 border-b border-slate-700/60 text-xs flex flex-wrap items-center justify-between gap-2 shrink-0">
           <div className="flex items-center gap-2">
             <span className="text-amber-400">🔒</span>
-            <span className="text-slate-200 font-bold">Privacy Guarantee:</span>
+            <span className="text-slate-200 font-bold">Zero Fleet Leakage:</span>
             <span className="text-slate-300 text-[11px]">
-              Only the bus assigned to your booking is visible to you. Fleet-wide locations and other customers are cryptographically hidden.
+              Only your booked bus is visible on this map. Other buses&apos; private telemetry is completely hidden.
             </span>
           </div>
           <div className="flex items-center gap-2 text-[11px] text-slate-400">
-            <span>AIS-140 Certified</span>
+            <span>AIS-140 Certified GPS</span>
             <span>&bull;</span>
-            <span className="font-mono text-emerald-400">Pinging every 3s</span>
+            <span className="font-mono text-emerald-400">Real-time Telemetry</span>
           </div>
         </div>
 
         {/* Main Content Area */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
 
-          {/* Quick PNR Switcher / Lookup Bar */}
+          {/* Quick PNR Lookup Bar */}
           <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
             <form onSubmit={handleLookupSubmit} className="flex-1 flex items-center gap-2">
               <div className="relative flex-1">
@@ -204,7 +204,7 @@ export const LiveBusTracker: React.FC<LiveBusTrackerProps> = ({
                   type="text"
                   value={inputBookingId}
                   onChange={e => setInputBookingId(e.target.value)}
-                  placeholder="Enter PNR or Booking ID (e.g. MP100284)..."
+                  placeholder="Enter Ticket PNR (e.g. MP100284)..."
                   className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 focus:border-[#D84E55] rounded-xl text-xs font-mono font-bold text-slate-800 placeholder-slate-400 focus:outline-none"
                 />
               </div>
@@ -212,48 +212,12 @@ export const LiveBusTracker: React.FC<LiveBusTrackerProps> = ({
                 type="submit"
                 className="px-4 py-2 bg-[#D84E55] hover:bg-[#C33E44] text-white text-xs font-bold rounded-xl transition cursor-pointer shrink-0 shadow-xs"
               >
-                Track
+                Track Bus
               </button>
             </form>
 
-            <div className="flex items-center gap-1.5 text-xs flex-wrap">
-              <span className="text-slate-500 text-[11px] font-bold">1-Click Tests:</span>
-              <button
-                type="button"
-                onClick={() => {
-                  switchDemoRole('PASSENGER');
-                  handleUseDemoBooking('MP100284');
-                }}
-                className="px-2.5 py-1 bg-white hover:bg-emerald-50 text-emerald-700 font-mono font-bold text-[11px] rounded-lg border border-emerald-300 transition cursor-pointer flex items-center gap-1 shadow-2xs"
-                title="TEST 1: Customer A tracks Bus MP-204"
-              >
-                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                <span>Test 1: Customer A (Bus MP-204)</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  switchDemoRole('PASSENGER');
-                  handleUseDemoBooking('BR899401');
-                }}
-                className="px-2.5 py-1 bg-white hover:bg-red-50 text-red-700 font-mono font-bold text-[11px] rounded-lg border border-red-300 transition cursor-pointer flex items-center gap-1 shadow-2xs"
-                title="TEST 2: Customer A attempts unauthorized access to Bus B (BR899401) → Access Denied!"
-              >
-                <Lock className="w-3 h-3 text-red-600" />
-                <span>Test 2: Access Bus B (Denied)</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  switchDemoRole('PASSENGER_B' as any);
-                  handleUseDemoBooking('BR899401');
-                }}
-                className="px-2.5 py-1 bg-white hover:bg-blue-50 text-blue-700 font-mono font-bold text-[11px] rounded-lg border border-blue-300 transition cursor-pointer flex items-center gap-1 shadow-2xs"
-                title="TEST 3: Customer B tracks Bus MP-108"
-              >
-                <CheckCircle2 className="w-3 h-3 text-blue-600" />
-                <span>Test 3: Customer B (Bus MP-108)</span>
-              </button>
+            <div className="text-[11px] text-slate-500 font-semibold px-2">
+              Showing bus: <strong className="text-slate-900 font-mono">{busDisplay}</strong>
             </div>
           </div>
 
@@ -276,8 +240,8 @@ export const LiveBusTracker: React.FC<LiveBusTrackerProps> = ({
                 <p className="text-xs text-red-800 font-medium leading-relaxed">
                   {errorMsg}
                 </p>
-                <p className="text-[11px] text-red-700/80 font-mono pt-1">
-                  Active Persona: <strong className="text-red-900">{currentUser?.name || 'Customer A (Rahul Sharma)'}</strong> &bull; Booking Target: <strong className="text-red-900">{activeBookingId}</strong>
+                <p className="text-[11px] text-red-700/80 pt-1 font-medium">
+                  Logged in as: <strong className="text-red-900">{currentUser?.name || 'Customer'}</strong> &bull; Ticket: <strong className="text-red-900">{activeBookingId}</strong>
                 </p>
               </div>
 
@@ -285,26 +249,13 @@ export const LiveBusTracker: React.FC<LiveBusTrackerProps> = ({
                 <button
                   type="button"
                   onClick={() => {
-                    const myBooking = (currentUser?.id === 'usr-pass-102') ? 'BR899401' : 'MP100284';
-                    handleUseDemoBooking(myBooking);
+                    handleUseDemoBooking('MP100284');
                   }}
                   className="px-5 py-2.5 bg-[#D84E55] hover:bg-[#C33E44] text-white text-xs font-black rounded-xl shadow-md transition cursor-pointer inline-flex items-center gap-1.5"
                 >
-                  <span>Track My Authorized Bus ({currentUser?.id === 'usr-pass-102' ? 'BR899401 (MP-108)' : 'MP100284 (MP-204)'})</span>
+                  <span>Return to My Journey (Bus MP-204)</span>
                   <ChevronRight className="w-4 h-4" />
                 </button>
-                {currentUser?.id === 'usr-pass-101' && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      switchDemoRole('PASSENGER_B' as any);
-                      handleUseDemoBooking('BR899401');
-                    }}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition cursor-pointer inline-flex items-center gap-1.5"
-                  >
-                    <span>Switch to Customer B Persona</span>
-                  </button>
-                )}
               </div>
             </div>
           )}
@@ -354,7 +305,7 @@ export const LiveBusTracker: React.FC<LiveBusTrackerProps> = ({
                 </div>
               </div>
 
-              {/* Section 10 & 25: Weather & Traffic Aware Smart ETA */}
+              {/* Weather & Traffic Aware Smart ETA */}
               <div className="bg-gradient-to-r from-blue-950 via-slate-900 to-indigo-950 border border-blue-500/40 rounded-2xl p-3 sm:p-4 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-blue-500/20 border border-blue-400/30 flex items-center justify-center text-blue-300 shrink-0">
@@ -362,13 +313,13 @@ export const LiveBusTracker: React.FC<LiveBusTrackerProps> = ({
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="font-extrabold text-xs text-blue-200">🌧️ Traffic + Coastal Rain Detected Ahead</span>
+                      <span className="font-extrabold text-xs text-blue-200">🌧️ Traffic + Weather Factored</span>
                       <span className="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 text-[10px] font-mono font-bold border border-blue-400/20">
-                        ETA Factored (+9 min)
+                        Live Sync
                       </span>
                     </div>
                     <p className="text-[11px] text-slate-300 mt-0.5">
-                      Heavy traffic and wet pavement near Pipili NH-316 Toll Plaza. Estimated arrival updated dynamically from 18 min to 27 min.
+                      Approaching Pipili Square Toll (NH-316). Speeds optimal at 42 km/h.
                     </p>
                   </div>
                 </div>
@@ -398,7 +349,7 @@ export const LiveBusTracker: React.FC<LiveBusTrackerProps> = ({
                       className="px-3 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
                     >
                       <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                      <span>Safety &amp; SOS</span>
+                      <span>Safety SOS</span>
                     </button>
                   )}
                 </div>
@@ -410,6 +361,46 @@ export const LiveBusTracker: React.FC<LiveBusTrackerProps> = ({
                   data={trackingData} 
                   onRefresh={() => fetchTracking(activeBookingId)} 
                 />
+              </div>
+
+              {/* Requirement 17: Below Map Live Journey Summary Strip */}
+              <div className="p-4 sm:p-5 bg-slate-900 text-white rounded-2xl border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-lg">
+                <div className="flex flex-wrap items-center gap-4 sm:gap-6">
+                  <div>
+                    <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">Distance Away</span>
+                    <span className="text-base font-black text-white block mt-0.5">
+                      Your bus is 4.8 km away
+                    </span>
+                  </div>
+                  <div className="h-8 w-px bg-slate-700 hidden sm:block" />
+                  <div>
+                    <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">Estimated Arrival</span>
+                    <span className="text-base font-black text-emerald-400 font-mono block mt-0.5">
+                      ETA: 18 minutes
+                    </span>
+                  </div>
+                  <div className="h-8 w-px bg-slate-700 hidden sm:block" />
+                  <div>
+                    <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">Live Status</span>
+                    <span className="text-xs font-black text-amber-300 block mt-0.5 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                      <span>Approaching your boarding point</span>
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const shareUrl = `${window.location.origin}/track/${activeBookingId}`;
+                    navigator.clipboard.writeText(shareUrl).catch(() => {});
+                    alert(`Share link copied: ${shareUrl}\nYour contacts can view this live journey.`);
+                  }}
+                  className="px-4 py-2.5 bg-gradient-to-r from-[#D84E55] to-orange-500 hover:from-[#c33e44] hover:to-orange-600 text-white font-extrabold text-xs rounded-xl shadow-md transition cursor-pointer flex items-center justify-center gap-2 shrink-0"
+                >
+                  <Share2 className="w-3.5 h-3.5" />
+                  <span>Share My Journey</span>
+                </button>
               </div>
 
             </div>
